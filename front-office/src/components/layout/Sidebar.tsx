@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import {
-  Building2,
   LayoutGrid,
   Users,
   UserPlus,
@@ -18,6 +17,7 @@ import { Avatar } from '../ui/Avatar'
 import { cn } from '../../utils/cn'
 import { TONE_STYLES } from '../../utils/tone'
 import type { Tone } from '../../utils/tone'
+import logo from '../../logo.png'
 
 interface NavItem {
   to: string
@@ -80,9 +80,7 @@ export function Sidebar() {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-border-soft bg-surface-1">
       <div className="flex h-16 items-center gap-2.5 border-b border-border-soft px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-600">
-          <Building2 className="h-5 w-5 text-on-primary" strokeWidth={1.75} aria-hidden="true" />
-        </div>
+        <img src={logo} alt="" className="h-9 w-auto" />
         <div className="min-w-0">
           <p className="whitespace-nowrap text-[15px] font-bold uppercase leading-tight tracking-[0.06em] text-ink">SHRI Health</p>
           <p className="text-xs font-medium leading-tight text-ink-subtle">Care Entry</p>

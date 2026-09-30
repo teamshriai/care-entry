@@ -48,9 +48,6 @@
 .brand-mark {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  background: var(--vivid);
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;

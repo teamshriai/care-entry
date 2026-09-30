@@ -36,6 +36,8 @@ function portalRoute(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Deployment sub-path, e.g. BASE_PATH=/dev/care-entry/ (defaults to the site root)
+  base: process.env.BASE_PATH ?? '/',
   plugins: [react(), tailwindcss(), portalRoute()],
   // Listen on all network interfaces so colleagues on the same LAN can open the app
   server: { host: true },
