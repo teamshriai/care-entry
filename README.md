@@ -9,7 +9,7 @@ npm run dev
 ```
 
 Open **http://localhost:5173/** (Vite uses the next free port if 5173 is busy; the exact address is printed).
-That is the Front Office dashboard. **Patient Self-Registration → Open Portal** opens the portal at
+That is the Care Entry dashboard. **Patient Self-Registration → Open Portal** opens the portal at
 `/patient-self-registration` on the same address. There is no second server, terminal or port.
 
 | Command | What it does |

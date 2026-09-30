@@ -26,7 +26,7 @@ export function ScheduleAppointmentPage() {
   function leave() {
     // 'default' means this was the first entry in the history stack (a
     // bookmark or a fresh tab), where going back would leave the app.
-    if (location.key === 'default') navigate('/front-office')
+    if (location.key === 'default') navigate('/')
     else navigate(-1)
   }
 

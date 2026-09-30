@@ -237,7 +237,7 @@ export function PatientProfilePage() {
             icon={CalendarDays}
             iconTone="info"
             title="Appointment history"
-            subtitle="Operational history only — no clinical record is shown in the Front Office"
+            subtitle="Operational history only — no clinical record is shown in Care Entry"
             action={<span className="text-xs tabular-nums text-ink-faint">{appointments.length}</span>}
           />
           {appointments.length === 0 ? (

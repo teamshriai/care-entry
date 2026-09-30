@@ -42,17 +42,15 @@ function FreshOnNavigate({ children }: { children: ReactNode }) {
 
 // No auth route — no authentication or backend infrastructure is built here
 // (none exists to integrate with). The app opens straight into the shared
-// Front Office workspace.
+// Care Entry workspace.
 function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
         <PatientProvider>
           <Routes>
-          <Route path="/" element={<Navigate to="/front-office" replace />} />
-
           <Route element={<AppLayout />}>
-            <Route path="/front-office" element={<FrontOfficeHomePage />} />
+            <Route path="/" element={<FrontOfficeHomePage />} />
 
             {/* Patients */}
             <Route path="/patients/search" element={<FindPatientPage />} />
@@ -139,12 +137,13 @@ function App() {
             <Route path="/payments/:paymentId/receipt" element={<PaymentReceiptPage />} />
 
             {/* Legacy paths kept working so older links don't dead-end */}
+            <Route path="/front-office" element={<Navigate to="/" replace />} />
             <Route path="/front-office/attendant-pass" element={<Navigate to="/services/attendant-pass" replace />} />
             <Route path="/front-office/enquiry" element={<Navigate to="/services/enquiry" replace />} />
             <Route path="/front-office/mlc" element={<Navigate to="/services/mlc" replace />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/front-office" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </PatientProvider>
       </ToastProvider>

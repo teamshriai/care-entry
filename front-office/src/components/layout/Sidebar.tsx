@@ -40,9 +40,9 @@ interface NavGroup {
 // a patient, visit opening) live inside their workflows, not here.
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Front Office',
+    label: 'Care Entry',
     items: [
-      { to: '/front-office', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
+      { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
       { to: '/patients/search', label: 'Search Patient', icon: Users, tone: 'teal' },
       { to: '/register/new', label: 'Register Patient', icon: UserPlus, tone: 'teal' },
     ],
