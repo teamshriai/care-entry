@@ -195,7 +195,7 @@ export function RegisterPatientPage() {
               </Field>
 
               <div className="flex justify-end gap-2.5 border-t border-border-soft pt-4">
-                <Button type="button" variant="secondary" onClick={() => navigate('/front-office')}>
+                <Button type="button" variant="secondary" onClick={() => navigate('/')}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={!form.name.trim() || !form.mobile.trim()}>
