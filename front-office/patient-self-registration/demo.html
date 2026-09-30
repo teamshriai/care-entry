@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Care Entry entry page for the Patient Self-Registration portal (served at /patient-self-registration).
+     Mirrors ../../patient-self-registration/demo.html; its script loads the portal's own source via demo-main.ts. -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SHRI HEALTH · Aadhaar / ABHA identity demo</title>
+    <script>
+      try {
+        document.documentElement.setAttribute(
+          'data-theme',
+          localStorage.getItem('shri-theme-v3') === 'dark' ? 'dark' : 'light'
+        );
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/patient-self-registration/demo-main.ts"></script>
+  </body>
+</html>

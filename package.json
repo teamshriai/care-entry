@@ -1,0 +1,20 @@
+{
+  "name": "care-entry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SHRI HEALTH Care Entry Portal",
+  "workspaces": [
+    "front-office",
+    "patient-self-registration"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w front-office",
+    "build": "npm run typecheck -w patient-self-registration && npm run build -w front-office",
+    "preview": "npm run preview -w front-office",
+    "lint": "npm run lint -w front-office && npm run lint -w patient-self-registration"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/teamshriai/care-entry.git"
+  }
+}

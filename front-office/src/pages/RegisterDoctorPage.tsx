@@ -1,0 +1,535 @@
+import { useState } from 'react'
+import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { CheckCircle2, UserRoundPlus, Stethoscope, Building2, CalendarCheck, ShieldCheck } from 'lucide-react'
+import { PageHeader } from '../components/layout/PageHeader'
+import { DoctorIllustration } from '../components/ui/illustrations/DoctorIllustration'
+import { Card, CardBody, CardHeader } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Alert } from '../components/ui/Alert'
+import { Badge } from '../components/ui/Badge'
+import { Avatar } from '../components/ui/Avatar'
+import { useStoreValue } from '../hooks/useStore'
+import { useToast } from '../hooks/useToast'
+import { getDepartments } from '../domain/selectors'
+import { registerDoctor } from '../domain/actions'
+import { initialsOf } from '../utils/format'
+import { cn } from '../utils/cn'
+import type { ConsultationType, DoctorRole, Gender, Provider, ProviderStatus } from '../types/doctor'
+
+const DAYS = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+]
+const GENDERS: Gender[] = ['Male', 'Female', 'Other']
+const CONSULT_TYPES: ConsultationType[] = ['OPD', 'OPD + Teleconsult', 'Teleconsult only']
+const ROLES: DoctorRole[] = ['Consultant', 'Senior Consultant', 'Associate Consultant', 'Visiting Consultant', 'Registrar']
+const SLOT_LENGTHS = [10, 15, 20, 30, 45]
+
+const inputClass =
+  'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
+
+interface DoctorFormState {
+  name: string
+  gender: Gender
+  dateOfBirth: string
+  mobile: string
+  email: string
+  department: string
+  specialty: string
+  qualification: string
+  registrationNumber: string
+  experienceYears: string
+  employeeId: string
+  consultationType: ConsultationType
+  consultationFee: string
+  room: string
+  workingDays: number[]
+  startTime: string
+  endTime: string
+  slotMinutes: number
+  loginEmail: string
+  role: DoctorRole
+  status: ProviderStatus
+}
+
+const EMPTY: DoctorFormState = {
+  name: '',
+  gender: 'Male',
+  dateOfBirth: '',
+  mobile: '',
+  email: '',
+  department: '',
+  specialty: '',
+  qualification: '',
+  registrationNumber: '',
+  experienceYears: '',
+  employeeId: '',
+  consultationType: 'OPD',
+  consultationFee: '',
+  room: '',
+  workingDays: [1, 2, 3, 4, 5],
+  startTime: '09:00',
+  endTime: '13:00',
+  slotMinutes: 15,
+  loginEmail: '',
+  role: 'Consultant',
+  status: 'Active',
+}
+
+/**
+ * Doctor Management creates the doctor's HOSPITAL PROFILE — identity,
+ * department, schedule and account status. It does not grant or imply any
+ * clinical capability: no notes, no diagnosis, no patient history. What it
+ * does do is make the doctor appear in the directory and become bookable.
+ */
+export function RegisterDoctorPage() {
+  const navigate = useNavigate()
+  const { notify } = useToast()
+  const departments = useStoreValue(getDepartments)
+
+  const [form, setForm] = useState<DoctorFormState>(EMPTY)
+  const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<Provider | null>(null)
+
+  function update<K extends keyof DoctorFormState>(field: K, value: DoctorFormState[K]) {
+    setForm((current) => ({ ...current, [field]: value }))
+    setError(null)
+  }
+
+  function toggleDay(day: number) {
+    setForm((current) => ({
+      ...current,
+      workingDays: current.workingDays.includes(day)
+        ? current.workingDays.filter((d) => d !== day)
+        : [...current.workingDays, day].sort(),
+    }))
+    setError(null)
+  }
+
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    try {
+      const provider = registerDoctor({
+        ...form,
+        schedule: {
+          workingDays: form.workingDays,
+          startTime: form.startTime,
+          endTime: form.endTime,
+          slotMinutes: Number(form.slotMinutes),
+          breaks: [],
+        },
+      })
+      setCreated(provider)
+      notify('Doctor registered', { detail: `${provider.name} · ${provider.department}` })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      setError(message)
+      notify('Registration failed', { tone: 'error', detail: message })
+    }
+  }
+
+  if (created) {
+    const bookable = created.status === 'Active'
+    return (
+      <div>
+        <PageHeader title="Register Doctor" subtitle="Profile created — the doctor is now in the directory." />
+        <div className="px-6 py-6 lg:px-8">
+          <Card className="max-w-2xl">
+            <CardBody className="flex flex-col gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stable-bg">
+                  <CheckCircle2 className="h-5 w-5 text-stable" strokeWidth={1.75} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-ink">{created.name} registered</p>
+                    <Badge status={created.status} />
+                  </div>
+                  <p className="mt-0.5 text-sm text-ink-muted">
+                    {created.department} · {created.specialty} · {created.employeeId} · consults{' '}
+                    {created.schedule.startTime}–{created.schedule.endTime} in {created.schedule.slotMinutes}-minute
+                    slots
+                  </p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    {bookable
+                      ? 'Now visible in the Doctor Directory, in availability, and selectable when booking appointments.'
+                      : 'Saved as Inactive — activate the account from the profile before appointments can be booked.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2.5 border-t border-border-soft pt-4">
+                <Button onClick={() => navigate(`/doctors/${created.providerId}`)}>Open doctor profile</Button>
+                <Button variant="secondary" onClick={() => navigate('/doctors')}>
+                  Doctor directory
+                </Button>
+                {bookable ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigate('/appointments/new', { state: { providerId: created.providerId } })}
+                  >
+                    Schedule an appointment
+                  </Button>
+                ) : null}
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setCreated(null)
+                    setForm(EMPTY)
+                  }}
+                >
+                  Register another
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Register Doctor"
+        subtitle="Creates the doctor's hospital profile and schedule. This does not grant access to any clinical record."
+        illustration={<DoctorIllustration className="h-8 w-8" />}
+        illustrationTone="indigo"
+      />
+
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="flex min-w-0 flex-col gap-6">
+            {error ? <Alert tone="critical">{error}</Alert> : null}
+
+            <Card>
+              <CardHeader icon={UserRoundPlus} iconTone="indigo" title="Basic information" />
+              <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Doctor name" required className="sm:col-span-2">
+                  <input
+                    value={form.name}
+                    onChange={(e) => update('name', e.target.value)}
+                    placeholder="Dr. Full Name"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Gender">
+                  <div className="flex gap-1.5">
+                    {GENDERS.map((option) => (
+                      <Choice key={option} active={form.gender === option} onClick={() => update('gender', option)}>
+                        {option}
+                      </Choice>
+                    ))}
+                  </div>
+                </Field>
+                <Field label="Date of birth">
+                  <input
+                    type="date"
+                    value={form.dateOfBirth}
+                    onChange={(e) => update('dateOfBirth', e.target.value)}
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Mobile number" required>
+                  <input
+                    value={form.mobile}
+                    onChange={(e) => update('mobile', e.target.value)}
+                    placeholder="+91 ..........."
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Email">
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => update('email', e.target.value)}
+                    placeholder="name@hospital.org"
+                    className={inputClass}
+                  />
+                </Field>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader icon={Stethoscope} iconTone="indigo" title="Professional information" />
+              <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Department" required>
+                  <select
+                    value={form.department}
+                    onChange={(e) => update('department', e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select a department…</option>
+                    {departments.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Specialty" required>
+                  <input
+                    value={form.specialty}
+                    onChange={(e) => update('specialty', e.target.value)}
+                    placeholder="e.g. Interventional Cardiology"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Qualification">
+                  <input
+                    value={form.qualification}
+                    onChange={(e) => update('qualification', e.target.value)}
+                    placeholder="MBBS, MD, DM"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Medical registration number" required>
+                  <input
+                    value={form.registrationNumber}
+                    onChange={(e) => update('registrationNumber', e.target.value)}
+                    placeholder="State council registration"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Years of experience">
+                  <input
+                    value={form.experienceYears}
+                    onChange={(e) => update('experienceYears', e.target.value.replace(/[^0-9]/g, ''))}
+                    inputMode="numeric"
+                    placeholder="Years"
+                    className={inputClass}
+                  />
+                </Field>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader icon={Building2} iconTone="indigo" title="Hospital information" />
+              <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Doctor / employee ID" hint="Left blank, one is allocated automatically">
+                  <input
+                    value={form.employeeId}
+                    onChange={(e) => update('employeeId', e.target.value)}
+                    placeholder="SHRI-DOC-000"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Consultation type">
+                  <select
+                    value={form.consultationType}
+                    onChange={(e) => update('consultationType', e.target.value as ConsultationType)}
+                    className={inputClass}
+                  >
+                    {CONSULT_TYPES.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Consultation fee (₹)">
+                  <input
+                    value={form.consultationFee}
+                    onChange={(e) => update('consultationFee', e.target.value.replace(/[^0-9]/g, ''))}
+                    inputMode="numeric"
+                    placeholder="800"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Consultation room / location">
+                  <input
+                    value={form.room}
+                    onChange={(e) => update('room', e.target.value)}
+                    placeholder="OPD Room 4, Block A"
+                    className={inputClass}
+                  />
+                </Field>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader
+                icon={CalendarCheck}
+                iconTone="stable"
+                title="Schedule"
+                subtitle="Drives bookable slots — availability is computed from this, never entered by hand"
+              />
+              <CardBody className="flex flex-col gap-4">
+                <Field label="Working days" required>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DAYS.map((day) => (
+                      <Choice
+                        key={day.value}
+                        active={form.workingDays.includes(day.value)}
+                        onClick={() => toggleDay(day.value)}
+                      >
+                        {day.label}
+                      </Choice>
+                    ))}
+                  </div>
+                </Field>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <Field label="Session starts" required>
+                    <input
+                      type="time"
+                      value={form.startTime}
+                      onChange={(e) => update('startTime', e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="Session ends" required>
+                    <input
+                      type="time"
+                      value={form.endTime}
+                      onChange={(e) => update('endTime', e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="Slot duration">
+                    <select
+                      value={form.slotMinutes}
+                      onChange={(e) => update('slotMinutes', Number(e.target.value))}
+                      className={inputClass}
+                    >
+                      {SLOT_LENGTHS.map((option) => (
+                        <option key={option} value={option}>
+                          {option} minutes
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                <p className="text-xs text-ink-faint">
+                  Leave and one-off unavailability are recorded on the doctor&apos;s profile after registration.
+                </p>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader icon={ShieldCheck} iconTone="stable" title="Account" />
+              <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Login email / username" hint="Defaults to the contact email">
+                  <input
+                    value={form.loginEmail}
+                    onChange={(e) => update('loginEmail', e.target.value)}
+                    placeholder="name@hospital.org"
+                    className={inputClass}
+                  />
+                </Field>
+                <Field label="Role">
+                  <select
+                    value={form.role}
+                    onChange={(e) => update('role', e.target.value as DoctorRole)}
+                    className={inputClass}
+                  >
+                    {ROLES.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Account status" hint="Only Active doctors can be booked">
+                  <div className="flex gap-1.5">
+                    {(['Active', 'Inactive'] as ProviderStatus[]).map((option) => (
+                      <Choice key={option} active={form.status === option} onClick={() => update('status', option)}>
+                        {option}
+                      </Choice>
+                    ))}
+                  </div>
+                </Field>
+              </CardBody>
+            </Card>
+          </div>
+
+          {/* Summary / submit */}
+          <div className="min-w-0">
+            <Card className="2xl:sticky 2xl:top-6">
+              <CardBody className="flex flex-col gap-4">
+                <div className="flex items-center gap-2.5">
+                  <Avatar initials={form.name ? initialsOf(form.name) : 'DR'} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{form.name || 'New doctor'}</p>
+                    <p className="truncate text-xs text-ink-muted">
+                      {form.department || 'Department'} · {form.specialty || 'Specialty'}
+                    </p>
+                  </div>
+                </div>
+
+                <dl className="space-y-2 border-t border-border-soft pt-3 text-sm">
+                  <Row label="Working days" value={form.workingDays.length ? `${form.workingDays.length} days/week` : '—'} />
+                  <Row label="Session" value={`${form.startTime}–${form.endTime}`} />
+                  <Row label="Slot length" value={`${form.slotMinutes} min`} />
+                  <Row label="Fee" value={form.consultationFee ? `₹${form.consultationFee}` : '—'} />
+                  <Row label="Status" value={form.status} />
+                </dl>
+
+                <p className="text-xs text-ink-faint">
+                  Registering creates a hospital profile only. Clinical functionality lives in the Clinician Portal.
+                </p>
+
+                <div className="flex flex-col gap-2 border-t border-border-soft pt-4">
+                  <Button type="submit">Register doctor</Button>
+                  <Button type="button" variant="secondary" onClick={() => navigate('/doctors')}>
+                    Cancel
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function Field({
+  label,
+  required,
+  hint,
+  children,
+  className,
+}: {
+  label: string
+  required?: boolean
+  hint?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      <label className="text-xs font-medium text-ink-muted">
+        {label} {required ? <span className="text-critical">*</span> : null}
+      </label>
+      <div className="mt-1.5">{children}</div>
+      {hint ? <p className="mt-1 text-xs text-ink-faint">{hint}</p> : null}
+    </div>
+  )
+}
+
+function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+        active
+          ? 'border-brand-600 bg-brand-600 text-white'
+          : 'border-border bg-surface text-ink hover:bg-surface-muted',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="shrink-0 text-xs text-ink-muted">{label}</dt>
+      <dd className="min-w-0 truncate text-right text-sm font-medium text-ink" title={value}>
+        {value}
+      </dd>
+    </div>
+  )
+}

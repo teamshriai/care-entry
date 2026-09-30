@@ -1,0 +1,46 @@
+// Patient domain model — derived from src/domain/seedData.js's own model
+// comment and every shape actually produced by actions.js/selectors.js.
+
+export type Sex = 'Male' | 'Female' | 'Other'
+
+export interface Patient {
+  patientId: string
+  uhid: string
+  name: string
+  nameNative: string | null
+  age: number | null
+  sex: Sex
+  mobile: string
+  email: string | null
+  address: string | null
+  abhaId: string | null
+  registrationStatus: 'Registered'
+  /** Known transliterated spellings, used by search only. Not every patient has one. */
+  aliases?: string[]
+  createdAt: number
+}
+
+/** actions.registerPatient's input shape. */
+export interface RegisterPatientInput {
+  name: string
+  age?: number | string
+  sex?: Sex
+  mobile: string
+  abhaId?: string
+}
+
+/** actions.updatePatientDemographics's input shape — a partial edit. */
+export interface PatientDemographicsInput {
+  name?: string
+  age?: number | null
+  sex?: Sex
+  mobile?: string
+  email?: string | null
+  address?: string | null
+}
+
+/** One row of domain/selectors.searchPatients / getPatientSearchResults. */
+export interface PatientSearchMatch {
+  patient: Patient
+  matchedOn: 'UHID' | 'Name' | 'Name (native script)' | 'Name (known alias)' | 'Phone' | 'ABHA'
+}
