@@ -6,4 +6,4 @@
 const PORTAL_PATH = '/patient-self-registration'
 
 /** Absolute URL of the Patient Self-Registration portal. Used by both "Open Portal" and "Copy Link". */
-export const PATIENT_SELF_REGISTRATION_URL: string = new URL(PORTAL_PATH, window.location.origin).toString()
+export const PATIENT_SELF_REGISTRATION_URL: string = new URL(import.meta.env.BASE_URL.replace(/\/$/, '') + PORTAL_PATH, window.location.origin).toString()

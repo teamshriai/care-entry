@@ -8,6 +8,7 @@ import { IdentityVerify } from '../identity/IdentityVerify';
 import type { DemoIdentity } from '../identity/identityData';
 import type { Gender } from '../types';
 import '../design-system.css';
+import logo from '../logo.png'
 
 type Stage = 'choose' | 'verify' | 'form' | 'done';
 
@@ -115,9 +116,7 @@ export default function DemoApp() {
       <aside className="side-nav">
         <div className="brand">
           <span className="brand-mark">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12h4l2 8 4-16 2 8h6" />
-            </svg>
+            <img src={logo} alt="" width={34} height={34} />
           </span>
           <span className="brand-text">
             <span className="brand-name">SHRI HEALTH</span>
