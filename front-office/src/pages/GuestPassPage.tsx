@@ -12,6 +12,7 @@ import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
 import { getGuestPasses, getKnownWards, searchPatients } from '../domain/selectors'
 import { issueGuestPass, returnGuestPass } from '../domain/actions'
+import { todayKey } from '../domain/time'
 import { formatClock, formatRelativeTime } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { GuestPass } from '../types/frontDesk'
@@ -56,7 +57,9 @@ export function GuestPassPage() {
   const [error, setError] = useState<string | null>(null)
 
   const active = passes.filter((pass) => !pass.returned)
-  const returned = passes.filter((pass) => pass.returned)
+  const returned = passes.filter(
+    (pass) => pass.returned && pass.returnedAt !== null && todayKey(new Date(pass.returnedAt)) === todayKey(new Date(now)),
+  )
 
   function handleIssue(event: React.FormEvent) {
     event.preventDefault()

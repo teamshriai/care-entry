@@ -13,6 +13,7 @@ import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
 import { getMlcRecords } from '../domain/selectors'
 import { registerMlc, markMlcIntimationSent, acknowledgeMlcIntimation } from '../domain/actions'
+import { todayKey } from '../domain/time'
 import { formatRelativeTime, formatClock } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { MlcCategory } from '../types/frontDesk'
@@ -189,7 +190,7 @@ export function MlcPage() {
         <Card className="min-w-0">
           <CardHeader
             title="MLC register"
-            subtitle="Today's medico-legal cases and their intimation status"
+            subtitle="Every case and its police intimation status, newest first"
             action={<span className="text-xs tabular-nums text-ink-faint">{records.length}</span>}
           />
           {records.length === 0 ? (
@@ -213,7 +214,12 @@ export function MlcPage() {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {record.acknowledgedAt ? (
-                      <Badge tone="stable">Acknowledged {formatClock(record.acknowledgedAt)}</Badge>
+                      <Badge tone="stable">
+                        Acknowledged{' '}
+                        {todayKey(new Date(record.acknowledgedAt)) === todayKey(new Date(now))
+                          ? formatClock(record.acknowledgedAt)
+                          : formatRelativeTime(record.acknowledgedAt, now)}
+                      </Badge>
                     ) : record.intimationSent ? (
                       <Badge tone="warning">Acknowledgement pending</Badge>
                     ) : (

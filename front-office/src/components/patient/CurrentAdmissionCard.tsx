@@ -62,7 +62,8 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
                 : [admission.paymentType, admission.insuranceProvider, admission.policyNumber].filter(Boolean).join(' · ')
             }
           />
-          {billing ? (
+          {/* No bed yet, no bill yet — a stay is billed from the day it starts. */}
+          {admitted && billing ? (
             <Fact
               label="Running bill"
               value={
