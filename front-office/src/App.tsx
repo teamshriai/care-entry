@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { AppLayout } from './layouts/AppLayout'
 import { ThemeProvider } from './contexts/ThemeProvider'
 import { PatientProvider } from './contexts/PatientContext'
@@ -18,12 +18,12 @@ import { GuestPassPage } from './pages/GuestPassPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
 import { BillingPage } from './pages/BillingPage'
-import { AdmissionsBedManagementPage } from './pages/AdmissionsBedManagementPage'
-import { DischargePage } from './pages/DischargePage'
-import { AdmissionDetailPage } from './pages/AdmissionDetailPage'
+import { InpatientsPage } from './pages/InpatientsPage'
 import { PaymentDetailPage } from './pages/PaymentDetailPage'
 import { PaymentReceiptPage } from './pages/PaymentReceiptPage'
 import { todayKey } from './domain/time'
+import { useStoreValue } from './hooks/useStore'
+import { getAdmissionById } from './domain/admissionSelectors'
 
 /**
  * Starts the page afresh when its query changes — Register opened from the
@@ -48,6 +48,24 @@ function ScheduleRedirect() {
     params.set('slot', state.slot)
   }
   return <Navigate to={`/appointments?${params.toString()}`} replace />
+}
+
+/** Old links to /admissions/discharge (with an admission in router state)
+ *  open the discharge flow over Inpatients. */
+function DischargeRedirect() {
+  const location = useLocation()
+  const admissionId = (location.state as { admissionId?: string } | null)?.admissionId
+  const params = new URLSearchParams({ flow: 'discharge' })
+  if (admissionId) params.set('admission', admissionId)
+  return <Navigate to={`/admissions?${params.toString()}`} replace />
+}
+
+/** An admission has no page of its own any more — it lives on the patient's
+ *  profile. */
+function AdmissionRedirect() {
+  const { admissionId } = useParams<{ admissionId: string }>()
+  const admission = useStoreValue(getAdmissionById, admissionId ?? '')
+  return <Navigate to={admission ? `/patients/${admission.patientId}` : '/admissions'} replace />
 }
 
 // No auth route — no authentication or backend infrastructure is built here
@@ -99,13 +117,13 @@ function App() {
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/billing/bills" element={<Navigate to="/billing?filter=all" replace />} />
 
-            {/* IP Admission */}
-            <Route path="/admissions" element={<AdmissionsBedManagementPage />} />
+            {/* Inpatients — admit and discharge are flows over the board */}
+            <Route path="/admissions" element={<InpatientsPage />} />
             <Route path="/admissions/new" element={<Navigate to="/admissions?flow=admit" replace />} />
             <Route path="/admissions/list" element={<Navigate to="/admissions" replace />} />
-            <Route path="/admissions/beds" element={<Navigate to="/admissions" replace />} />
-            <Route path="/admissions/discharge" element={<DischargePage />} />
-            <Route path="/admissions/:admissionId" element={<AdmissionDetailPage />} />
+            <Route path="/admissions/beds" element={<Navigate to="/admissions?filter=beds" replace />} />
+            <Route path="/admissions/discharge" element={<DischargeRedirect />} />
+            <Route path="/admissions/:admissionId" element={<AdmissionRedirect />} />
 
             {/* Payments — the old list pages now land on Billing's filters, and
                 Collect Payment opens the billing flow; one bill and its

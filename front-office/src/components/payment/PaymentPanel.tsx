@@ -33,6 +33,7 @@ export function PaymentPanel({
   status,
   allowPartial = false,
   methods = ['UPI', 'Card'],
+  payer,
   onPay,
   onFail,
 }: {
@@ -43,6 +44,8 @@ export function PaymentPanel({
   /** Lets the desk take part of the amount (inpatient bills only). */
   allowPartial?: boolean
   methods?: PaymentMethod[]
+  /** Who settles an Insurance/TPA payment — the insurer, TPA or company. */
+  payer?: string
   /** Records the payment. Throw to show the error instead. */
   onPay: (method: PaymentMethod, amount: number) => void
   /** Records a failed UPI/card attempt, where there is a bill to record it on. */
@@ -116,7 +119,8 @@ export function PaymentPanel({
       {methods.length > 1 ? (
         <div role="radiogroup" aria-label="Payment method" className={cn('grid gap-2', methods.length > 2 ? 'grid-cols-3' : 'grid-cols-2')}>
           {methods.map((option) => {
-            const { label, icon: Icon } = METHOD_META[option]
+            const { icon: Icon } = METHOD_META[option]
+            const label = option === 'Insurance/TPA' && payer ? payer : METHOD_META[option].label
             const active = method === option
             return (
               <button
@@ -132,8 +136,8 @@ export function PaymentPanel({
                     : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2 hover:text-ink',
                 )}
               >
-                <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-                {label}
+                <Icon className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                <span className="truncate">{label}</span>
               </button>
             )
           })}
@@ -175,10 +179,10 @@ export function PaymentPanel({
 
       {method === 'Insurance/TPA' ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-ink-muted">Settle against the insurer’s approved amount.</p>
+          <p className="text-sm text-ink-muted">Record the amount {payer ?? 'the insurer'} has approved for this stay.</p>
           <Button size="lg" disabled={!amountValid} onClick={pay}>
             <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
-            Settle {amountValid ? formatRupees(amount) : ''} by insurer
+            Settle {amountValid ? formatRupees(amount) : ''} by {payer ?? 'insurer'}
           </Button>
         </div>
       ) : null}

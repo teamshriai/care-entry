@@ -87,8 +87,6 @@ export const DISCHARGE_TYPES: DischargeType[] = [
 ]
 
 export interface DischargeDetails {
-  /** When the patient left the bed. Defaults to now. */
-  dischargedAt?: number
   dischargeType: DischargeType
   remarks?: string
 }
@@ -126,11 +124,6 @@ export interface Admission {
   cancelReason: string | null
   createdAt: number
   updatedAt: number
-}
-
-export interface AdmissionPaymentInput {
-  method: PaymentMethod
-  amount: number
 }
 
 export interface CreateAdmissionInput {

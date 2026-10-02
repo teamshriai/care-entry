@@ -59,7 +59,6 @@ export const BILL_STATUS_TONE: Record<BillDisplayStatus, Tone> = {
 // system: initial payment at admission and the pending balance at discharge are
 // both just collections against that one record.
 import type { RoomType } from '../types/admission'
-import type { PaymentMethod } from '../types/payment'
 
 export const ADMISSION_CHARGE = 500
 
@@ -70,9 +69,6 @@ export const DAILY_BED_CHARGE: Record<RoomType, number> = {
   Private: 5000,
   ICU: 8000,
 }
-
-/** The ways a patient can pay at admission and at discharge. */
-export const IP_PAYMENT_METHODS: PaymentMethod[] = ['UPI', 'Card']
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

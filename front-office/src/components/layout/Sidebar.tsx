@@ -57,7 +57,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'IP Admission',
     items: [
-      { to: '/admissions', label: 'Ward Status', icon: BedDouble, end: true, tone: 'purple' },
+      { to: '/admissions', label: 'Inpatients', icon: BedDouble, end: true, tone: 'purple' },
       { to: '/admissions/new', label: 'Admit Patient', icon: ClipboardPlus, tone: 'purple' },
       { to: '/admissions/discharge', label: 'Discharge', icon: ClipboardCheck, tone: 'purple' },
     ],

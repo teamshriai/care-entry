@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { IndianRupee, Plus, Printer } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
@@ -18,6 +18,9 @@ import {
   getPaymentsForPatient,
 } from '../../domain/selectors'
 import { collectPayment, createPaymentBill, recordFailedPayment } from '../../domain/actions'
+import { repriceAdmissionBill } from '../../domain/admissionActions'
+import { getCurrentAdmissionForPatient } from '../../domain/patientSelectors'
+import { getState } from '../../domain/store'
 import { COUNTER_CHARGES, billNumberFor, billServicesSummary, formatRupees, isBillDue, sumItems } from '../../utils/billing'
 import { cn } from '../../utils/cn'
 import type { FlowProps } from '../registry'
@@ -51,6 +54,13 @@ export function BillingFlow({ params, onClose }: FlowProps) {
   const patient = useStoreValue(getPatientById, patientId)
   const bills = useStoreValue(getPaymentsForPatient, patientId)
   const allDue = useStoreValue(getBillsByFilter, 'due')
+
+  // An inpatient's running bill is first brought up to the stay so far, so
+  // what is collected here is what the stay costs today.
+  useEffect(() => {
+    const admission = patientId ? getCurrentAdmissionForPatient(getState(), patientId) : null
+    if (admission?.status === 'Admitted') repriceAdmissionBill(admission.admissionId, Date.now())
+  }, [patientId])
 
   const due = bills.filter(isBillDue)
   const settledBills = bills.filter((bill) => !isBillDue(bill))
@@ -272,7 +282,7 @@ export function BillingFlow({ params, onClose }: FlowProps) {
         {amountDue > 0 ? (
           <section aria-label="Payment" className="border-t border-border-soft pt-5">
             <PaymentPanel
-              key={`${selectedIds.join('|')}#${draft.map((d) => d.code).join('|')}#${estimateItems.length}`}
+              key={`${selectedIds.join('|')}#${draft.map((d) => d.code).join('|')}#${estimateItems.length}#${amountDue}`}
               amount={amountDue}
               status={
                 selectedBills.length === 1 && newBills === 0 ? (

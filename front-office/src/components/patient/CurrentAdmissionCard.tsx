@@ -54,7 +54,14 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 2xl:grid-cols-4">
           <Fact label={admitted ? 'Admitted' : 'Requested'} value={`${formatDateKey(todayKey(new Date(since)))} · ${formatClock(since)}`} />
           {admitted ? <Fact label="Stay" value={`Day ${stayDays(since, now)}`} /> : <Fact label="Type" value={admission.admissionType} />}
-          <Fact label="Payer" value={admission.paymentType === 'Self Pay' ? 'Self pay' : `${admission.paymentType} · ${admission.insuranceProvider ?? ''}`} />
+          <Fact
+            label="Payer"
+            value={
+              admission.paymentType === 'Self Pay'
+                ? 'Self pay'
+                : [admission.paymentType, admission.insuranceProvider, admission.policyNumber].filter(Boolean).join(' · ')
+            }
+          />
           {billing ? (
             <Fact
               label="Running bill"
@@ -63,6 +70,16 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
               }
             />
           ) : null}
+          <Fact label="Reason" value={admission.reason} />
+          <div className="min-w-0">
+            <dt className="text-xs text-ink-muted">Attendant</dt>
+            <dd className="truncate font-medium text-ink">
+              {admission.attendant.name} ({admission.attendant.relationship}) ·{' '}
+              <a href={`tel:${admission.attendant.phone.replace(/[^0-9+]/g, '')}`} className="text-primary-text hover:underline">
+                {admission.attendant.phone}
+              </a>
+            </dd>
+          </div>
         </dl>
         <div className="flex justify-end">
           <Button size="sm" variant="ghost" onClick={() => setCancelling(true)}>

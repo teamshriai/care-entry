@@ -8,6 +8,7 @@ import { useStoreValue } from '../../hooks/useStore'
 import { hasOpenLayer } from '../../hooks/useLayer'
 import { useFlow } from '../../flows/useFlow'
 import { findBillByNumber, getPatientFlags, getPatientSearchSuggestions, searchPatients } from '../../domain/selectors'
+import { getAdmittedPatients } from '../../domain/admissionSelectors'
 import type { PatientFlags } from '../../domain/selectors'
 import { billNumberFor, formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
@@ -57,6 +58,7 @@ export function PatientSearch(props: PatientSearchProps) {
   const suggestions = useStoreValue(getPatientSearchSuggestions)
   const flags = useStoreValue(getPatientFlags)
   const bill = useStoreValue(findBillByNumber, query)
+  const admitted = useStoreValue(getAdmittedPatients)
 
   const inpatientsOnly = props.mode === 'pick' && props.scope === 'inpatients'
   const allowed = (patient: Patient) => !inpatientsOnly || Boolean(flags[patient.patientId]?.bed)
@@ -67,6 +69,9 @@ export function PatientSearch(props: PatientSearchProps) {
     for (const match of matches.filter((m) => allowed(m.patient)).slice(0, MAX_MATCHES)) {
       options.push({ kind: 'patient', patient: match.patient, section: 'Patients' })
     }
+  } else if (inpatientsOnly) {
+    // Picking an inpatient: an empty box lists everyone in a bed.
+    for (const patient of admitted) options.push({ kind: 'patient', patient, section: 'Admitted now' })
   } else {
     for (const patient of suggestions.recent.filter(allowed)) options.push({ kind: 'patient', patient, section: 'Recently registered' })
     for (const patient of suggestions.mostOpened.filter(allowed)) options.push({ kind: 'patient', patient, section: 'Most opened' })

@@ -1151,6 +1151,13 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
   if (amount > payment.balance) {
     throw new DomainError('VALIDATION', `That is more than the ₹${payment.balance.toLocaleString('en-IN')} balance due.`)
   }
+  // Only a stay billed to an insurer, TPA or company is settled by that payer.
+  if (method === 'Insurance/TPA') {
+    const admission = payment.admissionId ? state.admissions.find((a) => a.admissionId === payment.admissionId) : undefined
+    if (!admission || admission.paymentType === 'Self Pay') {
+      throw new DomainError('VALIDATION', 'Only an insured inpatient’s bill can be settled by the insurer.')
+    }
+  }
 
   const now = Date.now()
   const { transactionId, nextSeq } = paymentTransactionId(state)

@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import type { ElementType } from 'react'
-import { BedDouble, BedSingle, HeartPulse, ShieldCheck, Siren } from 'lucide-react'
+import { BedDouble, ShieldCheck } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { StepSection } from '../../components/flow/StepSection'
@@ -11,6 +10,7 @@ import { MobileInput } from '../../components/ui/MobileInput'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
+import { WardIcon } from '../../components/ui/WardIcon'
 import { useStoreValue } from '../../hooks/useStore'
 import { getState } from '../../domain/store'
 import { getPatientById, getProviders } from '../../domain/selectors'
@@ -25,14 +25,6 @@ import type { Admission, AdmissionType, AttendantRelationship, PaymentType, Refe
 import type { Payment, PaymentMethod } from '../../types/payment'
 import type { Patient } from '../../types/patient'
 import type { FlowProps } from '../registry'
-
-const WARD_ICON: Record<Ward, ElementType> = {
-  'General Ward': BedDouble,
-  'Semi-Private Ward': BedDouble,
-  'Private Ward': BedSingle,
-  ICU: HeartPulse,
-  Emergency: Siren,
-}
 
 const inputClass =
   'h-10 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none transition-colors focus:border-primary-600 focus:ring-1 focus:ring-primary-600 placeholder:text-ink-subtle'
@@ -227,7 +219,6 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
         >
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {wards.map((w) => {
-              const Icon = WARD_ICON[w.ward]
               const roomType = w.beds[0]?.roomType ?? 'General'
               const full = w.available === 0
               return (
@@ -244,10 +235,9 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                   )}
                 >
                   <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    <Icon
+                    <WardIcon
+                      ward={w.ward}
                       className={cn('h-4.5 w-4.5', w.ward === 'ICU' || w.ward === 'Emergency' ? 'text-critical' : 'text-primary-text')}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
                     />
                     {w.ward}
                   </span>
