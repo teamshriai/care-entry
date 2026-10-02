@@ -49,7 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Services',
     items: [
-      { to: '/services/attendant-pass', label: 'Attendant Pass', icon: IdCard, tone: 'brand' },
+      { to: '/services/guest-pass', label: 'Guest Pass', icon: IdCard, tone: 'brand' },
       { to: '/services/enquiry', label: 'Enquiry & Estimate', icon: Receipt, tone: 'stable' },
       { to: '/services/mlc', label: 'MLC', icon: FileWarning, tone: 'warning' },
     ],

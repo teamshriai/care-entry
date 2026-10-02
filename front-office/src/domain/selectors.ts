@@ -10,7 +10,7 @@ import type { Provider, DoctorRow, DoctorStatus } from '../types/doctor'
 import type { DoctorLeave, DoctorSchedule, ScheduleBreak } from '../types/schedule'
 import type { Appointment, AppointmentRow, PatientAppointmentRow, SlotBoardEntry, UpcomingAppointmentRow } from '../types/appointment'
 import type { QueueTokenRow, QueueView } from '../types/queue'
-import type { AttendantPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
+import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
 import type { ActivityLogEntry } from '../types/activity'
 import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentSummary } from '../types/payment'
@@ -54,18 +54,18 @@ export function getTariffs(state: AppState): Tariff[] {
   return state.tariffs
 }
 
-export function getAttendantPasses(state: AppState): AttendantPass[] {
-  return [...state.attendantPasses].sort((a, b) => b.issuedAt - a.issuedAt)
+export function getGuestPasses(state: AppState): GuestPass[] {
+  return [...state.guestPasses].sort((a, b) => b.issuedAt - a.issuedAt)
 }
 
 /** Wards already defined in the project — every ward that has beds in the
  *  admission data plus any ward an existing pass was issued against. The
- *  Attendant Pass form offers these (with a few standard wards) as its only
+ *  Guest Pass form offers these (with a few standard wards) as its only
  *  choices; no ward name is ever typed in freehand. */
 export function getKnownWards(state: AppState): string[] {
   const wards = new Set<string>()
   for (const bed of state.beds) wards.add(bed.ward)
-  for (const pass of state.attendantPasses) wards.add(pass.ward)
+  for (const pass of state.guestPasses) wards.add(pass.ward)
   return [...wards]
 }
 
@@ -499,12 +499,12 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
   }
 
   const dayMs = 24 * 60 * 60 * 1000
-  for (const pass of state.attendantPasses) {
+  for (const pass of state.guestPasses) {
     if (!pass.returned && now - pass.issuedAt > dayMs) {
       items.push({
         id: `na-pass-${pass.passId}`,
         tone: 'critical',
-        title: 'Attendant pass overdue',
+        title: 'Guest pass overdue',
         detail: `${pass.passId} (${pass.patientName}, ward ${pass.ward}) has not been returned.`,
       })
     }
@@ -527,7 +527,7 @@ export interface ActivityCategoryCount {
 // domain/actions.ts and domain/admissionActions.ts (see withActivity call
 // sites) — this only re-groups real activity-log entries into the counts
 // the Dashboard's chart shows, it never invents a count. Entries whose text
-// isn't one of these (ABHA linking, attendant passes, MLC, doctor
+// isn't one of these (ABHA linking, guest passes, MLC, doctor
 // registration/leave, estimates, queue/token events) aren't part of these
 // five categories and are left out of the chart, same as they were never
 // singled out in the list view either.

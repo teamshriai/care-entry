@@ -15,7 +15,7 @@ import { DoctorProfilePage } from './pages/DoctorProfilePage'
 import { TodaysAppointmentsPage } from './pages/TodaysAppointmentsPage'
 import { ScheduleAppointmentPage } from './pages/ScheduleAppointmentPage'
 import { OpQueuePage } from './pages/OpQueuePage'
-import { AttendantPassPage } from './pages/AttendantPassPage'
+import { GuestPassPage } from './pages/GuestPassPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
 import { BillingDashboardPage } from './pages/BillingDashboardPage'
@@ -98,7 +98,7 @@ function App() {
             <Route path="/op-queue" element={<OpQueuePage />} />
 
             {/* Services */}
-            <Route path="/services/attendant-pass" element={<AttendantPassPage />} />
+            <Route path="/services/guest-pass" element={<GuestPassPage />} />
             <Route path="/services/enquiry" element={<EnquiryEstimatePage />} />
             <Route path="/services/mlc" element={<MlcPage />} />
 
@@ -141,7 +141,8 @@ function App() {
 
             {/* Legacy paths kept working so older links don't dead-end */}
             <Route path="/front-office" element={<Navigate to="/" replace />} />
-            <Route path="/front-office/attendant-pass" element={<Navigate to="/services/attendant-pass" replace />} />
+            <Route path="/services/attendant-pass" element={<Navigate to="/services/guest-pass" replace />} />
+            <Route path="/front-office/attendant-pass" element={<Navigate to="/services/guest-pass" replace />} />
             <Route path="/front-office/enquiry" element={<Navigate to="/services/enquiry" replace />} />
             <Route path="/front-office/mlc" element={<Navigate to="/services/mlc" replace />} />
           </Route>

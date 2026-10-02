@@ -19,9 +19,9 @@ import type { Appointment, BookAppointmentInput } from '../types/appointment'
 import type { CheckInResult, OpenWalkInVisitInput } from '../types/queue'
 import type {
   AddEstimateItemInput,
-  AttendantPass,
+  GuestPass,
   Estimate,
-  IssueAttendantPassInput,
+  IssueGuestPassInput,
   MlcRecord,
   RegisterMlcInput,
   RemoveEstimateItemInput,
@@ -722,28 +722,28 @@ export function linkAbha(patientId: string, abhaId: string): void {
 
 // -------------------------------------------------------- front desk services
 
-export function issueAttendantPass({ patientId, ward, relationship }: IssueAttendantPassInput): AttendantPass {
+export function issueGuestPass({ patientId, ward, relationship }: IssueGuestPassInput): GuestPass {
   const state = getState()
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('VALIDATION', 'Select a patient first.')
   if (!ward?.trim()) throw new DomainError('VALIDATION', 'Ward is required.')
 
-  const openForPatient = state.attendantPasses.filter((p) => p.patientId === patientId && !p.returned).length
+  const openForPatient = state.guestPasses.filter((p) => p.patientId === patientId && !p.returned).length
   if (openForPatient >= 1) {
     throw new DomainError(
       'PASS_LIMIT',
-      `${patient.name} already has an active attendant pass. One attendant per patient — return the existing pass first.`,
+      `${patient.name} already has an active guest pass. One guest per patient — return the existing pass first.`,
     )
   }
 
   const seq = state.nextIds.pass
-  const passId = `AP/${ward.trim().toUpperCase()}/${String(1000 + seq).slice(1)}`
-  const pass: AttendantPass = {
+  const passId = `GP/${ward.trim().toUpperCase()}/${String(1000 + seq).slice(1)}`
+  const pass: GuestPass = {
     passId,
     patientId,
     patientName: patient.name,
     ward: ward.trim(),
-    relationship: relationship?.trim() || 'Attendant',
+    relationship: relationship?.trim() || 'Guest',
     issuedAt: Date.now(),
     returnedAt: null,
     returned: false,
@@ -751,11 +751,11 @@ export function issueAttendantPass({ patientId, ward, relationship }: IssueAtten
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Attendant pass issued', meta: `${passId} · ${patient.name}` },
+      { text: 'Guest pass issued', meta: `${passId} · ${patient.name}` },
     ])
     return {
       ...current,
-      attendantPasses: [...current.attendantPasses, pass],
+      guestPasses: [...current.guestPasses, pass],
       activityLog,
       nextIds: { ...current.nextIds, pass: seq + 1, activity: activitySeq },
     }
@@ -764,19 +764,19 @@ export function issueAttendantPass({ patientId, ward, relationship }: IssueAtten
   return pass
 }
 
-export function returnAttendantPass(passId: string): void {
+export function returnGuestPass(passId: string): void {
   const state = getState()
-  const pass = state.attendantPasses.find((p) => p.passId === passId)
+  const pass = state.guestPasses.find((p) => p.passId === passId)
   if (!pass) throw new DomainError('NOT_FOUND', 'That pass no longer exists.')
   if (pass.returned) throw new DomainError('INVALID_TRANSITION', 'That pass has already been returned.')
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Attendant pass returned', meta: `${passId} · ${pass.patientName}` },
+      { text: 'Guest pass returned', meta: `${passId} · ${pass.patientName}` },
     ])
     return {
       ...current,
-      attendantPasses: current.attendantPasses.map((p) =>
+      guestPasses: current.guestPasses.map((p) =>
         p.passId === passId ? { ...p, returned: true, returnedAt: Date.now() } : p,
       ),
       activityLog,

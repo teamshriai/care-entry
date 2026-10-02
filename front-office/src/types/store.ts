@@ -4,7 +4,7 @@ import type { DoctorLeave } from './schedule'
 import type { Appointment } from './appointment'
 import type { Visit } from './visit'
 import type { QueueToken } from './queue'
-import type { AttendantPass, Estimate, MlcRecord, Tariff, RegistrationLogEntry } from './frontDesk'
+import type { GuestPass, Estimate, MlcRecord, Tariff, RegistrationLogEntry } from './frontDesk'
 import type { ActivityLogEntry } from './activity'
 import type { Connectivity } from './connectivity'
 import type { Payment } from './payment'
@@ -58,7 +58,7 @@ export interface AppState {
   appointments: Appointment[]
   visits: Visit[]
   queueTokens: QueueToken[]
-  attendantPasses: AttendantPass[]
+  guestPasses: GuestPass[]
   estimates: Estimate[]
   mlcRecords: MlcRecord[]
   tariffs: Tariff[]

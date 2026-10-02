@@ -10,11 +10,11 @@ import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
-import { getAttendantPasses, getKnownWards, searchPatients } from '../domain/selectors'
-import { issueAttendantPass, returnAttendantPass } from '../domain/actions'
+import { getGuestPasses, getKnownWards, searchPatients } from '../domain/selectors'
+import { issueGuestPass, returnGuestPass } from '../domain/actions'
 import { formatClock, formatRelativeTime } from '../utils/format'
 import { cn } from '../utils/cn'
-import type { AttendantPass } from '../types/frontDesk'
+import type { GuestPass } from '../types/frontDesk'
 import type { Patient } from '../types/patient'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -33,12 +33,12 @@ function wardLabel(ward: string): string {
   return NAMED_WARD.test(ward) ? ward : `Ward ${ward}`
 }
 
-export function AttendantPassPage() {
+export function GuestPassPage() {
   const now = useNow(30000)
   const { notify } = useToast()
   const { patient: contextPatient } = usePatientContext()
   const knownWards = useStoreValue(getKnownWards)
-  const passes = useStoreValue(getAttendantPasses)
+  const passes = useStoreValue(getGuestPasses)
 
   // The patient chosen on this form. Starts from whoever is already in
   // context (selected via the app bar or Find Patient) but is changeable here.
@@ -65,8 +65,8 @@ export function AttendantPassPage() {
       // The submit button is disabled without a patient, so this only runs
       // once one is selected; the '' fallback just satisfies the type and
       // fails the same server-side validation an undefined id would.
-      const pass = issueAttendantPass({ patientId: patient?.patientId ?? '', ward, relationship })
-      notify('Attendant pass issued', { detail: `${pass.passId} · ${pass.patientName}` })
+      const pass = issueGuestPass({ patientId: patient?.patientId ?? '', ward, relationship })
+      notify('Guest pass issued', { detail: `${pass.passId} · ${pass.patientName}` })
       setWard('')
       setRelationship('')
       setChosenPatient(null)
@@ -79,9 +79,9 @@ export function AttendantPassPage() {
     }
   }
 
-  function handleReturn(pass: AttendantPass) {
+  function handleReturn(pass: GuestPass) {
     try {
-      returnAttendantPass(pass.passId)
+      returnGuestPass(pass.passId)
       notify('Pass returned', { detail: pass.passId })
     } catch (err) {
       notify('Could not return pass', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
@@ -91,8 +91,8 @@ export function AttendantPassPage() {
   return (
     <div>
       <PageHeader
-        title="Attendant Pass"
-        subtitle="Issue and return attendant passes. One active pass per patient — overdue passes surface on the dashboard."
+        title="Guest Pass"
+        subtitle="Issue and return guest passes. One active pass per patient — overdue passes surface on the dashboard."
       />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -267,7 +267,7 @@ export function AttendantPassPage() {
                       <p className="text-xs text-ink-muted">{wardLabel(pass.ward)}</p>
                     </div>
                     <span className="shrink-0 text-xs tabular-nums text-ink-muted">
-                      {/* A returned pass always has returnedAt set, by construction of returnAttendantPass. */}
+                      {/* A returned pass always has returnedAt set, by construction of returnGuestPass. */}
                       Returned {formatClock(pass.returnedAt!)}
                     </span>
                   </div>

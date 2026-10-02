@@ -27,7 +27,7 @@ import type { Appointment, AppointmentStatus } from '../types/appointment'
 import type { Visit } from '../types/visit'
 import type { QueueToken, QueueTokenStatus } from '../types/queue'
 import type { ActivityLogEntry } from '../types/activity'
-import type { AttendantPass, MlcRecord, RegistrationLogEntry, Tariff } from '../types/frontDesk'
+import type { GuestPass, MlcRecord, RegistrationLogEntry, Tariff } from '../types/frontDesk'
 import type { Payment } from '../types/payment'
 import { createAdmissionSeed } from './admissionSeedData'
 import { admissionBillItems } from '../utils/billing'
@@ -339,9 +339,9 @@ export function createSeedState(): AppState {
     logAt(entry.registeredAt, 'New patient registered', `${name} · ${entry.patientId}`)
   })
 
-  const attendantPasses: AttendantPass[] = [
-    { passId: 'AP/4B/0198', patientId: 'SHRI-0120338', patientName: 'Sunita Rao', ward: '4B', relationship: 'Daughter', issuedAt: minutesAgo(26 * 60), returnedAt: null, returned: false },
-    { passId: 'AP/2A/0231', patientId: 'SHRI-0125590', patientName: 'Karthik Subramanian', ward: '2A', relationship: 'Spouse', issuedAt: minutesAgo(3 * 60), returnedAt: null, returned: false },
+  const guestPasses: GuestPass[] = [
+    { passId: 'GP/4B/0198', patientId: 'SHRI-0120338', patientName: 'Sunita Rao', ward: '4B', relationship: 'Daughter', issuedAt: minutesAgo(26 * 60), returnedAt: null, returned: false },
+    { passId: 'GP/2A/0231', patientId: 'SHRI-0125590', patientName: 'Karthik Subramanian', ward: '2A', relationship: 'Spouse', issuedAt: minutesAgo(3 * 60), returnedAt: null, returned: false },
   ]
 
   // Payments — administrative bills only, never a clinical charge. One
@@ -695,7 +695,7 @@ export function createSeedState(): AppState {
     appointments,
     visits,
     queueTokens,
-    attendantPasses,
+    guestPasses,
     estimates: [],
     mlcRecords,
     tariffs,

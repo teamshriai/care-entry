@@ -15,7 +15,7 @@ export const notifications: Notification[] = [
   {
     id: 'ntf-1',
     tier: 'urgent',
-    text: 'Attendant pass limit reached — Ward 4B',
+    text: 'Guest pass limit reached — Ward 4B',
     time: '8 min ago',
   },
   {

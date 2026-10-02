@@ -1,8 +1,8 @@
-// Front Desk services — Attendant Pass, Enquiry & Estimate, MLC — plus the
+// Front Desk services — Guest Pass, Enquiry & Estimate, MLC — plus the
 // small pieces of state (the registration log) that belong to no single
 // screen.
 
-export interface AttendantPass {
+export interface GuestPass {
   passId: string
   patientId: string
   patientName: string
@@ -13,7 +13,7 @@ export interface AttendantPass {
   returned: boolean
 }
 
-export interface IssueAttendantPassInput {
+export interface IssueGuestPassInput {
   patientId: string
   ward: string
   relationship?: string

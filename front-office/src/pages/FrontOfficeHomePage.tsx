@@ -108,7 +108,7 @@ export function FrontOfficeHomePage() {
             ))}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            <QuickActionTile icon={IdCard} iconTone="brand" label="Attendant Pass" to="/services/attendant-pass" dense />
+            <QuickActionTile icon={IdCard} iconTone="brand" label="Guest Pass" to="/services/guest-pass" dense />
             <QuickActionTile icon={Receipt} iconTone="stable" label="Enquiry & Estimate" to="/services/enquiry" dense />
             <QuickActionTile icon={FileWarning} iconTone="warning" label="MLC" to="/services/mlc" dense />
           </div>
