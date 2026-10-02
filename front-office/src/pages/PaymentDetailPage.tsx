@@ -152,7 +152,7 @@ export function PaymentDetailPage() {
                   ...payment.transactions.map((txn) => ({
                     id: txn.transactionId,
                     at: txn.collectedAt,
-                    detail: `${txn.method}${txn.tenderedAmount ? ` · ${rupees(txn.tenderedAmount)} received` : ''}`,
+                    detail: txn.method,
                     amount: txn.amount,
                     failed: false,
                   })),

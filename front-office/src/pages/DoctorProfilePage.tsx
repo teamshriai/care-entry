@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarCheck, CalendarX2, Stethoscope, Trash2 } from 'lucide-react'
+import { CalendarCheck, CalendarX2, Stethoscope, Trash2 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -20,9 +20,11 @@ import {
   getSlotBoard,
   getAppointmentsForProvider,
   getDoctorLeaves,
+  getToday,
 } from '../domain/selectors'
 import { setDoctorStatus, addDoctorLeave, removeDoctorLeave } from '../domain/actions'
 import { initialsOf } from '../utils/format'
+import { useFlow } from '../flows/useFlow'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -31,7 +33,9 @@ export function DoctorProfilePage() {
   const navigate = useNavigate()
   const now = useNow(30000)
   const { notify } = useToast()
+  const { openFlow } = useFlow()
   const id = providerId ?? ''
+  const today = useStoreValue(getToday)
 
   const row = useStoreValue(getDoctorRow, id, now)
   const slotEntries = useStoreValue(getSlotBoard, id, now)
@@ -52,8 +56,8 @@ export function DoctorProfilePage() {
               <EmptyState
                 icon={Stethoscope}
                 title="No such doctor"
-                description="This doctor may have been removed. Return to the directory to find another."
-                action={<Button size="sm" onClick={() => navigate('/doctors')}>Back to directory</Button>}
+                description="This doctor may have been removed. Every doctor is listed in the directory."
+                action={<Button size="sm" onClick={() => navigate('/doctors')}>Doctors</Button>}
               />
             </CardBody>
           </Card>
@@ -93,16 +97,9 @@ export function DoctorProfilePage() {
         subtitle={`${provider.department} · ${provider.specialty} · ${provider.employeeId}`}
         actions={
           <>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/doctors')}>
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Directory
-            </Button>
-            <Button
-              size="sm"
-              disabled={!row.nextSlot}
-              onClick={() => navigate('/appointments/new', { state: { providerId: id, slot: row.nextSlot } })}
-            >
-              Schedule appointment
+            <Button size="sm" onClick={() => openFlow('schedule', { doctor: id })}>
+              <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Schedule
             </Button>
           </>
         }
@@ -238,7 +235,7 @@ export function DoctorProfilePage() {
                 ) : (
                   <SlotBoard
                     entries={slotEntries}
-                    onSelect={(slot) => navigate('/appointments/new', { state: { providerId: id, slot } })}
+                    onSelect={(slot) => openFlow('schedule', { doctor: id, date: today, slot })}
                   />
                 )}
               </CardBody>
@@ -254,11 +251,6 @@ export function DoctorProfilePage() {
               />
               <AppointmentsTable
                 appointments={appointments}
-                emptyAction={
-                  <Button size="sm" onClick={() => navigate('/appointments/new', { state: { providerId: id } })}>
-                    Schedule an appointment
-                  </Button>
-                }
                 renderActions={() => (
                   <Button size="sm" variant="ghost" onClick={() => navigate('/appointments')}>
                     View

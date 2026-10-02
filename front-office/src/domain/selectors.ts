@@ -13,9 +13,9 @@ import type { QueueTokenRow, QueueView } from '../types/queue'
 import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
 import type { ActivityLogEntry } from '../types/activity'
 import type { Connectivity } from '../types/connectivity'
-import type { Payment, PaymentSummary } from '../types/payment'
+import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
 import type { Tone } from '../utils/tone'
-import { billDisplayStatus, isBillDue } from '../utils/billing'
+import { REGISTRATION_FEE, billDisplayStatus, isBillDue } from '../utils/billing'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -25,6 +25,11 @@ const LONG_WAIT_MINUTES = 15
 
 export function getPatients(state: AppState): Patient[] {
   return state.patients
+}
+
+/** The operational day (YYYY-MM-DD) the store is running on. */
+export function getToday(state: AppState): string {
+  return state.today
 }
 
 export function getProviders(state: AppState): Provider[] {
@@ -72,6 +77,16 @@ export function getKnownWards(state: AppState): string[] {
 
 export function getEstimates(state: AppState): Estimate[] {
   return [...state.estimates].sort((a, b) => b.createdAt - a.createdAt)
+}
+
+export function getEstimateById(state: AppState, estimateId: string): Estimate | null {
+  return state.estimates.find((e) => e.estimateId === estimateId) ?? null
+}
+
+/** The bill an estimate became, once it was paid — an estimate is billed once. */
+export function getBillForEstimate(state: AppState, estimateId: string): Payment | null {
+  if (!estimateId) return null
+  return state.payments.find((p) => p.estimateId === estimateId && p.status !== 'Cancelled') ?? null
 }
 
 /** The one estimate a patient is currently working on — Cancelled ones don't
@@ -247,6 +262,143 @@ export function getDoctorRows(state: AppState, now: number = Date.now(), date: s
 
 export function getDoctorRow(state: AppState, providerId: string, now: number = Date.now(), date: string = state.today): DoctorRow | null {
   return getDoctorRows(state, now, date).find((row) => row.provider.providerId === providerId) ?? null
+}
+
+// --------------------------------------------------------------- scheduling
+
+/** Statuses in which a doctor is in session today and can take a walk-in. */
+const IN_SESSION: DoctorStatus[] = ['Available', 'Running late', 'In consultation', 'On break', 'Fully booked']
+
+const SUGGESTION_HORIZON_DAYS = 14
+
+/** The date `days` after a YYYY-MM-DD key, as a key. */
+export function addDaysToKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return todayKey(new Date(year, month - 1, day + days))
+}
+
+export interface FreeSlot {
+  date: string
+  slot: string
+}
+
+export interface DoctorSuggestion {
+  provider: Provider
+  /** How the doctor stands today. */
+  status: DoctorStatus
+  /** The soonest free slots, across the next two weeks. */
+  nextSlots: FreeSlot[]
+  bookable: boolean
+  /** Why the doctor can't be booked, when they can't. */
+  reason: string | null
+}
+
+/** A department's doctors, the soonest bookable first — what the schedule
+ *  flow suggests once a department is chosen. */
+export function getDoctorSuggestions(state: AppState, department: string, now: number): DoctorSuggestion[] {
+  const firstSlotAt = (s: DoctorSuggestion) =>
+    s.nextSlots[0] ? slotToTimestamp(s.nextSlots[0].date, s.nextSlots[0].slot) : Number.POSITIVE_INFINITY
+  return state.providers
+    .filter((p) => p.department === department && p.status === 'Active')
+    .map((provider) => {
+      const status = getDoctorStatus(state, provider.providerId, now, state.today)
+      const nextSlots: FreeSlot[] = []
+      for (let i = 0; i < SUGGESTION_HORIZON_DAYS && nextSlots.length < 4; i += 1) {
+        const date = addDaysToKey(state.today, i)
+        for (const slot of getAvailableSlots(state, provider.providerId, now, date)) {
+          nextSlots.push({ date, slot })
+          if (nextSlots.length >= 4) break
+        }
+      }
+      const bookable = nextSlots.length > 0
+      return {
+        provider,
+        status,
+        nextSlots,
+        bookable,
+        reason: bookable ? null : `No open slots in the next ${SUGGESTION_HORIZON_DAYS} days`,
+      }
+    })
+    .sort((a, b) => Number(b.bookable) - Number(a.bookable) || firstSlotAt(a) - firstSlotAt(b))
+}
+
+export interface DateStripDay {
+  date: string
+  open: number
+  state: 'open' | 'full' | 'leave' | 'off'
+}
+
+/** Two weeks of one doctor's days: open (with how many free slots), full,
+ *  on leave, or not working. */
+export function getDoctorDateStrip(state: AppState, providerId: string, now: number): DateStripDay[] {
+  const days: DateStripDay[] = []
+  for (let i = 0; i < SUGGESTION_HORIZON_DAYS; i += 1) {
+    const date = addDaysToKey(state.today, i)
+    const schedule = getDoctorSchedule(state, providerId, date)
+    if (!schedule) {
+      days.push({ date, open: 0, state: 'off' })
+    } else if (schedule.onLeave) {
+      days.push({ date, open: 0, state: 'leave' })
+    } else {
+      const open = getAvailableSlots(state, providerId, now, date).length
+      days.push({ date, open, state: open > 0 ? 'open' : 'full' })
+    }
+  }
+  return days
+}
+
+export interface WalkInDoctor {
+  provider: Provider
+  status: DoctorStatus
+  /** Patients already waiting for this doctor. */
+  waiting: number
+  /** Rough wait for a new token, from the doctor's own pace today. */
+  waitMinutes: number
+}
+
+/** Doctors in session right now in a department, shortest wait first —
+ *  who a walk-in ("Start Consultation") can be sent to. */
+export function getDoctorsAvailableNow(state: AppState, department: string, now: number): WalkInDoctor[] {
+  return state.providers
+    .filter((p) => p.department === department && p.status === 'Active')
+    .map((provider) => {
+      const status = getDoctorStatus(state, provider.providerId, now, state.today)
+      const mine = state.queueTokens.filter((t) => t.providerId === provider.providerId)
+      const waiting = mine.filter((t) => t.status === 'Waiting').length
+      const busy = mine.some((t) => t.status === 'Called' || t.status === 'In consultation')
+      return {
+        provider,
+        status,
+        waiting,
+        waitMinutes: (waiting + (busy ? 1 : 0)) * getAverageConsultationMinutes(state, provider.providerId),
+      }
+    })
+    .filter((row) => IN_SESSION.includes(row.status))
+    .sort((a, b) => a.waitMinutes - b.waitMinutes)
+}
+
+/** Whether a patient still owes the one-time registration fee — true until
+ *  a registration fee is on one of their bills (cancelled or refunded ones
+ *  don't count). */
+export function needsRegistrationFee(state: AppState, patientId: string): boolean {
+  return !state.payments.some(
+    (p) =>
+      p.patientId === patientId &&
+      p.status !== 'Cancelled' &&
+      p.status !== 'Refunded' &&
+      p.items.some((item) => item.code === REGISTRATION_FEE.code),
+  )
+}
+
+/** A consultation's bill lines: the registration fee the first time, then
+ *  the doctor's own consultation fee. */
+export function getConsultationBillItems(state: AppState, patientId: string, providerId: string): PaymentItem[] {
+  const provider = getProviderById(state, providerId)
+  if (!provider) return []
+  return [
+    ...(needsRegistrationFee(state, patientId) ? [REGISTRATION_FEE] : []),
+    { code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee },
+  ]
 }
 
 export function getAppointmentsForDate(state: AppState, date: string = state.today): AppointmentRow[] {

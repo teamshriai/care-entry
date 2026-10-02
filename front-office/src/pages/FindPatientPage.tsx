@@ -12,6 +12,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
+import { useFlow } from '../flows/useFlow'
 import { getPatientSearchResults, getPossibleDuplicates } from '../domain/selectors'
 import { initialsOf } from '../utils/format'
 import type { Patient } from '../types/patient'
@@ -25,6 +26,7 @@ export function FindPatientPage() {
   const navigate = useNavigate()
   const { notify } = useToast()
   const { setPatient } = usePatientContext()
+  const { openFlow } = useFlow()
   const inputRef = useRef<HTMLInputElement>(null)
   const locationState = location.state as FindPatientLocationState | null
   const [query, setQuery] = useState(locationState?.query ?? '')
@@ -184,10 +186,7 @@ export function FindPatientPage() {
                           >
                             Profile
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => select(patient, '/appointments/new', { source: 'find-patient' })}
-                          >
+                          <Button size="sm" onClick={() => openFlow('schedule', { uhid: patient.uhid })}>
                             Schedule
                           </Button>
                         </div>

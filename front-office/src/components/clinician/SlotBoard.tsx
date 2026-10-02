@@ -33,13 +33,17 @@ export function SlotBoard({
       {entries.map((entry) => {
         const selectable = entry.status === 'available' && Boolean(onSelect)
         const isSelected = selectedSlot === entry.slot
+        // A booking not yet paid still holds its slot — say so, so the desk
+        // knows it may free up.
+        const label = entry.status === 'booked' && entry.appointment?.status === 'Payment Pending' ? 'Held' : LABEL[entry.status]
         return (
           <button
             key={entry.slot}
             type="button"
             disabled={!selectable}
+            aria-pressed={selectable ? isSelected : undefined}
             onClick={() => selectable && onSelect?.(entry.slot)}
-            title={`${entry.slot} · ${LABEL[entry.status]}`}
+            title={`${entry.slot} · ${entry.status === 'booked' && label === 'Held' ? 'Held — booked, not yet paid' : label}`}
             className={cn(
               'rounded-lg border-2 px-3 py-2.5 text-left transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1',
@@ -59,7 +63,7 @@ export function SlotBoard({
                 isSelected ? 'text-white/85' : 'opacity-80',
               )}
             >
-              {LABEL[entry.status]}
+              {label}
             </span>
           </button>
         )

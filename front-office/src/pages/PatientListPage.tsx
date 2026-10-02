@@ -10,6 +10,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
+import { useFlow } from '../flows/useFlow'
 import { getPatientList, getPossibleDuplicates } from '../domain/selectors'
 import { initialsOf } from '../utils/format'
 import type { Patient } from '../types/patient'
@@ -28,6 +29,7 @@ export function PatientListPage() {
   const navigate = useNavigate()
   const { notify } = useToast()
   const { setPatient } = usePatientContext()
+  const { openFlow } = useFlow()
   const justRegistered = (location.state as PatientListLocationState | null)?.justRegistered
 
   const patients = useStoreValue(getPatientList)
@@ -118,8 +120,8 @@ export function PatientListPage() {
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{patient.mobile}</td>
                       <td className="whitespace-nowrap px-5 py-3">
-                        <Button size="sm" onClick={() => select(patient, '/appointments/new', { source: 'find-patient' })}>
-                          Schedule Appointment
+                        <Button size="sm" onClick={() => openFlow('schedule', { uhid: patient.uhid })}>
+                          Schedule
                         </Button>
                       </td>
                     </tr>

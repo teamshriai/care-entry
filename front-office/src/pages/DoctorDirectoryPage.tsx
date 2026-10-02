@@ -8,10 +8,8 @@ import { Button } from '../components/ui/Button'
 import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
-import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
-import { getDoctorRows, getDepartments, getSpecialties } from '../domain/selectors'
-import { openWalkInVisit } from '../domain/actions'
+import { useFlow } from '../flows/useFlow'
+import { getDoctorRows, getDepartments, getSpecialties, getToday } from '../domain/selectors'
 import { cn } from '../utils/cn'
 import type { DoctorRow, Provider } from '../types/doctor'
 
@@ -30,8 +28,8 @@ function matchesAvailability(row: DoctorRow, filter: AvailabilityFilter): boolea
 export function DoctorDirectoryPage() {
   const navigate = useNavigate()
   const now = useNow(30000)
-  const { notify } = useToast()
-  const { patient } = usePatientContext()
+  const { openFlow } = useFlow()
+  const today = useStoreValue(getToday)
 
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('All departments')
@@ -56,23 +54,10 @@ export function DoctorDirectoryPage() {
     })
   }, [rows, query, department, specialty, availability])
 
+  // Scheduling picks the patient inside the flow; walk-ins start from the
+  // patient's profile (Start Consultation), never from here.
   function handleBook(provider: Provider, nextSlot: string | null) {
-    navigate('/appointments/new', { state: { providerId: provider.providerId, slot: nextSlot } })
-  }
-
-  function handleWalkIn(provider: Provider) {
-    if (!patient) return
-    try {
-      const result = openWalkInVisit({
-        patientId: patient.patientId,
-        providerId: provider.providerId,
-        department: provider.department,
-      })
-      notify('Walk-in visit opened', { detail: `Token ${result.tokenNumber} · ${patient.name}` })
-      navigate('/op-queue', { state: { justCreatedToken: result.tokenNumber } })
-    } catch (err) {
-      notify('Could not open visit', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
+    openFlow('schedule', nextSlot ? { doctor: provider.providerId, date: today, slot: nextSlot } : { doctor: provider.providerId })
   }
 
   return (
@@ -141,7 +126,6 @@ export function DoctorDirectoryPage() {
               </button>
             ))}
             <span className="ml-auto text-xs text-ink-muted">
-              {patient ? `Walk-in enabled for ${patient.name}` : 'Select a patient to enable walk-in'} ·{' '}
               {filtered.length} of {rows.length} doctors
             </span>
           </div>
@@ -149,9 +133,7 @@ export function DoctorDirectoryPage() {
           <DoctorAvailabilityTable
             rows={filtered}
             onBook={handleBook}
-            onWalkIn={handleWalkIn}
             onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
-            patientInContext={Boolean(patient)}
           />
         </Card>
       </div>

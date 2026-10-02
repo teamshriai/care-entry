@@ -1,31 +1,16 @@
 import { useState } from 'react'
-import type { ElementType } from 'react'
-import { Banknote, CreditCard, Loader2, QrCode, ShieldCheck } from 'lucide-react'
+import type { ElementType, ReactNode } from 'react'
+import { CreditCard, Loader2, QrCode, ShieldCheck } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Alert } from '../ui/Alert'
-import { Badge } from '../ui/Badge'
-import { BillStatusBadge } from './BillStatusBadge'
-import { collectPayment, recordFailedPayment } from '../../domain/actions'
 import { formatRupees } from '../../utils/billing'
 import { cn } from '../../utils/cn'
-import type { Payment, PaymentMethod } from '../../types/payment'
+import type { PaymentMethod } from '../../types/payment'
 
-export type PanelMethod = 'Cash' | 'UPI' | 'Card' | 'Insurance/TPA'
-
-const METHOD_META: Record<PanelMethod, { label: string; icon: ElementType }> = {
-  Cash: { label: 'Cash', icon: Banknote },
+const METHOD_META: Record<PaymentMethod, { label: string; icon: ElementType }> = {
   UPI: { label: 'UPI', icon: QrCode },
   Card: { label: 'Card', icon: CreditCard },
-  'Insurance/TPA': { label: 'TPA', icon: ShieldCheck },
-}
-
-export interface SettledPayment {
-  amount: number
-  method: PaymentMethod
-  /** Cash change handed back. */
-  change: number
-  /** The bills as they stand after this collection. */
-  bills: Payment[]
+  'Insurance/TPA': { label: 'Insurer / TPA', icon: ShieldCheck },
 }
 
 function errorMessage(err: unknown): string {
@@ -33,91 +18,64 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * The one place money is taken. Everywhere a bill is collected — billing,
- * scheduling, walk-in, admission, discharge — it is this panel: pick Cash,
- * UPI or Card, confirm what the counter sees (cash in hand, UPI received,
- * card approved), done. A UPI that never arrives or a declined card is
- * recorded and the bill reads Failed (red) until it is paid.
+ * The one place money is taken — billing, scheduling, Start Consultation,
+ * admission and discharge all use this panel. The hospital is cashless and
+ * has no pay-later: the patient pays by UPI or card (an insured inpatient's
+ * bill can be settled by the insurer), and staff confirm what the phone or
+ * terminal shows. A UPI that never arrives or a declined card reads as
+ * Failed (red) until it is paid another way.
  *
  * Simulated: no gateway is called and no card/bank/UPI credential is ever
- * entered — staff confirm the result they see on the terminal or phone.
+ * entered — only the result staff confirm is recorded, by `onPay`.
  */
 export function PaymentPanel({
-  bills,
+  amount: due,
+  status,
   allowPartial = false,
-  methods = ['Cash', 'UPI', 'Card'],
-  onSettled,
-  onPayLater,
-  payLaterLabel = 'Pay later',
+  methods = ['UPI', 'Card'],
+  onPay,
+  onFail,
 }: {
-  /** Bills to collect, in the order money is applied. Only bills with a balance. */
-  bills: Payment[]
-  /** Lets the desk take part of the amount — only when collecting one bill. */
+  /** What is due now. */
+  amount: number
+  /** Shown beside the amount — e.g. the bill's status. */
+  status?: ReactNode
+  /** Lets the desk take part of the amount (inpatient bills only). */
   allowPartial?: boolean
-  methods?: PanelMethod[]
-  onSettled: (result: SettledPayment) => void
-  onPayLater?: () => void
-  payLaterLabel?: string
+  methods?: PaymentMethod[]
+  /** Records the payment. Throw to show the error instead. */
+  onPay: (method: PaymentMethod, amount: number) => void
+  /** Records a failed UPI/card attempt, where there is a bill to record it on. */
+  onFail?: (method: PaymentMethod, amount: number, reason: string) => void
 }) {
-  const due = bills.reduce((sum, bill) => sum + bill.balance, 0)
-  const single = bills.length === 1 ? bills[0] : null
-  const partial = allowPartial && single !== null
-
-  const [method, setMethod] = useState<PanelMethod>(methods[0])
+  const [method, setMethod] = useState<PaymentMethod>(methods[0])
   const [amountText, setAmountText] = useState(String(due))
-  const [cashText, setCashText] = useState('')
   const [failure, setFailure] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const amount = partial ? Number(amountText) : due
+  const amount = allowPartial ? Number(amountText) : due
   const amountValid = amountText.trim() !== '' && Number.isFinite(amount) && amount > 0 && amount <= due
-  const cash = cashText.trim() === '' ? amount : Number(cashText)
-  const cashValid = Number.isFinite(cash) && cash >= amount
-  const change = method === 'Cash' && cashValid ? cash - amount : 0
 
-  function chooseMethod(next: PanelMethod) {
+  function chooseMethod(next: PaymentMethod) {
     setMethod(next)
-    setFailure(null)
     setError(null)
   }
 
-  /** Applies `amount` across the bills in order. */
-  function settle(chosen: PanelMethod) {
+  function pay() {
     if (!amountValid) return
     setError(null)
     try {
-      let remaining = amount
-      const updated: Payment[] = []
-      for (const bill of bills) {
-        if (remaining <= 0) break
-        const portion = Math.min(remaining, bill.balance)
-        updated.push(
-          collectPayment({
-            paymentId: bill.paymentId,
-            amount: portion,
-            method: chosen,
-            tenderedAmount: chosen === 'Cash' && single ? cash : undefined,
-          }),
-        )
-        remaining -= portion
-      }
-      onSettled({ amount, method: chosen, change: chosen === 'Cash' ? change : 0, bills: updated })
+      onPay(method, amount)
     } catch (err) {
       setError(errorMessage(err))
     }
   }
 
-  function fail(chosen: 'UPI' | 'Card', reason: string) {
+  function fail(reason: string) {
     if (!amountValid) return
     setError(null)
     try {
-      let remaining = amount
-      for (const bill of bills) {
-        if (remaining <= 0) break
-        const portion = Math.min(remaining, bill.balance)
-        recordFailedPayment({ paymentId: bill.paymentId, amount: portion, method: chosen, reason })
-        remaining -= portion
-      }
+      onFail?.(method, amount, reason)
       setFailure(reason)
     } catch (err) {
       setError(errorMessage(err))
@@ -131,13 +89,13 @@ export function PaymentPanel({
           <p className="text-xs font-medium text-ink-muted">Amount due</p>
           <p className="text-2xl font-semibold tabular-nums text-ink">{formatRupees(due)}</p>
         </div>
-        {single ? <BillStatusBadge payment={single} /> : <Badge tone="warning">{bills.length} bills</Badge>}
+        {status}
       </div>
 
-      {partial ? (
+      {allowPartial ? (
         <div>
           <label htmlFor="collect-now" className="text-xs font-medium text-ink-muted">
-            Collect now
+            Pay now
           </label>
           <div className="mt-1.5 flex h-11 items-center rounded-lg border border-border bg-surface-1 px-3 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
             <span className="text-sm text-ink-muted">₹</span>
@@ -150,35 +108,37 @@ export function PaymentPanel({
             />
           </div>
           {amountValid && amount < due ? (
-            <p className="mt-1 text-xs text-ink-muted">{formatRupees(due - amount)} will remain due.</p>
+            <p className="mt-1 text-xs text-ink-muted">{formatRupees(due - amount)} stays on the running bill.</p>
           ) : null}
         </div>
       ) : null}
 
-      <div role="radiogroup" aria-label="Payment method" className={cn('grid gap-2', methods.length > 3 ? 'grid-cols-4' : 'grid-cols-3')}>
-        {methods.map((option) => {
-          const { label, icon: Icon } = METHOD_META[option]
-          const active = method === option
-          return (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => chooseMethod(option)}
-              className={cn(
-                'flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border text-sm font-semibold transition-colors',
-                active
-                  ? 'border-primary-600 bg-primary-50 text-primary-text'
-                  : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2 hover:text-ink',
-              )}
-            >
-              <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-              {label}
-            </button>
-          )
-        })}
-      </div>
+      {methods.length > 1 ? (
+        <div role="radiogroup" aria-label="Payment method" className={cn('grid gap-2', methods.length > 2 ? 'grid-cols-3' : 'grid-cols-2')}>
+          {methods.map((option) => {
+            const { label, icon: Icon } = METHOD_META[option]
+            const active = method === option
+            return (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => chooseMethod(option)}
+                className={cn(
+                  'flex min-h-14 items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-colors',
+                  active
+                    ? 'border-primary-600 bg-primary-50 text-primary-text'
+                    : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2 hover:text-ink',
+                )}
+              >
+                <Icon className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
       {failure ? (
         <Alert tone="critical">
@@ -186,36 +146,6 @@ export function PaymentPanel({
         </Alert>
       ) : null}
       {error ? <Alert tone="critical">{error}</Alert> : null}
-
-      {method === 'Cash' ? (
-        <div className="flex flex-col gap-3">
-          <div>
-            <label htmlFor="cash-received" className="text-xs font-medium text-ink-muted">
-              Cash received
-            </label>
-            <div className="mt-1.5 flex h-11 items-center rounded-lg border border-border bg-surface-1 px-3 focus-within:border-primary-600 focus-within:ring-1 focus-within:ring-primary-600">
-              <span className="text-sm text-ink-muted">₹</span>
-              <input
-                id="cash-received"
-                value={cashText}
-                onChange={(event) => setCashText(event.target.value.replace(/[^0-9]/g, ''))}
-                inputMode="numeric"
-                placeholder={amountValid ? String(amount) : ''}
-                className="h-full w-full bg-transparent px-1.5 text-sm font-semibold tabular-nums text-ink outline-none placeholder:font-normal placeholder:text-ink-subtle"
-              />
-            </div>
-            {!cashValid ? (
-              <p className="mt-1 text-xs text-critical">Less than {formatRupees(amount)}.</p>
-            ) : change > 0 ? (
-              <p className="mt-1 text-sm font-semibold text-ink">Return {formatRupees(change)} change</p>
-            ) : null}
-          </div>
-          <Button size="lg" disabled={!amountValid || !cashValid} onClick={() => settle('Cash')}>
-            <Banknote className="h-4 w-4" strokeWidth={1.75} />
-            Received {amountValid ? formatRupees(amount) : ''}
-          </Button>
-        </div>
-      ) : null}
 
       {method === 'UPI' ? (
         <Waiting
@@ -225,8 +155,8 @@ export function PaymentPanel({
           okLabel="Payment received"
           failLabel="Not received"
           disabled={!amountValid}
-          onOk={() => settle('UPI')}
-          onFail={() => fail('UPI', 'UPI payment not received')}
+          onOk={pay}
+          onFail={() => fail('UPI payment not received')}
         />
       ) : null}
 
@@ -238,25 +168,19 @@ export function PaymentPanel({
           okLabel="Approved"
           failLabel="Declined"
           disabled={!amountValid}
-          onOk={() => settle('Card')}
-          onFail={() => fail('Card', 'Card declined')}
+          onOk={pay}
+          onFail={() => fail('Card declined')}
         />
       ) : null}
 
       {method === 'Insurance/TPA' ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-ink-muted">Settle against the insurer’s approved amount.</p>
-          <Button size="lg" disabled={!amountValid} onClick={() => settle('Insurance/TPA')}>
+          <Button size="lg" disabled={!amountValid} onClick={pay}>
             <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
-            Settle {amountValid ? formatRupees(amount) : ''} by TPA
+            Settle {amountValid ? formatRupees(amount) : ''} by insurer
           </Button>
         </div>
-      ) : null}
-
-      {onPayLater ? (
-        <Button variant="ghost" onClick={onPayLater} className="self-center">
-          {payLaterLabel}
-        </Button>
       ) : null}
     </div>
   )

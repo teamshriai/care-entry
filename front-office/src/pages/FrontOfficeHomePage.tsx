@@ -32,7 +32,9 @@ import {
   getDoctorRows,
   getAppointmentsForDate,
   getNeedsAttention,
+  getToday,
 } from '../domain/selectors'
+import { useFlow } from '../flows/useFlow'
 import { getDischargesToday } from '../domain/admissionSelectors'
 import { formatHeaderDateTime } from '../utils/format'
 import { cn } from '../utils/cn'
@@ -73,8 +75,10 @@ const ATTENTION_ICON: Record<Tone, ElementType> = {
 
 export function FrontOfficeHomePage() {
   const navigate = useNavigate()
+  const { openFlow } = useFlow()
   // 15s tick: enough for minute-level context on this page. Nothing here mutates data — the clock only re-derives.
   const now = useNow(15000)
+  const today = useStoreValue(getToday)
 
   const summary = useStoreValue(getOperationalSummary, now)
   const dischargesToday = useStoreValue(getDischargesToday)
@@ -130,7 +134,7 @@ export function FrontOfficeHomePage() {
               rows={doctorRows}
               compact
               onBook={(provider, nextSlot) =>
-                navigate('/appointments/new', { state: { providerId: provider.providerId, slot: nextSlot } })
+                openFlow('schedule', nextSlot ? { doctor: provider.providerId, date: today, slot: nextSlot } : { doctor: provider.providerId })
               }
             />
           </Card>
@@ -155,8 +159,8 @@ export function FrontOfficeHomePage() {
               compact
               maxRows={5}
               emptyAction={
-                <Button size="sm" onClick={() => navigate('/appointments/new')}>
-                  Schedule an appointment
+                <Button size="sm" onClick={() => openFlow('schedule')}>
+                  Schedule
                 </Button>
               }
             />

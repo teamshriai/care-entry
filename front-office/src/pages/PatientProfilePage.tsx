@@ -13,8 +13,8 @@ import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
 import { useCountPatientOpen } from '../hooks/useCountPatientOpen'
+import { useFlow } from '../flows/useFlow'
 import { getPatientById, getAppointmentsForPatient, getConnectivity, getPaymentsForPatient } from '../domain/selectors'
 import { getAdmissionsForPatient } from '../domain/admissionSelectors'
 import { updatePatientDemographics, linkAbha } from '../domain/actions'
@@ -48,7 +48,7 @@ export function PatientProfilePage() {
   const { uhid } = useParams<{ uhid: string }>()
   const navigate = useNavigate()
   const { notify } = useToast()
-  const { setPatient } = usePatientContext()
+  const { openFlow } = useFlow()
 
   const patient = useStoreValue(getPatientById, uhid ?? '')
   useCountPatientOpen(patient?.patientId)
@@ -119,10 +119,6 @@ export function PatientProfilePage() {
     }
   }
 
-  function selectAnd(path: string, state?: unknown) {
-    setPatient(patient)
-    navigate(path, state ? { state } : undefined)
-  }
 
   return (
     <div>
@@ -136,11 +132,11 @@ export function PatientProfilePage() {
               <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
               Search
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => selectAnd('/doctors')}>
-              Start visit
+            <Button size="sm" variant="secondary" onClick={() => openFlow('consult', { uhid: patient.uhid })}>
+              Start Consultation
             </Button>
-            <Button size="sm" onClick={() => selectAnd('/appointments/new', { source: 'find-patient' })}>
-              Schedule appointment
+            <Button size="sm" onClick={() => openFlow('schedule', { uhid: patient.uhid })}>
+              Schedule
             </Button>
           </>
         }
@@ -246,15 +242,7 @@ export function PatientProfilePage() {
             action={<span className="text-xs tabular-nums text-ink-faint">{appointments.length}</span>}
           />
           {appointments.length === 0 ? (
-            <EmptyState
-              title="No appointments yet"
-              description="Schedule an appointment or start a walk-in visit for this patient."
-              action={
-                <Button size="sm" onClick={() => selectAnd('/appointments/new', { source: 'find-patient' })}>
-                  Schedule appointment
-                </Button>
-              }
-            />
+            <EmptyState title="No appointments yet" description="Schedule or Start Consultation adds the first one." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] border-collapse text-sm">

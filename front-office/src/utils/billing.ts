@@ -72,7 +72,7 @@ export const DAILY_BED_CHARGE: Record<RoomType, number> = {
 }
 
 /** The ways a patient can pay at admission and at discharge. */
-export const IP_PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'UPI', 'Card', 'Other']
+export const IP_PAYMENT_METHODS: PaymentMethod[] = ['UPI', 'Card']
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

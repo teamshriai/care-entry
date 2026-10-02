@@ -5,7 +5,9 @@
 // refund. No real payment gateway, no card/bank/UPI credentials are ever
 // held here — only the simulated RESULT of a collection.
 
-export type PaymentMethod = 'Cash' | 'UPI' | 'Card' | 'Net Banking' | 'Insurance/TPA' | 'Other'
+/** A cashless hospital: patients pay by UPI or card; an insured inpatient's
+ *  bill is settled by the insurer or TPA. No cash, and no pay-later. */
+export type PaymentMethod = 'UPI' | 'Card' | 'Insurance/TPA'
 
 export type PaymentStatus = 'Pending' | 'Partially Paid' | 'Paid' | 'Cancelled' | 'Refunded'
 
@@ -28,8 +30,6 @@ export interface PaymentTransaction {
   amount: number
   method: PaymentMethod
   collectedAt: number
-  /** Cash handed over, when more than the amount (the receipt shows the change). */
-  tenderedAmount?: number
 }
 
 /** A collection the front desk confirmed did NOT go through — UPI not
@@ -92,7 +92,6 @@ export interface CollectPaymentInput {
   paymentId: string
   amount: number
   method: PaymentMethod
-  tenderedAmount?: number
 }
 
 /** actions.recordFailedPayment's input shape. */

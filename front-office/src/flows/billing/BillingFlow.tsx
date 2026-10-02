@@ -4,30 +4,50 @@ import { IndianRupee, Plus, Printer } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { PaymentPanel } from '../../components/payment/PaymentPanel'
-import type { SettledPayment } from '../../components/payment/PaymentPanel'
 import { BillStatusBadge } from '../../components/payment/BillStatusBadge'
+import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
-import { Alert } from '../../components/ui/Alert'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { useStoreValue } from '../../hooks/useStore'
-import { getBillsByFilter, getPatientById, getPaymentById, getPaymentsForPatient } from '../../domain/selectors'
-import { createPaymentBill } from '../../domain/actions'
+import {
+  getBillForEstimate,
+  getBillsByFilter,
+  getEstimateById,
+  getPatientById,
+  getPaymentById,
+  getPaymentsForPatient,
+} from '../../domain/selectors'
+import { collectPayment, createPaymentBill, recordFailedPayment } from '../../domain/actions'
 import { COUNTER_CHARGES, billNumberFor, billServicesSummary, formatRupees, isBillDue, sumItems } from '../../utils/billing'
 import { cn } from '../../utils/cn'
 import type { FlowProps } from '../registry'
-import type { Payment, PaymentItem } from '../../types/payment'
+import type { Payment, PaymentItem, PaymentMethod } from '../../types/payment'
+
+interface Settled {
+  amount: number
+  method: PaymentMethod
+  bills: Payment[]
+}
 
 /**
- * Billing for one patient: what they owe (dues first, all selected), take
- * the payment, done. Opened from the patient's Billing action, a bill row's
- * Collect, or a bill number typed into search. Opened with no patient (an
- * old Collect Payment link), it starts from the list of everything due.
+ * Billing for one patient: what they owe (dues first, all selected), any
+ * counter charge to add, the payment, done. Opened from the patient's Billing
+ * action, a bill row's Collect, or a bill number typed into search. Opened
+ * with no patient (an old Collect Payment link), it starts from everything
+ * due.
  */
 export function BillingFlow({ params, onClose }: FlowProps) {
   const navigate = useNavigate()
   const [pickedBillId, setPickedBillId] = useState(params.bill ?? '')
   const pickedBill = useStoreValue(getPaymentById, pickedBillId)
-  const patientId = params.uhid ?? pickedBill?.patientId ?? ''
+  // An estimate brought to the counter is paid here and billed as it is paid.
+  const estimate = useStoreValue(getEstimateById, params.estimate ?? '')
+  const estimateBill = useStoreValue(getBillForEstimate, params.estimate ?? '')
+  const estimateItems: PaymentItem[] =
+    estimate && !estimateBill && estimate.status !== 'Cancelled'
+      ? estimate.items.map((item) => ({ code: item.code, description: item.name, amount: item.rate * (item.quantity ?? 1) }))
+      : []
+  const patientId = params.uhid ?? pickedBill?.patientId ?? estimate?.patientId ?? ''
   const patient = useStoreValue(getPatientById, patientId)
   const bills = useStoreValue(getPaymentsForPatient, patientId)
   const allDue = useStoreValue(getBillsByFilter, 'due')
@@ -35,16 +55,22 @@ export function BillingFlow({ params, onClose }: FlowProps) {
   const due = bills.filter(isBillDue)
   const settledBills = bills.filter((bill) => !isBillDue(bill))
 
-  // Everything due starts selected — one confirmation clears the lot. A bill
-  // the flow was opened for is the only selection.
+  // Everything due starts selected — one payment clears the lot. A bill the
+  // flow was opened for is the only selection.
   const [selected, setSelected] = useState<string[]>(() => (params.bill ? [params.bill] : []))
   const [selectionTouched, setSelectionTouched] = useState(Boolean(params.bill))
   const selectedIds = selectionTouched ? selected : due.map((bill) => bill.paymentId)
   const selectedBills = due.filter((bill) => selectedIds.includes(bill.paymentId))
 
+  // Counter charges are added to this payment and only raised once it goes
+  // through — nothing is left on a bill unpaid.
   const [draft, setDraft] = useState<PaymentItem[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [settled, setSettled] = useState<SettledPayment | null>(null)
+  const [settled, setSettled] = useState<Settled | null>(null)
+
+  const amountDue = selectedBills.reduce((sum, bill) => sum + bill.balance, 0) + sumItems(draft) + sumItems(estimateItems)
+  const newBills = (draft.length > 0 ? 1 : 0) + (estimateItems.length > 0 ? 1 : 0)
+  // Part-payment only on one inpatient's running bill (a deposit).
+  const allowPartial = newBills === 0 && selectedBills.length === 1 && Boolean(selectedBills[0].admissionId)
 
   function toggle(bill: Payment) {
     setSelectionTouched(true)
@@ -61,16 +87,34 @@ export function BillingFlow({ params, onClose }: FlowProps) {
     )
   }
 
-  function raiseCharge() {
-    if (!patient || draft.length === 0) return
-    setError(null)
-    try {
-      const bill = createPaymentBill({ patientId: patient.patientId, items: draft })
-      setDraft([])
-      setSelectionTouched(true)
-      setSelected([...selectedIds, bill.paymentId])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+  function pay(method: PaymentMethod, amount: number) {
+    if (!patient) return
+    const paid: Payment[] = []
+    let remaining = amount
+    for (const bill of selectedBills) {
+      if (remaining <= 0) break
+      const portion = Math.min(remaining, bill.balance)
+      paid.push(collectPayment({ paymentId: bill.paymentId, amount: portion, method }))
+      remaining -= portion
+    }
+    if (estimate && estimateItems.length > 0) {
+      const billed = createPaymentBill({ patientId: patient.patientId, items: estimateItems, estimateId: estimate.estimateId })
+      paid.push(collectPayment({ paymentId: billed.paymentId, amount: billed.balance, method }))
+    }
+    if (draft.length > 0) {
+      const charge = createPaymentBill({ patientId: patient.patientId, items: draft })
+      paid.push(collectPayment({ paymentId: charge.paymentId, amount: charge.balance, method }))
+    }
+    setSettled({ amount, method, bills: paid })
+  }
+
+  function fail(method: PaymentMethod, amount: number, reason: string) {
+    let remaining = amount
+    for (const bill of selectedBills) {
+      if (remaining <= 0) break
+      const portion = Math.min(remaining, bill.balance)
+      recordFailedPayment({ paymentId: bill.paymentId, amount: portion, method, reason })
+      remaining -= portion
     }
   }
 
@@ -102,10 +146,9 @@ export function BillingFlow({ params, onClose }: FlowProps) {
           <p className="text-2xl font-semibold tabular-nums text-ink">{formatRupees(settled.amount)}</p>
           <p>
             {settled.method}
-            {settled.change > 0 ? ` · return ${formatRupees(settled.change)} change` : ''}
             {receipt ? ` · ${billNumberFor(receipt)}` : ` · ${settled.bills.length} bills`}
           </p>
-          {stillDue > 0 ? <p className="font-medium text-warning">{formatRupees(stillDue)} still due</p> : null}
+          {stillDue > 0 ? <p className="font-medium text-warning">{formatRupees(stillDue)} remains on the running bill</p> : null}
         </AckCard>
       </FlowSheet>
     )
@@ -152,7 +195,19 @@ export function BillingFlow({ params, onClose }: FlowProps) {
   return (
     <FlowSheet title="Billing" subtitle={subtitle} icon={IndianRupee} iconTone="stable" onClose={onClose}>
       <div className="flex flex-col gap-5">
-        {error ? <Alert tone="critical">{error}</Alert> : null}
+        {estimate && estimateItems.length > 0 ? (
+          <section aria-label="Estimate to pay" className="rounded-xl border border-primary-600 bg-primary-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary-text">Estimate {estimate.estimateId}</p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {estimateItems.map((item) => (
+                <li key={item.code} className="flex justify-between gap-3">
+                  <span className="text-ink">{item.description}</span>
+                  <span className="tabular-nums text-ink">{formatRupees(item.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <section aria-label="Bills due">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-subtle">Due</h3>
@@ -212,24 +267,27 @@ export function BillingFlow({ params, onClose }: FlowProps) {
               </button>
             )
           })}
-          {draft.length > 0 ? (
-            <Button size="sm" variant="secondary" onClick={raiseCharge}>
-              Add {formatRupees(sumItems(draft))} to bill
-            </Button>
-          ) : null}
         </section>
 
-        {selectedBills.length > 0 ? (
+        {amountDue > 0 ? (
           <section aria-label="Payment" className="border-t border-border-soft pt-5">
             <PaymentPanel
-              key={selectedBills.map((bill) => bill.paymentId).join('|')}
-              bills={selectedBills}
-              allowPartial
-              onSettled={setSettled}
+              key={`${selectedIds.join('|')}#${draft.map((d) => d.code).join('|')}#${estimateItems.length}`}
+              amount={amountDue}
+              status={
+                selectedBills.length === 1 && newBills === 0 ? (
+                  <BillStatusBadge payment={selectedBills[0]} />
+                ) : (
+                  <Badge tone="warning">{selectedBills.length + newBills === 1 ? 'Pending' : `${selectedBills.length + newBills} bills`}</Badge>
+                )
+              }
+              allowPartial={allowPartial}
+              onPay={pay}
+              onFail={selectedBills.length > 0 ? fail : undefined}
             />
           </section>
         ) : due.length > 0 ? (
-          <p className="text-sm text-ink-muted">Select the bills to collect.</p>
+          <p className="text-sm text-ink-muted">Select the bills to pay.</p>
         ) : null}
 
         {settledBills.length > 0 ? (

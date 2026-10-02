@@ -10,8 +10,9 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
-import { getTariffs, getDepartments, getActiveEstimateForPatient } from '../domain/selectors'
-import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem, saveEstimate, createPaymentBill } from '../domain/actions'
+import { useFlow } from '../flows/useFlow'
+import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate } from '../domain/selectors'
+import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem, saveEstimate } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { billNumberFor } from '../utils/billing'
 import type { Tariff } from '../types/frontDesk'
@@ -25,11 +26,13 @@ const rupees = (value: number) => `₹${value.toLocaleString('en-IN')}`
 export function EnquiryEstimatePage() {
   const navigate = useNavigate()
   const { notify } = useToast()
+  const { openFlow } = useFlow()
   const { patient, clearPatient } = usePatientContext()
 
   const tariffs = useStoreValue(getTariffs)
   const departments = useStoreValue(getDepartments)
   const estimate = useStoreValue(getActiveEstimateForPatient, patient?.patientId ?? '')
+  const estimateBill = useStoreValue(getBillForEstimate, estimate?.estimateId ?? '')
 
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('All departments')
@@ -83,27 +86,15 @@ export function EnquiryEstimatePage() {
     }
   }
 
-  function handleCreateBill() {
+  // No pay-later: the estimate becomes a bill only as it is paid, in the
+  // billing flow, so there is never an unpaid estimate bill.
+  function handleCollect() {
     if (!estimate || !patient) return
-    try {
-      const bill = createPaymentBill({
-        patientId: patient.patientId,
-        estimateId: estimate.estimateId,
-        items: estimate.items.map((item) => ({
-          code: item.code,
-          description: item.name,
-          amount: item.rate * (item.quantity ?? 1),
-        })),
-      })
-      notify('Bill created', { detail: `${billNumberFor(bill)} · ${rupees(bill.totalAmount)}` })
-      navigate(`/payments/${bill.paymentId}`)
-    } catch (err) {
-      notify('Could not create bill', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
+    openFlow('billing', { uhid: patient.uhid, estimate: estimate.estimateId })
   }
 
   const hasItems = Boolean(estimate && estimate.items.length > 0)
-  const canCreateBill = Boolean(estimate && estimate.status !== 'Cancelled' && hasItems)
+  const canCollect = Boolean(estimate && estimate.status !== 'Cancelled' && hasItems && !estimateBill)
 
   return (
     <div>
@@ -298,7 +289,7 @@ export function EnquiryEstimatePage() {
                 ) : null}
 
                 <p className="text-xs text-ink-faint">
-                  An estimate is not an invoice — billing and collection happen at the billing counter.
+                  An estimate is not an invoice — Collect raises the bill as it is paid.
                 </p>
 
                 {patient ? (
@@ -311,17 +302,22 @@ export function EnquiryEstimatePage() {
                         <Button size="sm" variant="secondary" onClick={() => window.print()}>
                           Print Estimate
                         </Button>
-                        {canCreateBill ? (
-                          <Button size="sm" variant="secondary" onClick={handleCreateBill}>
+                        {canCollect && estimate ? (
+                          <Button size="sm" onClick={handleCollect}>
                             <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            Create Bill
+                            Collect {rupees(estimate.total)}
+                          </Button>
+                        ) : estimateBill ? (
+                          <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${estimateBill.paymentId}`)}>
+                            <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
+                            Paid · {billNumberFor(estimateBill)}
                           </Button>
                         ) : null}
                       </>
                     ) : null}
-                    <Button size="sm" variant="ghost" onClick={() => navigate('/appointments/new')}>
+                    <Button size="sm" variant="ghost" onClick={() => openFlow('schedule', patient ? { uhid: patient.uhid } : {})}>
                       <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Schedule Appointment
+                      Schedule
                     </Button>
                   </div>
                 ) : null}

@@ -13,7 +13,6 @@ import { DoctorDirectoryPage } from './pages/DoctorDirectoryPage'
 import { RegisterDoctorPage } from './pages/RegisterDoctorPage'
 import { DoctorProfilePage } from './pages/DoctorProfilePage'
 import { TodaysAppointmentsPage } from './pages/TodaysAppointmentsPage'
-import { ScheduleAppointmentPage } from './pages/ScheduleAppointmentPage'
 import { OpQueuePage } from './pages/OpQueuePage'
 import { GuestPassPage } from './pages/GuestPassPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
@@ -25,6 +24,7 @@ import { DischargePage } from './pages/DischargePage'
 import { AdmissionDetailPage } from './pages/AdmissionDetailPage'
 import { PaymentDetailPage } from './pages/PaymentDetailPage'
 import { PaymentReceiptPage } from './pages/PaymentReceiptPage'
+import { todayKey } from './domain/time'
 
 /**
  * Starts the page afresh when its query changes — Register opened from the
@@ -35,6 +35,20 @@ import { PaymentReceiptPage } from './pages/PaymentReceiptPage'
 function FreshOnQuery({ children }: { children: ReactNode }) {
   const { search } = useLocation()
   return <div key={search}>{children}</div>
+}
+
+/** Old links to /appointments/new (with a doctor or slot in router state)
+ *  open the schedule flow over Appointments, carrying that starting point. */
+function ScheduleRedirect() {
+  const location = useLocation()
+  const state = (location.state ?? {}) as { providerId?: string; slot?: string; date?: string }
+  const params = new URLSearchParams({ flow: 'schedule' })
+  if (state.providerId) params.set('doctor', state.providerId)
+  if (state.slot) {
+    params.set('date', state.date ?? todayKey())
+    params.set('slot', state.slot)
+  }
+  return <Navigate to={`/appointments?${params.toString()}`} replace />
 }
 
 // No auth route — no authentication or backend infrastructure is built here
@@ -65,15 +79,13 @@ function App() {
             {/* Doctors */}
             <Route path="/doctors" element={<DoctorDirectoryPage />} />
             <Route path="/doctors/register" element={<RegisterDoctorPage />} />
-            {/* Legacy path — the day-across-all-doctors screen was folded
-                into the calendar-first Schedule Appointment page. */}
-            <Route path="/doctors/availability" element={<Navigate to="/appointments/new" replace />} />
+            {/* Legacy path — doctor availability lives in the schedule flow. */}
+            <Route path="/doctors/availability" element={<Navigate to="/appointments?flow=schedule" replace />} />
             <Route path="/doctors/:providerId" element={<DoctorProfilePage />} />
 
-            {/* Appointments — Schedule Appointment (calendar-first) is the
-                single scheduling module; Appointments is its secondary
-                operational list, reached from within it, not the sidebar. */}
-            <Route path="/appointments/new" element={<ScheduleAppointmentPage />} />
+            {/* Appointments — scheduling is a flow over the current page;
+                the old booking route opens it over Appointments. */}
+            <Route path="/appointments/new" element={<ScheduleRedirect />} />
             <Route path="/appointments" element={<TodaysAppointmentsPage />} />
 
             {/* Visits & queue */}

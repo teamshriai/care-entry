@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
+import { useFlow } from '../flows/useFlow'
 import { getDepartments } from '../domain/selectors'
 import { registerDoctor } from '../domain/actions'
 import { initialsOf } from '../utils/format'
@@ -92,6 +93,7 @@ const EMPTY: DoctorFormState = {
 export function RegisterDoctorPage() {
   const navigate = useNavigate()
   const { notify } = useToast()
+  const { openFlow } = useFlow()
   const departments = useStoreValue(getDepartments)
 
   const [form, setForm] = useState<DoctorFormState>(EMPTY)
@@ -170,11 +172,8 @@ export function RegisterDoctorPage() {
                   Doctor directory
                 </Button>
                 {bookable ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate('/appointments/new', { state: { providerId: created.providerId } })}
-                  >
-                    Schedule an appointment
+                  <Button variant="secondary" onClick={() => openFlow('schedule', { doctor: created.providerId })}>
+                    Schedule
                   </Button>
                 ) : null}
                 <Button
