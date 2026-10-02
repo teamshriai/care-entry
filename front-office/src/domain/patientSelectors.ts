@@ -13,6 +13,7 @@ import { getAppointmentsForPatient, getProviderById } from './selectors'
 import { billDisplayStatus, billNumberFor, billServicesSummary, formatRupees, isBillDue, stayDays } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
 import { formatDateKey } from '../utils/dates'
+import { todayKey } from './time'
 
 export type RiskLevel = 'High' | 'Watch' | 'Normal'
 
@@ -76,6 +77,19 @@ export function getPatientHeader(state: AppState, patientId: string, asOf: numbe
         ? { ward: admitted.wardLabel, bed: admitted.bedNumber, day: stayDays(admitted.admittedAt ?? admitted.createdAt, asOf), critical }
         : null,
   }
+}
+
+/** The doctor the patient saw (or is seeing) today — admission is usually
+ *  advised from that outpatient encounter, so the admit flow starts there. */
+export function getTodaysEncounterDoctor(state: AppState, patientId: string): string | null {
+  const appointment = state.appointments
+    .filter((a) => a.patientId === patientId && a.date === state.today && ['Confirmed', 'Checked-in', 'Completed'].includes(a.status))
+    .sort((a, b) => b.slot.localeCompare(a.slot))[0]
+  if (appointment) return appointment.providerId
+  const walkIn = state.visits
+    .filter((v) => v.patientId === patientId && !v.appointmentId && todayKey(new Date(v.arrivalTime)) === state.today)
+    .sort((a, b) => b.arrivalTime - a.arrivalTime)[0]
+  return walkIn?.providerId ?? null
 }
 
 // ------------------------------------------------------------------ timeline

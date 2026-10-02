@@ -10,7 +10,7 @@ import type { AppState } from '../types/store'
 import { computeAdmissionBilling } from './admissionSelectors'
 import { IP_PAYMENT_METHODS, admissionBillItems, formatRupees, sumItems } from '../utils/billing'
 import type { Admission, AdmissionPaymentInput, Bed, CreateAdmissionInput, DischargeDetails } from '../types/admission'
-import type { PaymentItem } from '../types/payment'
+import type { Payment, PaymentItem } from '../types/payment'
 
 function requireAdmission(state: AppState, admissionId: string): Admission {
   const admission = state.admissions.find((a) => a.admissionId === admissionId)
@@ -43,14 +43,26 @@ function assertPayment(payment: AdmissionPaymentInput | undefined, due: number, 
   }
 }
 
-export function admitPatient(input: CreateAdmissionInput): Admission {
+/**
+ * Admits a patient to a bed, raises the admission's bill and — for a
+ * self-pay patient — takes the first-day payment, as one step. The hospital
+ * has no pay-later, so a self-pay admission is saved only with its payment;
+ * an insured, TPA or corporate patient is billed to the payer and settled at
+ * discharge. A request already waiting for a bed is admitted rather than
+ * duplicated. Everything is checked before anything is saved.
+ */
+export function admitPatient(input: CreateAdmissionInput): { admission: Admission; bill: Payment } {
   const state = getState()
   if (!input.patientId) throw new DomainError('VALIDATION', 'Select a patient before admitting.')
   const patient = state.patients.find((p) => p.patientId === input.patientId)
   if (!patient) throw new DomainError('NOT_FOUND', 'That patient no longer exists.')
+  const already = state.admissions.find((a) => a.patientId === patient.patientId && a.status === 'Admitted')
+  if (already) {
+    throw new DomainError('ALREADY_ADMITTED', `${patient.name} is already admitted (${already.wardLabel} · ${already.bedNumber}).`)
+  }
 
   const doctor = state.providers.find((p) => p.providerId === input.doctorId)
-  if (!doctor) throw new DomainError('VALIDATION', 'Select an admitting doctor.')
+  if (!doctor || doctor.status !== 'Active') throw new DomainError('VALIDATION', 'Select an admitting doctor.')
 
   if (!input.reason?.trim()) throw new DomainError('VALIDATION', 'A reason for admission is required.')
   if (!input.attendant.name?.trim() || !input.attendant.phone?.trim()) {
@@ -63,24 +75,29 @@ export function admitPatient(input: CreateAdmissionInput): Admission {
     throw new DomainError('BED_UNAVAILABLE', `${bed.bedNumber} is no longer available — choose another bed.`)
   }
 
-  // The initial charges must be paid to admit: validated before anything is created.
+  const selfPay = input.paymentType === 'Self Pay'
+  if (selfPay && !input.paymentMethod) {
+    throw new DomainError('VALIDATION', 'A self-pay admission is paid when admitted — take the first-day payment.')
+  }
   const billItems = admissionBillItems(bed.roomType, 1)
-  const initialAmount = sumItems(billItems)
-  assertPayment(input.initialPayment, initialAmount, 'initial amount')
 
+  // A request already waiting for a bed (Pending / Bed Reserved) becomes this admission.
+  const waiting = state.admissions.find(
+    (a) => a.patientId === patient.patientId && (a.status === 'Pending' || a.status === 'Bed Reserved'),
+  )
   const seq = state.nextIds.admission
-  const year = new Date().getFullYear()
-  const admissionNumber = `ADM-${year}-${String(seq).padStart(5, '0')}`
   const now = Date.now()
+  const admissionId = waiting?.admissionId ?? `adm-${seq}`
+  const admissionNumber = waiting?.admissionNumber ?? `ADM-${new Date().getFullYear()}-${String(seq).padStart(5, '0')}`
 
   const admission: Admission = {
-    admissionId: `adm-${seq}`,
+    admissionId,
     admissionNumber,
-    patientId: input.patientId,
-    patientName: input.patientName,
+    patientId: patient.patientId,
+    patientName: patient.name,
     doctorId: doctor.providerId,
     doctorName: doctor.name,
-    department: input.department,
+    department: doctor.department,
     admissionType: input.admissionType,
     reason: input.reason.trim(),
     referralSource: input.referralSource,
@@ -91,15 +108,15 @@ export function admitPatient(input: CreateAdmissionInput): Admission {
     roomType: bed.roomType,
     attendant: input.attendant,
     paymentType: input.paymentType,
-    insuranceProvider: input.insuranceProvider ?? null,
-    policyNumber: input.policyNumber ?? null,
+    insuranceProvider: selfPay ? null : input.insuranceProvider?.trim() || null,
+    policyNumber: selfPay ? null : input.policyNumber?.trim() || null,
     paymentId: null,
     status: 'Admitted',
     admittedAt: now,
     dischargedAt: null,
     cancelledAt: null,
     cancelReason: null,
-    createdAt: now,
+    createdAt: waiting?.createdAt ?? now,
     updatedAt: now,
   }
 
@@ -109,23 +126,27 @@ export function admitPatient(input: CreateAdmissionInput): Admission {
       throw new DomainError('BED_UNAVAILABLE', 'That bed was just taken — choose another bed.')
     }
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Patient admitted', meta: `${admissionNumber} · ${input.patientName} · ${bed.bedNumber}` },
+      { text: 'Patient admitted', meta: `${admissionNumber} · ${patient.name} · ${bed.bedNumber}` },
     ])
     return {
       ...current,
-      admissions: [...current.admissions, admission],
+      admissions: waiting
+        ? current.admissions.map((a) => (a.admissionId === admissionId ? admission : a))
+        : [...current.admissions, admission],
       beds: setBedStatus(current, bed.bedId, 'Occupied', admission.admissionId),
       activityLog,
-      nextIds: { ...current.nextIds, admission: seq + 1, activity: activitySeq },
+      nextIds: waiting ? { ...current.nextIds, activity: activitySeq } : { ...current.nextIds, admission: seq + 1, activity: activitySeq },
     }
   })
 
-  // Bill the admission through the existing Payment/Billing system and collect the
-  // initial payment against that one record; Ward Status and Discharge read it later.
-  const billed = createBillForAdmission(admission.admissionId, billItems)
-  collectPayment({ paymentId: billed.paymentId!, amount: input.initialPayment.amount, method: input.initialPayment.method })
+  // The admission's bill, linked both ways; a self-pay patient pays the first day now.
+  const billed = createBillForAdmission(admissionId, billItems)
+  let bill = getState().payments.find((p) => p.paymentId === billed.paymentId)!
+  if (selfPay && input.paymentMethod) {
+    bill = collectPayment({ paymentId: bill.paymentId, amount: bill.balance, method: input.paymentMethod })
+  }
 
-  return requireAdmission(getState(), admission.admissionId)
+  return { admission: requireAdmission(getState(), admissionId), bill }
 }
 
 /** Raises a bill against the existing Payment/Billing system for admission

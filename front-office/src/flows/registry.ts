@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import type { FlowName, FlowParams } from './flowParams'
 import { BillingFlow } from './billing/BillingFlow'
 import { ConsultFlow, ScheduleFlow } from './schedule/ScheduleFlow'
+import { AdmitFlow } from './admit/AdmitFlow'
 
 export interface FlowProps {
   params: FlowParams
@@ -15,4 +16,5 @@ export const FLOWS: Partial<Record<FlowName, ComponentType<FlowProps>>> = {
   billing: BillingFlow,
   schedule: ScheduleFlow,
   consult: ConsultFlow,
+  admit: AdmitFlow,
 }

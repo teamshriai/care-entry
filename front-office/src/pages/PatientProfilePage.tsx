@@ -74,7 +74,7 @@ export function PatientProfilePage() {
         actions={{
           schedule: () => openFlow('schedule', { uhid: patient.uhid }),
           consult: () => openFlow('consult', { uhid: patient.uhid }),
-          admit: () => navigate('/admissions/new'),
+          admit: () => openFlow('admit', { uhid: patient.uhid }),
           discharge: () => navigate('/admissions/discharge'),
           billing: () => openFlow('billing', { uhid: patient.uhid }),
         }}

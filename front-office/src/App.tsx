@@ -19,7 +19,6 @@ import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
 import { BillingPage } from './pages/BillingPage'
 import { AdmissionsBedManagementPage } from './pages/AdmissionsBedManagementPage'
-import { AdmitPatientPage } from './pages/AdmitPatientPage'
 import { DischargePage } from './pages/DischargePage'
 import { AdmissionDetailPage } from './pages/AdmissionDetailPage'
 import { PaymentDetailPage } from './pages/PaymentDetailPage'
@@ -102,7 +101,7 @@ function App() {
 
             {/* IP Admission */}
             <Route path="/admissions" element={<AdmissionsBedManagementPage />} />
-            <Route path="/admissions/new" element={<AdmitPatientPage />} />
+            <Route path="/admissions/new" element={<Navigate to="/admissions?flow=admit" replace />} />
             <Route path="/admissions/list" element={<Navigate to="/admissions" replace />} />
             <Route path="/admissions/beds" element={<Navigate to="/admissions" replace />} />
             <Route path="/admissions/discharge" element={<DischargePage />} />

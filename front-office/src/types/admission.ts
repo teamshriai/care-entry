@@ -135,9 +135,8 @@ export interface AdmissionPaymentInput {
 
 export interface CreateAdmissionInput {
   patientId: string
-  patientName: string
+  /** The department comes from this doctor. */
   doctorId: string
-  department: string
   admissionType: AdmissionType
   reason: string
   referralSource: ReferralSource
@@ -146,6 +145,7 @@ export interface CreateAdmissionInput {
   paymentType: PaymentType
   insuranceProvider?: string | null
   policyNumber?: string | null
-  /** The initial charges collected at admission — required to admit. */
-  initialPayment: AdmissionPaymentInput
+  /** How a self-pay patient pays the first-day bill — required for Self Pay
+   *  (no pay-later); insured, TPA and corporate payers settle at discharge. */
+  paymentMethod?: PaymentMethod
 }

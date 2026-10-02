@@ -17,6 +17,16 @@ export function getAvailableBeds(state: AppState): Bed[] {
   return getBeds(state).filter((b) => b.status === 'Available')
 }
 
+/** A ward's beds, in room order. */
+export function getBedsForWard(state: AppState, ward: Ward): Bed[] {
+  return getBeds(state).filter((b) => b.ward === ward)
+}
+
+/** The bed the admit flow suggests for a ward — the first free one. */
+export function getFirstFreeBed(state: AppState, ward: Ward): Bed | null {
+  return getBeds(state).find((b) => b.ward === ward && b.status === 'Available') ?? null
+}
+
 export function getAdmissions(state: AppState): Admission[] {
   return [...state.admissions].sort((a, b) => b.createdAt - a.createdAt)
 }
