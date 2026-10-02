@@ -39,7 +39,7 @@ export interface PatientDemographicsInput {
   address?: string | null
 }
 
-/** One row of domain/selectors.searchPatients / getPatientSearchResults. */
+/** One row of domain/selectors.searchPatients. */
 export interface PatientSearchMatch {
   patient: Patient
   matchedOn: 'UHID' | 'Name' | 'Name (native script)' | 'Name (known alias)' | 'Mobile' | 'ABHA'

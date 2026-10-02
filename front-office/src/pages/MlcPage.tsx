@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { FileWarning, ShieldCheck, Send } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
@@ -10,8 +9,8 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
-import { getMlcRecords } from '../domain/selectors'
+import { PatientPickField } from '../components/patient/PatientPickField'
+import { getMlcRecords, getPatientById } from '../domain/selectors'
 import { registerMlc, markMlcIntimationSent, acknowledgeMlcIntimation } from '../domain/actions'
 import { todayKey } from '../domain/time'
 import { formatRelativeTime, formatClock } from '../utils/format'
@@ -25,10 +24,10 @@ const inputClass =
   'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
 
 export function MlcPage() {
-  const navigate = useNavigate()
   const now = useNow(60000)
   const { notify } = useToast()
-  const { patient } = usePatientContext()
+  const [patientId, setPatientId] = useState('')
+  const patient = useStoreValue(getPatientById, patientId)
   const records = useStoreValue(getMlcRecords)
 
   const [category, setCategory] = useState<MlcCategory | ''>('')
@@ -52,6 +51,7 @@ export function MlcPage() {
         incidentAt,
       })
       notify('MLC registered', { detail: `${record.mlcId} · ${record.patientName}` })
+      setPatientId('')
       setCategory('')
       setPoliceStation('')
       setIncidentAt('')
@@ -86,27 +86,19 @@ export function MlcPage() {
               {error ? <Alert tone="critical">{error}</Alert> : null}
 
               <div>
-                <p className="text-xs font-medium text-ink-muted">Patient</p>
-                {patient ? (
-                  <div className="mt-1.5 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2.5">
-                    <p className="text-sm font-semibold text-ink">{patient.name}</p>
-                    <p className="text-xs text-ink-muted">
-                      {patient.uhid} · {patient.age ?? '—'} yrs · {patient.sex}
-                    </p>
-                  </div>
-                ) : (
-                  <Alert tone="warning" className="mt-1.5">
-                    Select or register the patient first — identity may be pending, but an MLC is always bound to a
-                    patient record.{' '}
-                    <button
-                      type="button"
-                      className="font-semibold underline"
-                      onClick={() => navigate('/patients/search')}
-                    >
-                      Find patient
-                    </button>
-                  </Alert>
-                )}
+                <p className="mb-1.5 text-xs font-medium text-ink-muted">
+                  Patient <span className="text-critical">*</span>
+                </p>
+                <PatientPickField
+                  patient={patient}
+                  onChange={(next) => setPatientId(next.patientId)}
+                  placeholder="Search the patient — register them first if new"
+                />
+                {!patient ? (
+                  <p className="mt-1.5 text-xs text-ink-muted">
+                    An MLC is always bound to a patient record — identity may still be pending.
+                  </p>
+                ) : null}
               </div>
 
               <div>

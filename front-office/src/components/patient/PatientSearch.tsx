@@ -78,6 +78,12 @@ export function PatientSearch(props: PatientSearchProps) {
   }
   const activeIndex = options.length === 0 ? -1 : Math.min(active, options.length - 1)
 
+  // Picking straight away (e.g. after "Change"): the cursor is already in the box.
+  const focusOnMount = props.mode === 'pick' && Boolean(props.autoFocus)
+  useEffect(() => {
+    if (focusOnMount) inputRef.current?.focus()
+  }, [focusOnMount])
+
   useEffect(() => {
     if (!open) return undefined
     function handleMouseDown(event: MouseEvent) {

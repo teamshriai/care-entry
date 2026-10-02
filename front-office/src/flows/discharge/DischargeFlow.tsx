@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Printer } from 'lucide-react'
+import { IdCard, LogOut, Printer } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { StepSection } from '../../components/flow/StepSection'
@@ -13,7 +13,7 @@ import { WardIcon } from '../../components/ui/WardIcon'
 import { useStoreValue } from '../../hooks/useStore'
 import { useNow } from '../../hooks/useNow'
 import { getState } from '../../domain/store'
-import { getPatientById, getPaymentById } from '../../domain/selectors'
+import { getActiveGuestPasses, getPatientById, getPaymentById } from '../../domain/selectors'
 import { getAdmissionById, previewDischargeBill } from '../../domain/admissionSelectors'
 import { getCurrentAdmissionForPatient } from '../../domain/patientSelectors'
 import { dischargeAdmission, repriceAdmissionBill } from '../../domain/admissionActions'
@@ -52,6 +52,7 @@ interface Discharged {
   admission: Admission
   bill: Payment | null
   days: number
+  passIds: string[]
 }
 
 /**
@@ -70,6 +71,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
   const current = useStoreValue(getCurrentAdmissionForPatient, patientId)
   const admission = current?.status === 'Admitted' ? current : null
   const preview = useStoreValue(previewDischargeBill, admission?.admissionId ?? '', now)
+  const passes = useStoreValue(getActiveGuestPasses, patientId)
 
   const [dischargeType, setDischargeType] = useState<DischargeType>('Normal Discharge')
   const [remarks, setRemarks] = useState('')
@@ -109,7 +111,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
     try {
       const result = dischargeAdmission(admission.admissionId, { dischargeType, remarks })
       const bill = result.paymentId ? getPaymentById(getState(), result.paymentId) : null
-      setDone({ admission: result, bill, days: preview.days })
+      setDone({ admission: result, bill, days: preview.days, passIds: passes.map((pass) => pass.passId) })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -120,7 +122,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
     : 'Choose the patient'
 
   if (done) {
-    const { admission: left, bill, days } = done
+    const { admission: left, bill, days, passIds } = done
     return (
       <FlowSheet title="Discharge" subtitle={subtitle} icon={LogOut} iconTone="info" onClose={onClose}>
         <AckCard
@@ -147,6 +149,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
             {left.admissionNumber} · Day {days} · {TYPE_LABEL[left.dischargeType ?? 'Normal Discharge']}
           </p>
           {bill ? <p>Final bill {formatRupees(bill.totalAmount)} · settled</p> : null}
+          {passIds.length > 0 ? <p>Guest pass {passIds.join(', ')} returned</p> : null}
         </AckCard>
       </FlowSheet>
     )
@@ -265,6 +268,12 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                   aria-label="Discharge remarks"
                   className={inputClass}
                 />
+                {passes.length > 0 ? (
+                  <p className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-muted">
+                    <IdCard className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                    Collect guest pass {passes.map((pass) => pass.passId).join(', ')} — it is returned with the discharge.
+                  </p>
+                ) : null}
                 {error ? <Alert tone="critical">{error}</Alert> : null}
                 <Button size="lg" disabled={!preview.canDischarge} onClick={discharge}>
                   <LogOut className="h-4 w-4" strokeWidth={1.75} />

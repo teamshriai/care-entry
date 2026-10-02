@@ -1,31 +1,25 @@
-import { useMemo, useState } from 'react'
-import { IdCard, Search, Undo2 } from 'lucide-react'
+import { useState } from 'react'
+import { IdCard, Undo2 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
+import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
-import { getGuestPasses, getKnownWards, searchPatients } from '../domain/selectors'
+import { getGuestPasses, getPatientById } from '../domain/selectors'
+import { getCurrentAdmissionForPatient } from '../domain/patientSelectors'
 import { issueGuestPass, returnGuestPass } from '../domain/actions'
 import { todayKey } from '../domain/time'
 import { formatClock, formatRelativeTime } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { GuestPass } from '../types/frontDesk'
-import type { Patient } from '../types/patient'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const RELATIONSHIPS = ['Spouse', 'Son', 'Daughter', 'Parent', 'Sibling', 'Other']
-
-// Standard wards offered on every install; wards already defined elsewhere in
-// the project (bed data, existing passes) are appended by getKnownWards.
-// A pass stores the short ward code ('2A') or the full ward name ('ICU',
-// 'General Ward'), exactly as the seeded passes do.
-const STANDARD_WARDS = ['2A', '2B', '3A', '3B', 'ICU']
 const NAMED_WARD = /ward|icu|emergency/i
 
 /** Display text for a stored ward value: short codes read 'Ward 2A', names
@@ -37,23 +31,14 @@ function wardLabel(ward: string): string {
 export function GuestPassPage() {
   const now = useNow(30000)
   const { notify } = useToast()
-  const { patient: contextPatient } = usePatientContext()
-  const knownWards = useStoreValue(getKnownWards)
   const passes = useStoreValue(getGuestPasses)
 
-  // The patient chosen on this form. Starts from whoever is already in
-  // context (selected via the app bar or Find Patient) but is changeable here.
-  const [chosenPatient, setChosenPatient] = useState<Patient | null>(null)
-  const [changing, setChanging] = useState(false)
-  const patient = changing ? null : (chosenPatient ?? contextPatient)
-  const [query, setQuery] = useState('')
-  const matches = useStoreValue(searchPatients, query)
-  const [ward, setWard] = useState('')
+  // A pass is for an admitted patient's companion; the ward is the one
+  // they are in.
+  const [patientId, setPatientId] = useState('')
+  const patient = useStoreValue(getPatientById, patientId)
+  const stay = useStoreValue(getCurrentAdmissionForPatient, patientId)
   const [relationship, setRelationship] = useState('')
-  const wardOptions = useMemo(() => {
-    const extra = knownWards.filter((known) => !STANDARD_WARDS.includes(known))
-    return [...STANDARD_WARDS, ...extra].map((value) => ({ value, label: wardLabel(value) }))
-  }, [knownWards])
   const [error, setError] = useState<string | null>(null)
 
   const active = passes.filter((pass) => !pass.returned)
@@ -68,13 +53,10 @@ export function GuestPassPage() {
       // The submit button is disabled without a patient, so this only runs
       // once one is selected; the '' fallback just satisfies the type and
       // fails the same server-side validation an undefined id would.
-      const pass = issueGuestPass({ patientId: patient?.patientId ?? '', ward, relationship })
+      const pass = issueGuestPass({ patientId: patient?.patientId ?? '', relationship })
       notify('Guest pass issued', { detail: `${pass.passId} · ${pass.patientName}` })
-      setWard('')
       setRelationship('')
-      setChosenPatient(null)
-      setChanging(false)
-      setQuery('')
+      setPatientId('')
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -95,7 +77,7 @@ export function GuestPassPage() {
     <div>
       <PageHeader
         title="Guest Pass"
-        subtitle="Issue and return guest passes. One active pass per patient — overdue passes surface on the dashboard."
+        subtitle="A pass for an inpatient's companion — one per patient, for the ward they are in, returned at discharge."
       />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -106,83 +88,19 @@ export function GuestPassPage() {
               {error ? <Alert tone="critical">{error}</Alert> : null}
 
               <div>
-                <label className="text-xs font-medium text-ink-muted">
-                  Search Patient <span className="text-critical">*</span>
-                </label>
-                {patient ? (
-                  <div className="mt-1.5 flex items-start justify-between gap-3 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-ink">{patient.name}</p>
-                      <p className="text-xs text-ink-muted">UHID {patient.uhid}</p>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setChanging(true)
-                        setQuery('')
-                      }}
-                    >
-                      Change
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="relative mt-1.5">
-                    <div className="flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
-                      <Search className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={1.75} />
-                      <input
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                        placeholder="Search by patient name or UHID"
-                        className="h-full w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
-                      />
-                    </div>
-                    {query.trim().length >= 2 ? (
-                      <div className="menu-surface absolute left-0 top-[calc(100%+4px)] z-30 w-full overflow-hidden rounded-xl">
-                        {matches.length > 0 ? (
-                          <div className="max-h-64 divide-y divide-border-soft overflow-y-auto">
-                            {matches.slice(0, 6).map(({ patient: match }) => (
-                              <button
-                                key={match.patientId}
-                                type="button"
-                                onClick={() => {
-                                  setChosenPatient(match)
-                                  setChanging(false)
-                                  setQuery('')
-                                }}
-                                className="block w-full px-4 py-2.5 text-left transition-colors hover:bg-surface-muted"
-                              >
-                                <p className="truncate text-sm font-medium text-ink">{match.name}</p>
-                                <p className="truncate text-xs text-ink-muted">UHID {match.uhid}</p>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="px-4 py-3 text-sm text-ink-muted">No matching patients</p>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-ink-muted">
-                  Ward <span className="text-critical">*</span>
-                </label>
-                <select
-                  value={ward}
-                  onChange={(event) => setWard(event.target.value)}
-                  className="mt-1.5 h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                >
-                  <option value="">Select Ward</option>
-                  {wardOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <p className="mb-1.5 text-xs font-medium text-ink-muted">
+                  Inpatient <span className="text-critical">*</span>
+                </p>
+                <PatientPickField
+                  patient={patient}
+                  onChange={(next) => {
+                    setPatientId(next.patientId)
+                    setError(null)
+                  }}
+                  scope="inpatients"
+                  placeholder="Search an admitted patient by name, mobile or UHID"
+                  detail={stay?.wardLabel ? `${stay.wardLabel} · ${stay.bedNumber}` : undefined}
+                />
               </div>
 
               <div>
@@ -208,8 +126,8 @@ export function GuestPassPage() {
                 </div>
               </div>
 
-              <Button type="submit" disabled={!patient || !ward || !relationship}>
-                Issue pass
+              <Button type="submit" disabled={!patient || stay?.status !== 'Admitted' || !relationship}>
+                Issue pass{stay?.wardLabel ? ` · ${wardLabel(stay.wardLabel)}` : ''}
               </Button>
             </form>
           </CardBody>

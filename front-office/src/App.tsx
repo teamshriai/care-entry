@@ -2,11 +2,9 @@ import type { ReactNode } from 'react'
 import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { AppLayout } from './layouts/AppLayout'
 import { ThemeProvider } from './contexts/ThemeProvider'
-import { PatientProvider } from './contexts/PatientContext'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { FrontOfficeHomePage } from './pages/FrontOfficeHomePage'
-import { FindPatientPage } from './pages/FindPatientPage'
-import { PatientListPage } from './pages/PatientListPage'
+import { PatientsPage } from './pages/PatientsPage'
 import { RegisterPatientPage } from './pages/RegisterPatientPage'
 import { PatientProfilePage } from './pages/PatientProfilePage'
 import { DoctorDirectoryPage } from './pages/DoctorDirectoryPage'
@@ -75,14 +73,13 @@ function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <PatientProvider>
           <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<FrontOfficeHomePage />} />
 
-            {/* Patients */}
-            <Route path="/patients" element={<PatientListPage />} />
-            <Route path="/patients/search" element={<FindPatientPage />} />
+            {/* Patients — one list; finding a patient is the search in the app bar */}
+            <Route path="/patients" element={<PatientsPage />} />
+            <Route path="/patients/search" element={<Navigate to="/patients" replace />} />
             <Route path="/patients/:uhid" element={<PatientProfilePage />} />
             <Route
               path="/register/new"
@@ -145,7 +142,6 @@ function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </PatientProvider>
       </ToastProvider>
     </ThemeProvider>
   )

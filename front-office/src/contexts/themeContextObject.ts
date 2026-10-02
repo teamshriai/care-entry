@@ -9,6 +9,5 @@ export interface ThemeContextValue {
 }
 
 // The context object lives in its own module so ThemeProvider.tsx exports
-// only components and stays fast-refresh friendly (same split as
-// PatientContext/useToast).
+// only components and stays fast-refresh friendly (same split as useToast).
 export const ThemeContext = createContext<ThemeContextValue | null>(null)

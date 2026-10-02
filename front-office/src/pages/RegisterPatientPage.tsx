@@ -12,7 +12,6 @@ import { Avatar } from '../components/ui/Avatar'
 import { AckCard } from '../components/flow/AckCard'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
 import { findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
 import { registerPatient } from '../domain/actions'
 import { initialsOf } from '../utils/format'
@@ -46,7 +45,6 @@ export function RegisterPatientPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { notify } = useToast()
-  const { setPatient } = usePatientContext()
   const connectivity = useStoreValue(getConnectivity)
   const [form, setForm] = useState<PatientFormState>(() => {
     const prefill = prefillFrom(location.search, location.state as RegisterPatientLocationState | null)
@@ -66,9 +64,7 @@ export function RegisterPatientPage() {
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     try {
-      const patient = registerPatient(form)
-      setPatient(patient)
-      setRegistered(patient)
+      setRegistered(registerPatient(form))
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -77,7 +73,6 @@ export function RegisterPatientPage() {
   }
 
   function openExistingPatient(patient: Patient) {
-    setPatient(patient)
     navigate(`/patients/${patient.uhid}`, { replace: true })
   }
 

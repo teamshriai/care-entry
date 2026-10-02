@@ -13,9 +13,9 @@ export interface GuestPass {
   returned: boolean
 }
 
+/** The ward comes from the patient's current stay. */
 export interface IssueGuestPassInput {
   patientId: string
-  ward: string
   relationship?: string
 }
 

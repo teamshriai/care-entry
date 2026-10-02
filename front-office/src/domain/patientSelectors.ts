@@ -8,8 +8,9 @@ import type { Payment } from '../types/payment'
 import type { PatientAppointmentRow } from '../types/appointment'
 import type { Provider } from '../types/doctor'
 import type { QueueToken } from '../types/queue'
+import type { Patient } from '../types/patient'
 import { computeAdmissionBilling } from './admissionSelectors'
-import { getAppointmentsForPatient, getProviderById } from './selectors'
+import { getAppointmentsForPatient, getPatientFlags, getPossibleDuplicates, getProviderById } from './selectors'
 import { billDisplayStatus, billNumberFor, billServicesSummary, formatRupees, isBillDue, stayDays } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
 import { formatDateKey } from '../utils/dates'
@@ -29,6 +30,31 @@ const OPEN_ADMISSION = ['Pending', 'Bed Reserved', 'Admitted']
 
 export function getCurrentAdmissionForPatient(state: AppState, patientId: string): Admission | null {
   return state.admissions.find((a) => a.patientId === patientId && OPEN_ADMISSION.includes(a.status)) ?? null
+}
+
+export interface PatientListRow {
+  patient: Patient
+  /** Bed number while admitted. */
+  bed: string | null
+  due: number
+  failed: boolean
+  /** Shares a mobile number with another record. */
+  duplicate: boolean
+}
+
+/** Every registered patient, newest first, with the marks the desk acts on. */
+export function getPatientRows(state: AppState): PatientListRow[] {
+  const flags = getPatientFlags(state)
+  const duplicates = new Set(getPossibleDuplicates(state).flat().map((p) => p.patientId))
+  return [...state.patients]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((patient) => ({
+      patient,
+      bed: flags[patient.patientId]?.bed ?? null,
+      due: flags[patient.patientId]?.due ?? 0,
+      failed: flags[patient.patientId]?.failed ?? false,
+      duplicate: duplicates.has(patient.patientId),
+    }))
 }
 
 /** The profile header: risk dot, payment chip and inpatient tag. An

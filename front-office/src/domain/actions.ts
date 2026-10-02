@@ -807,11 +807,14 @@ export function linkAbha(patientId: string, abhaId: string): void {
 
 // -------------------------------------------------------- front desk services
 
-export function issueGuestPass({ patientId, ward, relationship }: IssueGuestPassInput): GuestPass {
+export function issueGuestPass({ patientId, relationship }: IssueGuestPassInput): GuestPass {
   const state = getState()
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('VALIDATION', 'Select a patient first.')
-  if (!ward?.trim()) throw new DomainError('VALIDATION', 'Ward is required.')
+  // A guest pass is for an admitted patient's companion, for the ward they are in.
+  const stay = state.admissions.find((a) => a.patientId === patientId && a.status === 'Admitted')
+  if (!stay?.wardLabel) throw new DomainError('VALIDATION', `${patient.name} is not admitted — guest passes are for inpatients.`)
+  const ward = stay.wardLabel
 
   const openForPatient = state.guestPasses.filter((p) => p.patientId === patientId && !p.returned).length
   if (openForPatient >= 1) {

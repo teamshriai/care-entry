@@ -64,15 +64,9 @@ export function getGuestPasses(state: AppState): GuestPass[] {
   return [...state.guestPasses].sort((a, b) => b.issuedAt - a.issuedAt)
 }
 
-/** Wards already defined in the project — every ward that has beds in the
- *  admission data plus any ward an existing pass was issued against. The
- *  Guest Pass form offers these (with a few standard wards) as its only
- *  choices; no ward name is ever typed in freehand. */
-export function getKnownWards(state: AppState): string[] {
-  const wards = new Set<string>()
-  for (const bed of state.beds) wards.add(bed.ward)
-  for (const pass of state.guestPasses) wards.add(pass.ward)
-  return [...wards]
+/** A patient's guest passes still out. */
+export function getActiveGuestPasses(state: AppState, patientId: string): GuestPass[] {
+  return state.guestPasses.filter((p) => p.patientId === patientId && !p.returned)
 }
 
 export function getEstimates(state: AppState): Estimate[] {
@@ -893,37 +887,6 @@ export function getPatientFlags(state: AppState): Record<string, PatientFlags> {
     if (billDisplayStatus(payment) === 'Failed') entry.failed = true
   }
   return flags
-}
-
-export interface PatientSearchResult extends PatientSearchMatch {
-  appointmentToday: AppointmentRow | null
-  appointmentCount: number
-}
-
-/** Search results with the operational context staff need to act on. */
-export function getPatientSearchResults(state: AppState, rawQuery: string): PatientSearchResult[] {
-  const appointments = getAppointmentsForDate(state)
-  return searchPatients(state, rawQuery).map((result) => {
-    const todays = appointments
-      .filter((a) => a.patientId === result.patient.patientId && a.status !== 'Cancelled')
-      .sort((a, b) => a.slot.localeCompare(b.slot))
-    return { ...result, appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
-  })
-}
-
-/** Every patient in the store, most recently registered first — the Patient
- *  List shown when nothing has been searched. Reads the same `state.patients`
- *  that registration writes to, so a newly registered patient appears at once. */
-export function getPatientList(state: AppState): PatientSearchResult[] {
-  const appointments = getAppointmentsForDate(state)
-  return [...state.patients]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map((patient) => {
-      const todays = appointments
-        .filter((a) => a.patientId === patient.patientId && a.status !== 'Cancelled')
-        .sort((a, b) => a.slot.localeCompare(b.slot))
-      return { patient, matchedOn: 'Name', tier: 0, appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
-    })
 }
 
 // -------------------------------------------------------------- payments

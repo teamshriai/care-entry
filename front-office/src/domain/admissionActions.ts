@@ -12,6 +12,7 @@ import { admissionBillItems, formatRupees, sumItems } from '../utils/billing'
 import { DISCHARGE_TYPES } from '../types/admission'
 import type { Admission, Bed, CreateAdmissionInput, DischargeDetails } from '../types/admission'
 import type { Payment, PaymentItem } from '../types/payment'
+import type { GuestPass } from '../types/frontDesk'
 
 function requireAdmission(state: AppState, admissionId: string): Admission {
   const admission = state.admissions.find((a) => a.admissionId === admissionId)
@@ -181,8 +182,10 @@ export function cancelAdmission(admissionId: string, reason: string): Admission 
   const now = Date.now()
   let updated!: Admission
   setState((current) => {
+    const passes = activePasses(current, admission.patientId)
     const { activityLog, activitySeq } = withActivity(current, [
       { text: 'Admission cancelled', meta: `${admission.admissionNumber} · ${reason.trim()}` },
+      ...passes.map((pass) => ({ text: 'Guest pass returned', meta: `${pass.passId} · admission cancelled` })),
     ])
     const admissions = current.admissions.map((a) => {
       if (a.admissionId !== admissionId) return a
@@ -197,7 +200,15 @@ export function cancelAdmission(admissionId: string, reason: string): Admission 
         ? { ...p, status: 'Cancelled' as const, cancelledAt: now, cancelReason: 'Admission cancelled', updatedAt: now }
         : p,
     )
-    return { ...current, admissions, beds, payments, activityLog, nextIds: { ...current.nextIds, activity: activitySeq } }
+    return {
+      ...current,
+      admissions,
+      beds,
+      payments,
+      guestPasses: returnPasses(current, admission.patientId, now),
+      activityLog,
+      nextIds: { ...current.nextIds, activity: activitySeq },
+    }
   })
 
   return updated
@@ -228,8 +239,10 @@ export function dischargeAdmission(admissionId: string, details: DischargeDetail
 
   let updated!: Admission
   setState((current) => {
+    const passes = activePasses(current, admission.patientId)
     const { activityLog, activitySeq } = withActivity(current, [
       { text: 'Patient discharged', meta: `${admission.admissionNumber} · ${admission.patientName} · ${admission.bedNumber ?? ''}` },
+      ...passes.map((pass) => ({ text: 'Guest pass returned', meta: `${pass.passId} · at discharge` })),
     ])
     const admissions = current.admissions.map((a) => {
       if (a.admissionId !== admissionId) return a
@@ -244,10 +257,28 @@ export function dischargeAdmission(admissionId: string, details: DischargeDetail
       return updated
     })
     const beds = admission.bedId ? setBedStatus(current, admission.bedId, 'Available', null) : current.beds
-    return { ...current, admissions, beds, activityLog, nextIds: { ...current.nextIds, activity: activitySeq } }
+    return {
+      ...current,
+      admissions,
+      beds,
+      guestPasses: returnPasses(current, admission.patientId, now),
+      activityLog,
+      nextIds: { ...current.nextIds, activity: activitySeq },
+    }
   })
 
   return updated
+}
+
+/** A patient's guest passes still out. */
+function activePasses(current: AppState, patientId: string): GuestPass[] {
+  return current.guestPasses.filter((p) => p.patientId === patientId && !p.returned)
+}
+
+/** The pass comes back when the stay ends — collected at the desk with the
+ *  discharge (or the cancellation), so no one is left holding a live pass. */
+function returnPasses(current: AppState, patientId: string, at: number): GuestPass[] {
+  return current.guestPasses.map((p) => (p.patientId === patientId && !p.returned ? { ...p, returned: true, returnedAt: at } : p))
 }
 
 /** Brings a current stay's bill up to the stay so far — the admission charge

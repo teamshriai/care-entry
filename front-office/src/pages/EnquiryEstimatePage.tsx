@@ -5,29 +5,27 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
+import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
 import { useFlow } from '../flows/useFlow'
-import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate } from '../domain/selectors'
+import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate, getPatientById } from '../domain/selectors'
 import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem, saveEstimate } from '../domain/actions'
-import { initialsOf } from '../utils/format'
 import { billNumberFor } from '../utils/billing'
 import type { Tariff } from '../types/frontDesk'
 
 const rupees = (value: number) => `₹${value.toLocaleString('en-IN')}`
 
-/** An estimate always belongs to exactly one patient — the counter's own
- *  patient context (the same one used by Book Appointment, Visit Opening
- *  and MLC) gates every "Add", so there is no anonymous/global estimate to
+/** An estimate always belongs to exactly one patient — the patient chosen
+ *  here gates every "Add", so there is no anonymous/global estimate to
  *  accidentally add a service into. */
 export function EnquiryEstimatePage() {
   const navigate = useNavigate()
   const { notify } = useToast()
   const { openFlow } = useFlow()
-  const { patient, clearPatient } = usePatientContext()
+  const [patientId, setPatientId] = useState('')
+  const patient = useStoreValue(getPatientById, patientId)
 
   const tariffs = useStoreValue(getTariffs)
   const departments = useStoreValue(getDepartments)
@@ -104,46 +102,19 @@ export function EnquiryEstimatePage() {
       />
 
       <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
-        {/* Patient gate / context — the same PatientContext used across the portal */}
+        {/* Patient gate — every estimate belongs to one patient */}
         <Card>
-          <CardBody>
-            {patient ? (
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar initials={initialsOf(patient.name)} size="sm" />
-                    <div>
-                      <p className="text-2xs font-medium uppercase tracking-wide text-ink-faint">Patient</p>
-                      <p className="text-sm font-semibold text-ink">{patient.name}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-2xs font-medium uppercase tracking-wide text-ink-faint">UHID</p>
-                    <p className="text-sm text-ink">{patient.uhid}</p>
-                  </div>
-                  <div>
-                    <p className="text-2xs font-medium uppercase tracking-wide text-ink-faint">Mobile</p>
-                    <p className="text-sm text-ink">{patient.mobile}</p>
-                  </div>
-                </div>
-                <Button size="sm" variant="secondary" onClick={clearPatient}>
-                  Change Patient
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-ink">Select a patient to create an estimate</p>
-                  <p className="text-xs text-ink-muted">
-                    Services can be browsed below, but every estimate belongs to a specific patient.
-                  </p>
-                </div>
-                <Button size="sm" onClick={() => navigate('/patients/search')}>
-                  <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Find Patient
-                </Button>
-              </div>
-            )}
+          <CardBody className="flex flex-col gap-2 lg:max-w-xl">
+            <p className="text-xs font-medium text-ink-muted">Patient</p>
+            <PatientPickField
+              patient={patient}
+              onChange={(next) => setPatientId(next.patientId)}
+              placeholder="Search the patient this estimate is for"
+              detail={patient?.mobile}
+            />
+            {!patient ? (
+              <p className="text-xs text-ink-muted">Services can be browsed below; every estimate belongs to a specific patient.</p>
+            ) : null}
           </CardBody>
         </Card>
 

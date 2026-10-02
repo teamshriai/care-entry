@@ -42,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Care Entry',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
-      { to: '/patients/search', label: 'Search Patient', icon: Users, tone: 'teal' },
+      { to: '/patients', label: 'Patients', icon: Users, tone: 'teal' },
       { to: '/register/new', label: 'Register Patient', icon: UserPlus, tone: 'teal' },
     ],
   },
