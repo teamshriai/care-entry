@@ -20,7 +20,8 @@ import { updatePatientDemographics, linkAbha } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
-import { billNumberFor, billServicesSummary, paymentStatusTone } from '../utils/billing'
+import { billNumberFor, billServicesSummary } from '../utils/billing'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { appointmentStatusLabel } from '../utils/appointment'
 import type { Sex } from '../types/patient'
 
@@ -309,7 +310,7 @@ export function PatientProfilePage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-3">
                     <span className="text-sm font-semibold tabular-nums text-ink">{rupees(bill.totalAmount)}</span>
-                    <Badge tone={paymentStatusTone(bill.status)} status={bill.status} />
+                    <BillStatusBadge payment={bill} />
                   </div>
                 </div>
               ))}

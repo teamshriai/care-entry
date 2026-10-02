@@ -11,6 +11,8 @@ export type DomainErrorCode =
   | 'DUPLICATE'
   | 'PASS_LIMIT'
   | 'BED_UNAVAILABLE'
+  | 'ALREADY_ADMITTED'
+  | 'BALANCE_DUE'
 
 export class DomainError extends Error {
   code: DomainErrorCode

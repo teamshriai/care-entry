@@ -136,7 +136,7 @@ export function createBillForAdmission(admissionId: string, items: { code: strin
   if (admission.paymentId) throw new DomainError('INVALID_TRANSITION', 'This admission already has a bill.')
   if (!items.length) throw new DomainError('VALIDATION', 'Select at least one charge.')
 
-  const bill = createPaymentBill({ patientId: admission.patientId, items })
+  const bill = createPaymentBill({ patientId: admission.patientId, items, admissionId })
 
   let updated!: Admission
   setState((current) => {
@@ -213,7 +213,7 @@ export function dischargeAdmission(
   // never had one), then collect the pending amount against it.
   let paymentId = admission.paymentId
   if (!paymentId) {
-    const bill = createPaymentBill({ patientId: admission.patientId, items: billing.items })
+    const bill = createPaymentBill({ patientId: admission.patientId, items: billing.items, admissionId })
     paymentId = bill.paymentId
     setState((current) => ({
       ...current,
@@ -252,13 +252,15 @@ export function dischargeAdmission(
 
 /** Brings an admission's Payment record up to date with the final line items — the
  *  record's own items/total/balance/status, nothing else (paid amount and
- *  transactions are untouched). */
+ *  transactions are untouched). A cancelled or refunded bill is closed and is
+ *  never re-opened by re-pricing. */
 function syncPaymentToBill(paymentId: string, items: PaymentItem[]): void {
   const total = sumItems(items)
   setState((current) => ({
     ...current,
     payments: current.payments.map((p) => {
       if (p.paymentId !== paymentId) return p
+      if (p.status === 'Cancelled' || p.status === 'Refunded') return p
       const balance = Math.max(0, total - p.paidAmount)
       const status = balance === 0 ? 'Paid' : p.paidAmount > 0 ? 'Partially Paid' : 'Pending'
       return { ...p, items, totalAmount: total, balance, status, updatedAt: Date.now() }

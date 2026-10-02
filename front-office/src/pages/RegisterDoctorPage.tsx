@@ -28,7 +28,7 @@ const DAYS = [
   { value: 0, label: 'Sun' },
 ]
 const GENDERS: Gender[] = ['Male', 'Female', 'Other']
-const CONSULT_TYPES: ConsultationType[] = ['OPD', 'OPD + Teleconsult', 'Teleconsult only']
+const CONSULT_TYPES: ConsultationType[] = ['Outpatient', 'Outpatient + Teleconsult', 'Teleconsult only']
 const ROLES: DoctorRole[] = ['Consultant', 'Senior Consultant', 'Associate Consultant', 'Visiting Consultant', 'Registrar']
 const SLOT_LENGTHS = [10, 15, 20, 30, 45]
 
@@ -71,7 +71,7 @@ const EMPTY: DoctorFormState = {
   registrationNumber: '',
   experienceYears: '',
   employeeId: '',
-  consultationType: 'OPD',
+  consultationType: 'Outpatient',
   consultationFee: '',
   room: '',
   workingDays: [1, 2, 3, 4, 5],
@@ -342,7 +342,7 @@ export function RegisterDoctorPage() {
                   <input
                     value={form.room}
                     onChange={(e) => update('room', e.target.value)}
-                    placeholder="OPD Room 4, Block A"
+                    placeholder="Room 4, Block A"
                     className={inputClass}
                   />
                 </Field>

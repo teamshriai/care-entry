@@ -5,14 +5,14 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { BillingIllustration } from '../components/ui/illustrations/BillingIllustration'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { getPayments } from '../domain/selectors'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
-import { billNumberFor, billServicesSummary, paymentStatusTone } from '../utils/billing'
+import { billNumberFor, billServicesSummary } from '../utils/billing'
 
 function rupees(value: number): string {
   return `₹${value.toLocaleString('en-IN')}`
@@ -112,7 +112,7 @@ export function BillsListPage() {
                         {rupees(payment.balance)}
                       </td>
                       <td className="whitespace-nowrap px-5 py-3">
-                        <Badge tone={paymentStatusTone(payment.status)} status={payment.status} />
+                        <BillStatusBadge payment={payment} />
                       </td>
                       <td className="whitespace-nowrap px-5 py-3 text-right">
                         <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${payment.paymentId}`)}>

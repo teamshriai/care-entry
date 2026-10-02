@@ -1,6 +1,5 @@
-// Reused verbatim from clinician portal's tone system (src/utils/tone.js),
-// extended with Front Office-specific statuses. No new colors were added —
-// every tone still resolves to the same design tokens defined in index.css.
+// The app's tone system. Every tone resolves to a design token defined in
+// index.css; STATUS_TONE below maps each status word to one of them.
 
 export type Tone = 'critical' | 'warning' | 'stable' | 'info' | 'brand' | 'neutral' | 'teal' | 'indigo' | 'purple' | 'cyan' | 'rose'
 
@@ -112,15 +111,20 @@ export const TONE_VAR: Partial<Record<Tone, string>> = {
   brand: 'primary-text',
 }
 
+// One colour language for every status in the app:
+//   red (critical)  — critical, failed, emergency
+//   yellow (warning) — needs attention: pending, partial, running late, overdue
+//   blue (info)     — normal, in progress: confirmed, checked in, admitted, in queue
+//   green (stable)  — paid, available, linked
+//   grey (neutral)  — closed or not applicable: completed, cancelled, discharged
 const STATUS_TONE: Record<string, Tone> = {
-  // Carried over from the clinician portal's convention
   Emergency: 'critical',
   'Under Review': 'warning',
   New: 'info',
   Stable: 'stable',
   Active: 'stable',
   Connected: 'stable',
-  Completed: 'stable',
+  Completed: 'neutral',
   Scheduled: 'info',
   Pending: 'warning',
   'Pending review': 'warning',
@@ -133,58 +137,63 @@ const STATUS_TONE: Record<string, Tone> = {
   High: 'critical',
   Medium: 'warning',
   Low: 'neutral',
+  // Front-office risk dot — see domain/patientSelectors.ts
+  Watch: 'warning',
+  Normal: 'info',
 
-  // Front Office-specific statuses (M-04)
-  Waiting: 'neutral',
+  // Front desk
+  Waiting: 'info',
   Live: 'neutral',
   Forecast: 'brand',
   'Identity pending': 'warning',
   'Duplicate suspected': 'warning',
-  'Checked-in': 'stable',
-  'Visit open': 'stable',
+  'Checked-in': 'info',
+  'Visit open': 'info',
   'Visit pending': 'warning',
   Linked: 'stable',
   'Not linked': 'neutral',
   'Consent pending': 'warning',
   Revoked: 'critical',
 
-  // Appointment lifecycle (M-05, extended — see data/appointments.js note)
+  // Appointment lifecycle
   'Payment Pending': 'warning',
-  Confirmed: 'stable',
-  'In consultation': 'indigo',
-  Cancelled: 'critical',
-  'No-show': 'critical',
+  Confirmed: 'info',
+  'In consultation': 'info',
+  Cancelled: 'neutral',
+  'No-show': 'warning',
   Booked: 'info',
-  Called: 'cyan',
+  Called: 'info',
 
   // Derived doctor operational status — computed in domain/selectors.ts
   // (getDoctorStatus) from schedule + leave + breaks + queue state.
   Available: 'stable',
   'Running late': 'warning',
-  'Fully booked': 'purple',
+  'Fully booked': 'neutral',
   'On break': 'warning',
-  'On leave': 'critical',
+  'On leave': 'neutral',
   'Not scheduled': 'neutral',
   Inactive: 'neutral',
   Blocked: 'neutral',
   Issued: 'info',
-  Returned: 'stable',
-  Overdue: 'critical',
+  Returned: 'neutral',
+  Overdue: 'warning',
 
-  // Payment lifecycle — domain/selectors.ts's Payment.status
+  // Payment lifecycle — the display words from utils/billing.billDisplayStatus
   Paid: 'stable',
+  Partial: 'warning',
   'Partially Paid': 'warning',
+  Failed: 'critical',
   Refunded: 'info',
 
   // Estimate lifecycle — types/frontDesk.ts's EstimateStatus
   Draft: 'neutral',
   Saved: 'info',
 
-  // IP Admission — types/admission.ts's BedStatus/AdmissionStatus
-  Occupied: 'critical',
+  // Inpatients — types/admission.ts's BedStatus/AdmissionStatus
+  Occupied: 'info',
   Reserved: 'warning',
   Maintenance: 'neutral',
-  Admitted: 'stable',
+  Admitted: 'info',
   'Bed Reserved': 'warning',
   Transferred: 'info',
   Discharged: 'neutral',

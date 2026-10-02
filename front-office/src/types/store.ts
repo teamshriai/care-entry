@@ -35,7 +35,15 @@ export interface NextIds {
   mlc: number
   payment: number
   transaction: number
+  attempt: number
   admission: number
+}
+
+/** How often, and how recently, staff opened a patient's profile — feeds
+ *  the search box's "Most opened" list. */
+export interface PatientOpenStat {
+  count: number
+  lastOpenedAt: number
 }
 
 /** The single in-memory operational store's whole state shape — the ONE
@@ -58,6 +66,8 @@ export interface AppState {
   beds: Bed[]
   admissions: Admission[]
   registrationLog: RegistrationLogEntry[]
+  /** Keyed by patientId. */
+  patientOpens: Record<string, PatientOpenStat>
   activityLog: ActivityLogEntry[]
   connectivity: Connectivity
   tokenCounters: TokenCounters

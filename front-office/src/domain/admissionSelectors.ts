@@ -45,7 +45,7 @@ const WARD_TYPE_LABEL: Record<Ward, string> = {
   'General Ward': 'General',
   'Private Ward': 'Private',
   'Semi-Private Ward': 'Semi-Private',
-  ICU: 'Critical Care',
+  ICU: 'ICU',
   Emergency: 'Emergency',
 }
 

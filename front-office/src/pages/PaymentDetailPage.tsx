@@ -4,7 +4,6 @@ import { ArrowLeft, Printer, Receipt as ReceiptIcon, Undo2, XCircle } from 'luci
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
 import { Alert } from '../components/ui/Alert'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -16,7 +15,8 @@ import { cancelPayment, refundPayment } from '../domain/actions'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
-import { billNumberFor, paymentStatusTone } from '../utils/billing'
+import { billNumberFor } from '../utils/billing'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { cn } from '../utils/cn'
 import type { Payment } from '../types/payment'
 
@@ -152,7 +152,7 @@ export function PaymentDetailPage() {
             <CardHeader
               title="Bill items"
               subtitle={payment.appointmentId ? `Linked to appointment ${payment.appointmentId}` : undefined}
-              action={<Badge tone={paymentStatusTone(payment.status)} status={payment.status} />}
+              action={<BillStatusBadge payment={payment} />}
             />
             <div className="divide-y divide-border-soft">
               {payment.items.map((item) => (

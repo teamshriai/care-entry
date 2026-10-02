@@ -1,5 +1,4 @@
-import type { Payment, PaymentItem, PaymentStatus } from '../types/payment'
-import { toneFor } from './tone'
+import type { BillDisplayStatus, Payment, PaymentItem } from '../types/payment'
 import type { Tone } from './tone'
 
 /** The one Registration Fee charge — Care Entry and appointment booking's
@@ -21,14 +20,27 @@ export function billServicesSummary(payment: Payment): string {
   return payment.items.map((item) => item.description).join(' + ')
 }
 
-/** A bill's own status tone — deliberately separate from the shared,
- *  generic `toneFor('Pending')` (which many unrelated statuses across the
- *  app also key off, and stays amber for those). An unpaid bill reads as
- *  red here, everywhere a bill's status is shown, without touching that
- *  shared mapping or any other module's "Pending" badge. */
-export function paymentStatusTone(status: PaymentStatus): Tone {
-  if (status === 'Pending') return 'critical'
-  return toneFor(status)
+/** What a bill reads as everywhere it is shown. A stored Cancelled/Refunded
+ *  wins; otherwise the money decides: nothing due → Paid, the latest attempt
+ *  failed after the last collection → Failed, some collected → Partial,
+ *  nothing collected → Pending. */
+export function billDisplayStatus(payment: Payment): BillDisplayStatus {
+  if (payment.status === 'Cancelled' || payment.status === 'Refunded') return payment.status
+  if (payment.balance <= 0) return 'Paid'
+  const lastFailure = payment.failedAttempts[payment.failedAttempts.length - 1]?.attemptedAt ?? 0
+  const lastCollection = payment.transactions[payment.transactions.length - 1]?.collectedAt ?? 0
+  if (lastFailure > lastCollection) return 'Failed'
+  return payment.paidAmount > 0 ? 'Partial' : 'Pending'
+}
+
+/** Green paid, yellow pending/partial, red failed; closed bills are quiet. */
+export const BILL_STATUS_TONE: Record<BillDisplayStatus, Tone> = {
+  Paid: 'stable',
+  Partial: 'warning',
+  Pending: 'warning',
+  Failed: 'critical',
+  Cancelled: 'neutral',
+  Refunded: 'info',
 }
 
 // ------------------------------------------------------------- IP admission

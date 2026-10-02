@@ -566,7 +566,7 @@ export function registerDoctor(input: RegisterDoctorInput): Provider {
     registrationNumber: input.registrationNumber.trim(),
     experienceYears: Number(input.experienceYears) || 0,
     employeeId: input.employeeId?.trim() || `SHRI-DOC-${String(100 + state.nextIds.provider)}`,
-    consultationType: input.consultationType ?? 'OPD',
+    consultationType: input.consultationType ?? 'Outpatient',
     consultationFee: Number(input.consultationFee) || 0,
     room: input.room?.trim() || null,
     loginEmail: input.loginEmail?.trim() || input.email?.trim() || null,
@@ -1010,7 +1010,7 @@ function paymentTransactionId(state: AppState): { transactionId: string; nextSeq
   return { transactionId: `TXN-${String(seq).padStart(6, '0')}`, nextSeq: seq + 1 }
 }
 
-export function createPaymentBill({ patientId, items, appointmentId, estimateId }: CreatePaymentInput): Payment {
+export function createPaymentBill({ patientId, items, appointmentId, estimateId, admissionId }: CreatePaymentInput): Payment {
   const state = getState()
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('VALIDATION', 'Select a patient first.')
@@ -1026,12 +1026,14 @@ export function createPaymentBill({ patientId, items, appointmentId, estimateId 
     patientName: patient.name,
     appointmentId: appointmentId ?? null,
     estimateId: estimateId ?? null,
+    admissionId: admissionId ?? null,
     items,
     totalAmount: total,
     paidAmount: 0,
     balance: total,
     status: 'Pending',
     transactions: [],
+    failedAttempts: [],
     refund: null,
     createdAt: now,
     updatedAt: now,

@@ -5,6 +5,7 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { Alert } from '../components/ui/Alert'
 import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -196,7 +197,7 @@ export function AdmissionDetailPage() {
                     </div>
                     <div className="flex items-center justify-between border-t border-border-soft pt-3">
                       <span className="text-xs text-ink-muted">Payment Status</span>
-                      <Badge status={payment.status} />
+                      <BillStatusBadge payment={payment} />
                     </div>
                     <Button size="sm" onClick={() => navigate(`/payments/${payment.paymentId}`)}>
                       <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />

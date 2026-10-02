@@ -9,6 +9,11 @@ export type PaymentMethod = 'Cash' | 'UPI' | 'Card' | 'Net Banking' | 'Insurance
 
 export type PaymentStatus = 'Pending' | 'Partially Paid' | 'Paid' | 'Cancelled' | 'Refunded'
 
+/** What a bill reads as on screen. Derived from the stored record by
+ *  utils/billing.billDisplayStatus — never stored. 'Failed' means money is
+ *  still due and the latest attempt to collect it did not go through. */
+export type BillDisplayStatus = 'Paid' | 'Partial' | 'Pending' | 'Failed' | 'Cancelled' | 'Refunded'
+
 /** One line item on a bill — an administrative charge, never a clinical one. */
 export interface PaymentItem {
   code: string
@@ -23,6 +28,19 @@ export interface PaymentTransaction {
   amount: number
   method: PaymentMethod
   collectedAt: number
+  /** Cash handed over, when more than the amount (the receipt shows the change). */
+  tenderedAmount?: number
+}
+
+/** A collection the front desk confirmed did NOT go through — UPI not
+ *  received, card declined. No money moved; it is kept so the bill reads
+ *  "Failed" until the next successful collection. */
+export interface FailedPaymentAttempt {
+  attemptId: string
+  amount: number
+  method: PaymentMethod
+  reason: string
+  attemptedAt: number
 }
 
 /** A basic, single refund against an already-collected bill. */
@@ -44,12 +62,15 @@ export interface Payment {
   appointmentId: string | null
   /** Set when this bill was raised from an issued Enquiry & Estimate. */
   estimateId: string | null
+  /** Set when this is an admission's bill — the reverse of Admission.paymentId. */
+  admissionId: string | null
   items: PaymentItem[]
   totalAmount: number
   paidAmount: number
   balance: number
   status: PaymentStatus
   transactions: PaymentTransaction[]
+  failedAttempts: FailedPaymentAttempt[]
   refund: PaymentRefund | null
   createdAt: number
   updatedAt: number
@@ -63,6 +84,7 @@ export interface CreatePaymentInput {
   items: PaymentItem[]
   appointmentId?: string | null
   estimateId?: string | null
+  admissionId?: string | null
 }
 
 /** actions.collectPayment's input shape. */
@@ -70,6 +92,15 @@ export interface CollectPaymentInput {
   paymentId: string
   amount: number
   method: PaymentMethod
+  tenderedAmount?: number
+}
+
+/** actions.recordFailedPayment's input shape. */
+export interface RecordFailedPaymentInput {
+  paymentId: string
+  amount: number
+  method: PaymentMethod
+  reason: string
 }
 
 /** actions.cancelPayment's input shape. */

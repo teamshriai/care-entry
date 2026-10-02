@@ -27,9 +27,10 @@ import type { Appointment, AppointmentStatus } from '../types/appointment'
 import type { Visit } from '../types/visit'
 import type { QueueToken, QueueTokenStatus } from '../types/queue'
 import type { ActivityLogEntry } from '../types/activity'
-import type { AttendantPass, RegistrationLogEntry, Tariff } from '../types/frontDesk'
+import type { AttendantPass, MlcRecord, RegistrationLogEntry, Tariff } from '../types/frontDesk'
 import type { Payment } from '../types/payment'
 import { createAdmissionSeed } from './admissionSeedData'
+import { admissionBillItems } from '../utils/billing'
 
 export { todayKey }
 
@@ -75,9 +76,9 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-48120',
       experienceYears: 18,
       employeeId: 'SHRI-DOC-014',
-      consultationType: 'OPD',
+      consultationType: 'Outpatient',
       consultationFee: 800,
-      room: 'OPD Room 12, Block B',
+      room: 'Room12, Block B',
       loginEmail: 'arun.kumar@shrimedical.mock',
       role: 'Consultant',
       status: 'Active',
@@ -97,9 +98,9 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-52990',
       experienceYears: 12,
       employeeId: 'SHRI-DOC-021',
-      consultationType: 'OPD',
+      consultationType: 'Outpatient',
       consultationFee: 900,
-      room: 'OPD Room 4, Block A',
+      room: 'Room4, Block A',
       loginEmail: 'priya.nair@shrimedical.mock',
       role: 'Consultant',
       status: 'Active',
@@ -119,9 +120,9 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-44117',
       experienceYears: 15,
       employeeId: 'SHRI-DOC-008',
-      consultationType: 'OPD',
+      consultationType: 'Outpatient',
       consultationFee: 600,
-      room: 'OPD Room 2, Block A',
+      room: 'Room2, Block A',
       loginEmail: 'rahul.menon@shrimedical.mock',
       role: 'Consultant',
       status: 'Active',
@@ -141,9 +142,9 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-60441',
       experienceYears: 10,
       employeeId: 'SHRI-DOC-030',
-      consultationType: 'OPD',
+      consultationType: 'Outpatient',
       consultationFee: 750,
-      room: 'OPD Room 8, Block C',
+      room: 'Room8, Block C',
       loginEmail: 'meera.shah@shrimedical.mock',
       role: 'Consultant',
       status: 'Active',
@@ -163,9 +164,9 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-71203',
       experienceYears: 8,
       employeeId: 'SHRI-DOC-042',
-      consultationType: 'OPD',
+      consultationType: 'Outpatient',
       consultationFee: 800,
-      room: 'OPD Room 14, Block B',
+      room: 'Room14, Block B',
       loginEmail: 'ananya.rao@shrimedical.mock',
       role: 'Consultant',
       status: 'Active',
@@ -193,9 +194,9 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-39088',
       experienceYears: 20,
       employeeId: 'SHRI-DOC-003',
-      consultationType: 'OPD',
+      consultationType: 'Outpatient',
       consultationFee: 650,
-      room: 'OPD Room 1, Block A',
+      room: 'Room1, Block A',
       loginEmail: 'vikram.das@shrimedical.mock',
       role: 'Senior Consultant',
       status: 'Active',
@@ -300,20 +301,21 @@ export function createSeedState(): AppState {
   addAppointment({ patientId: 'SHRI-0125590', providerId: 'dr-arun-kumar', offset: -8, status: 'Completed', arrivedMinutesAgo: 95 })
   addAppointment({ patientId: 'SHRI-0091133', providerId: 'dr-arun-kumar', offset: -2, status: 'Checked-in', arrivedMinutesAgo: 24, tokenStatus: 'Called' })
   addAppointment({ patientId: 'SHRI-0102234', providerId: 'dr-arun-kumar', offset: 2, status: 'Confirmed' })
-  addAppointment({ patientId: 'SHRI-0111045', providerId: 'dr-arun-kumar', offset: 5, status: 'Scheduled' })
+  // Booked, bill raised, not yet paid — every booking carries exactly one bill.
+  const irfanBooking = addAppointment({ patientId: 'SHRI-0111045', providerId: 'dr-arun-kumar', offset: 5, status: 'Payment Pending' })
 
   // Dr. Rahul Menon — behind schedule: patients checked in for slots already
   // in the past are still waiting, so the delay is derivable.
   addAppointment({ patientId: 'SHRI-0044120', providerId: 'dr-rahul-menon', offset: -3, status: 'Checked-in', arrivedMinutesAgo: 42 })
   addAppointment({ patientId: 'SHRI-0120338', providerId: 'dr-rahul-menon', offset: -1, status: 'Checked-in', arrivedMinutesAgo: 16 })
-  addAppointment({ patientId: 'SHRI-0091987', providerId: 'dr-rahul-menon', offset: 3, status: 'Scheduled' })
+  const laxmananBooking = addAppointment({ patientId: 'SHRI-0091987', providerId: 'dr-rahul-menon', offset: 3, status: 'Payment Pending' })
 
   // Dr. Priya Nair — open, plus a no-show earlier in the session.
   addAppointment({ patientId: 'SHRI-0078812', providerId: 'dr-priya-nair', offset: -6, status: 'No-show' })
   addAppointment({ patientId: 'SHRI-0125590', providerId: 'dr-priya-nair', offset: 2, status: 'Confirmed' })
 
   // Dr. Ananya Rao — on a break right now.
-  addAppointment({ patientId: 'SHRI-0102234', providerId: 'dr-ananya-rao', offset: 3, status: 'Scheduled' })
+  const priyaBooking = addAppointment({ patientId: 'SHRI-0102234', providerId: 'dr-ananya-rao', offset: 3, status: 'Payment Pending' })
 
   // Dr. Vikram Das — every slot consumed -> Fully booked.
   slotsOf('dr-vikram-das').forEach((slot, index) => {
@@ -369,6 +371,8 @@ export function createSeedState(): AppState {
       patientName: paymentPatientName(patientId),
       appointmentId: null,
       estimateId: null,
+      admissionId: null,
+      failedAttempts: [],
       items: [{ code: 'CONS-NEU', description: 'Neurology consultation', amount: total }],
       totalAmount: total,
       paidAmount: total,
@@ -398,8 +402,10 @@ export function createSeedState(): AppState {
       receiptNo: nextReceiptNo(),
       patientId,
       patientName: paymentPatientName(patientId),
-      appointmentId: null,
+      appointmentId: irfanBooking?.appointmentId ?? null,
       estimateId: null,
+      admissionId: null,
+      failedAttempts: [],
       items,
       totalAmount: total,
       paidAmount: 0,
@@ -432,6 +438,8 @@ export function createSeedState(): AppState {
       patientName: paymentPatientName(patientId),
       appointmentId: null,
       estimateId: null,
+      admissionId: null,
+      failedAttempts: [],
       items,
       totalAmount: total,
       paidAmount: paid,
@@ -460,6 +468,8 @@ export function createSeedState(): AppState {
       patientName: paymentPatientName(patientId),
       appointmentId: null,
       estimateId: null,
+      admissionId: null,
+      failedAttempts: [],
       items: [{ code: 'REG-FEE', description: 'Registration Fee', amount: total }],
       totalAmount: total,
       paidAmount: 0,
@@ -489,6 +499,8 @@ export function createSeedState(): AppState {
       patientName: paymentPatientName(patientId),
       appointmentId: 'apt-1',
       estimateId: null,
+      admissionId: null,
+      failedAttempts: [],
       items: [{ code: 'CONS-NEU', description: 'Neurology consultation', amount: total }],
       totalAmount: total,
       paidAmount: total,
@@ -522,6 +534,8 @@ export function createSeedState(): AppState {
       patientName: paymentPatientName(patientId),
       appointmentId: null,
       estimateId: null,
+      admissionId: null,
+      failedAttempts: [],
       items: [{ code: 'REG-FEE', description: 'Registration Fee', amount: total }],
       totalAmount: total,
       paidAmount: total,
@@ -534,6 +548,125 @@ export function createSeedState(): AppState {
       cancelledAt: null,
       cancelReason: null,
     })
+  }
+
+  // The rest of the bills, built through one helper so totals, balance and
+  // status are always consistent with the collections recorded against them.
+  interface SeedBill {
+    patientId: string
+    items: Payment['items']
+    createdAt: number
+    appointmentId?: string | null
+    admissionId?: string | null
+    collections?: { amount: number; method: Payment['transactions'][number]['method']; at: number }[]
+    failed?: { amount: number; method: Payment['transactions'][number]['method']; reason: string; at: number }[]
+  }
+  let attemptSeq = 1
+  const pushBill = ({ patientId, items, createdAt, appointmentId = null, admissionId = null, collections = [], failed = [] }: SeedBill): Payment => {
+    const total = items.reduce((sum, item) => sum + item.amount, 0)
+    const paid = collections.reduce((sum, c) => sum + c.amount, 0)
+    const bill: Payment = {
+      paymentId: `pay-${paymentRecordSeq++}`,
+      receiptNo: nextReceiptNo(),
+      patientId,
+      patientName: paymentPatientName(patientId),
+      appointmentId,
+      estimateId: null,
+      admissionId,
+      items,
+      totalAmount: total,
+      paidAmount: paid,
+      balance: total - paid,
+      status: paid >= total ? 'Paid' : paid > 0 ? 'Partially Paid' : 'Pending',
+      transactions: collections.map((c) => ({ transactionId: nextTransactionId(), amount: c.amount, method: c.method, collectedAt: c.at })),
+      failedAttempts: failed.map((f) => ({
+        attemptId: `ATT-${String(attemptSeq++).padStart(6, '0')}`,
+        amount: f.amount,
+        method: f.method,
+        reason: f.reason,
+        attemptedAt: f.at,
+      })),
+      refund: null,
+      createdAt,
+      updatedAt: Math.max(createdAt, ...collections.map((c) => c.at), ...failed.map((f) => f.at)),
+      cancelledAt: null,
+      cancelReason: null,
+    }
+    payments.push(bill)
+    return bill
+  }
+  const consultationLine = (providerId: string) => {
+    const provider = providers.find((p) => p.providerId === providerId)!
+    return { code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee }
+  }
+  const registrationLine = { code: 'REG-FEE', description: 'Registration Fee', amount: 100 }
+
+  // Registration fees long-standing patients paid when they first registered,
+  // so their next booking is not charged again.
+  for (const patientId of ['SHRI-0044120', 'SHRI-0091133', 'SHRI-0102234']) {
+    const registeredAt = patients.find((p) => p.patientId === patientId)!.createdAt
+    pushBill({ patientId, items: [registrationLine], createdAt: registeredAt, collections: [{ amount: 100, method: 'Cash', at: registeredAt }] })
+  }
+
+  // Today's unpaid bookings.
+  if (laxmananBooking) {
+    pushBill({
+      patientId: laxmananBooking.patientId,
+      items: [registrationLine, consultationLine(laxmananBooking.providerId)],
+      createdAt: laxmananBooking.createdAt,
+      appointmentId: laxmananBooking.appointmentId,
+    })
+  }
+  if (priyaBooking) {
+    pushBill({
+      patientId: priyaBooking.patientId,
+      items: [consultationLine(priyaBooking.providerId)],
+      createdAt: priyaBooking.createdAt,
+      appointmentId: priyaBooking.appointmentId,
+    })
+  }
+
+  // Inpatients' bills — admission charge + the first day's bed, linked both
+  // ways. One part-paid deposit, one awaiting the insurer, one failed UPI.
+  const admissionSeed = createAdmissionSeed(now)
+  const billAdmission = (admissionId: string, extra: Pick<SeedBill, 'collections' | 'failed'>) => {
+    const admission = admissionSeed.admissions.find((a) => a.admissionId === admissionId)!
+    const admittedAt = admission.admittedAt ?? admission.createdAt
+    const bill = pushBill({
+      patientId: admission.patientId,
+      items: admissionBillItems(admission.roomType ?? 'General', 1),
+      createdAt: admittedAt,
+      admissionId,
+      ...extra,
+    })
+    admission.paymentId = bill.paymentId
+  }
+  billAdmission('adm-1', { collections: [{ amount: 1000, method: 'Cash', at: minutesAgo(590) }] })
+  billAdmission('adm-2', {})
+  billAdmission('adm-3', { failed: [{ amount: 5000, method: 'UPI', reason: 'Payment not received', at: minutesAgo(45) }] })
+
+  // An open medico-legal case: intimation sent, police acknowledgement awaited.
+  const mlcRecords: MlcRecord[] = [
+    {
+      mlcId: 'MLC/0001',
+      patientId: 'SHRI-0120338',
+      patientName: 'Sunita Rao',
+      category: 'Road traffic accident',
+      broughtBy: 'Ambulance',
+      policeStation: 'Peelamedu Police Station',
+      incidentAt: null,
+      registeredAt: minutesAgo(130),
+      intimationSent: true,
+      acknowledgedAt: null,
+    },
+  ]
+  logAt(minutesAgo(130), 'MLC registered', 'MLC/0001 · Sunita Rao')
+
+  // Profiles the desk opens most often — seeds the search box's "Most opened".
+  const patientOpens: AppState['patientOpens'] = {
+    'SHRI-0091133': { count: 7, lastOpenedAt: minutesAgo(30) },
+    'SHRI-0044120': { count: 5, lastOpenedAt: minutesAgo(120) },
+    'SHRI-0078812': { count: 3, lastOpenedAt: minutesAgo(26 * 60) },
   }
 
   // Rate card for the enquiry/estimate desk. A real deployment reads this
@@ -554,8 +687,6 @@ export function createSeedState(): AppState {
     { code: 'PKG-MASTER-M', name: 'Master Health Checkup (Male)', department: 'General Medicine', rate: 6500 },
   ]
 
-  const admissionSeed = createAdmissionSeed()
-
   return {
     today,
     patients,
@@ -566,12 +697,13 @@ export function createSeedState(): AppState {
     queueTokens,
     attendantPasses,
     estimates: [],
-    mlcRecords: [],
+    mlcRecords,
     tariffs,
     payments,
     beds: admissionSeed.beds,
     admissions: admissionSeed.admissions,
     registrationLog,
+    patientOpens,
     activityLog,
     // Explicitly labelled DEVELOPMENT infrastructure state — there is no real
     // service to connect to, and the UI says so rather than implying one.
@@ -579,8 +711,8 @@ export function createSeedState(): AppState {
     tokenCounters,
     nextIds: {
       appointment: appointmentSeq, visit: visitSeq, token: tokenSeq, activity: activitySeq,
-      patient: 1, provider: 1, leave: 2, pass: 1, estimate: 1, mlc: 1,
-      payment: paymentSeq + 1, transaction: transactionSeq + 1,
+      patient: 1, provider: 1, leave: 2, pass: 1, estimate: 1, mlc: mlcRecords.length + 1,
+      payment: paymentSeq + 1, transaction: transactionSeq + 1, attempt: attemptSeq,
       ...admissionSeed.nextIds,
     },
   }

@@ -3,7 +3,6 @@ import { Search, Plus, IndianRupee } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
 import { CollectPaymentModal } from '../components/payment/CollectPaymentModal'
@@ -13,7 +12,7 @@ import { getPatientSearchResults, getPaymentsForPatient } from '../domain/select
 import { createPaymentBill } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { cn } from '../utils/cn'
-import { paymentStatusTone } from '../utils/billing'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import type { Patient } from '../types/patient'
 import type { Payment, PaymentItem } from '../types/payment'
 
@@ -170,7 +169,7 @@ export function CollectPaymentPage() {
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                          <Badge tone={paymentStatusTone(bill.status)} status={bill.status} />
+                          <BillStatusBadge payment={bill} />
                           {bill.balance > 0 ? (
                             <Button size="sm" onClick={() => setCollecting(bill)}>
                               Collect Payment

@@ -32,9 +32,9 @@ export type AdmissionType = 'Emergency' | 'Elective' | 'Transfer'
 
 export const ADMISSION_TYPES: AdmissionType[] = ['Emergency', 'Elective', 'Transfer']
 
-export type ReferralSource = 'Walk-in' | 'OPD' | 'Emergency' | 'Referral' | 'Transfer'
+export type ReferralSource = 'Walk-in' | 'Outpatient' | 'Emergency' | 'Referral' | 'Transfer'
 
-export const REFERRAL_SOURCES: ReferralSource[] = ['Walk-in', 'OPD', 'Emergency', 'Referral', 'Transfer']
+export const REFERRAL_SOURCES: ReferralSource[] = ['Walk-in', 'Outpatient', 'Emergency', 'Referral', 'Transfer']
 
 export type AttendantRelationship =
   | 'Father'

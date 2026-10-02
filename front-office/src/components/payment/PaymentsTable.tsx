@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Receipt } from 'lucide-react'
-import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
+import { BillStatusBadge } from './BillStatusBadge'
 import { formatClock } from '../../utils/format'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import { cn } from '../../utils/cn'
-import { paymentStatusTone } from '../../utils/billing'
 import type { Payment } from '../../types/payment'
 
 function rupees(value: number): string {
@@ -84,7 +83,7 @@ export function PaymentsTable({
                 </td>
               ) : null}
               <td className="whitespace-nowrap px-5 py-3">
-                <Badge tone={paymentStatusTone(payment.status)} status={payment.status} />
+                <BillStatusBadge payment={payment} />
               </td>
               <td className="whitespace-nowrap px-5 py-3 text-right">
                 <div className="flex justify-end gap-1.5">{renderActions?.(payment)}</div>

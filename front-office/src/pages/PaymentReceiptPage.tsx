@@ -4,7 +4,7 @@ import { ArrowLeft, Printer } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { getPaymentById } from '../domain/selectors'
@@ -13,7 +13,6 @@ import { currentFrontOfficeUser } from '../data/currentUser'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
-import { paymentStatusTone } from '../utils/billing'
 
 function rupees(value: number): string {
   return `₹${value.toLocaleString('en-IN')}`
@@ -132,7 +131,7 @@ export function PaymentReceiptPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-ink-muted">Status</span>
-              <Badge tone={paymentStatusTone(payment.status)} status={payment.status} />
+              <BillStatusBadge payment={payment} />
             </div>
 
             {payment.refund ? (
