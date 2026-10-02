@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { Sidebar } from '../components/layout/Sidebar'
 import { AppBar } from '../components/layout/AppBar'
+import { FlowHost } from '../flows/FlowHost'
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -43,6 +44,9 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Schedule / walk-in / billing / admit / discharge open here, over the page. */}
+      <FlowHost />
     </div>
   )
 }
