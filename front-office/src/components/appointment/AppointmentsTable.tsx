@@ -5,7 +5,7 @@ import { AppointmentIllustration } from '../ui/illustrations/AppointmentIllustra
 import { cn } from '../../utils/cn'
 import { formatClock } from '../../utils/format'
 import { appointmentStatusLabel } from '../../utils/appointment'
-import type { AppointmentRow, UpcomingAppointmentRow } from '../../types/appointment'
+import type { AppointmentRow } from '../../types/appointment'
 
 // Arrival column shows the real check-in timestamp from the linked Visit —
 // blank until the patient actually arrives, never a placeholder time.
@@ -18,12 +18,12 @@ export function AppointmentsTable({
   maxRows,
   emptyAction,
 }: {
-  appointments: (AppointmentRow | UpcomingAppointmentRow)[]
-  renderActions?: (appointment: AppointmentRow | UpcomingAppointmentRow) => ReactNode
+  appointments: AppointmentRow[]
+  renderActions?: (appointment: AppointmentRow) => ReactNode
   /** Overrides the Status column's content (default: the generic status
    *  Badge). Lets a specific view — e.g. a simplified check-in status —
    *  replace it without affecting every other place this table is used. */
-  renderStatus?: (appointment: AppointmentRow | UpcomingAppointmentRow) => ReactNode
+  renderStatus?: (appointment: AppointmentRow) => ReactNode
   /** Header label for the trailing actions column (default: none, matching
    *  every existing usage, which treats it as an unlabeled action strip). */
   actionsLabel?: string
@@ -57,7 +57,7 @@ export function AppointmentsTable({
             <th className="px-5 py-2 font-semibold">Doctor</th>
             {compact ? null : <th className="px-5 py-2 font-semibold">Department</th>}
             <th className="px-5 py-2 font-semibold">Status</th>
-            {compact ? null : <th className="px-5 py-2 font-semibold">Arrival</th>}
+            {compact ? null : <th className="px-5 py-2 font-semibold">Checked in</th>}
             {/* Omitted entirely (not just left empty) when there's nothing to
                 act on — a view with no per-row action shouldn't carry a
                 trailing blank column just to match this table's usual shape. */}
@@ -99,7 +99,7 @@ export function AppointmentsTable({
               {compact ? null : (
                 <td className="whitespace-nowrap px-5 py-3 text-ink-muted tabular-nums">
                   {appointment.visit?.checkInTime ? (
-                    <span title="Time the visit was started">{formatClock(appointment.visit.checkInTime)}</span>
+                    <span title="When the patient checked in">{formatClock(appointment.visit.checkInTime)}</span>
                   ) : (
                     <span className="text-ink-faint">—</span>
                   )}

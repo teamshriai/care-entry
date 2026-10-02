@@ -12,10 +12,9 @@ import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
 import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate, getPatientById } from '../domain/selectors'
 import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem, saveEstimate } from '../domain/actions'
-import { billNumberFor } from '../utils/billing'
+import { billNumberFor, formatRupees } from '../utils/billing'
 import type { Tariff } from '../types/frontDesk'
 
-const rupees = (value: number) => `₹${value.toLocaleString('en-IN')}`
 
 /** An estimate always belongs to exactly one patient — the patient chosen
  *  here gates every "Add", so there is no anonymous/global estimate to
@@ -78,7 +77,7 @@ export function EnquiryEstimatePage() {
     if (!estimate) return
     try {
       const saved = saveEstimate(estimate.estimateId)
-      notify('Estimate saved', { detail: `${saved.estimateId} · ${rupees(saved.total)}` })
+      notify('Estimate saved', { detail: `${saved.estimateId} · ${formatRupees(saved.total)}` })
     } catch (err) {
       notify('Could not save estimate', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
     }
@@ -166,7 +165,7 @@ export function EnquiryEstimatePage() {
                         </td>
                         <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{tariff.department}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums text-ink">
-                          {rupees(tariff.rate)}
+                          {formatRupees(tariff.rate)}
                         </td>
                         <td className="whitespace-nowrap px-5 py-3 text-right">
                           <Button
@@ -211,7 +210,7 @@ export function EnquiryEstimatePage() {
                             <p className="truncate text-sm text-ink" title={item.name}>
                               {item.name}
                             </p>
-                            <p className="text-xs text-ink-muted">{rupees(item.rate)} each</p>
+                            <p className="text-xs text-ink-muted">{formatRupees(item.rate)} each</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <div className="flex items-center gap-1 rounded-lg border border-border px-1">
@@ -235,7 +234,7 @@ export function EnquiryEstimatePage() {
                               </button>
                             </div>
                             <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-ink">
-                              {rupees(item.rate * quantity)}
+                              {formatRupees(item.rate * quantity)}
                             </span>
                             <button
                               type="button"
@@ -255,7 +254,7 @@ export function EnquiryEstimatePage() {
                 {hasItems && estimate ? (
                   <div className="flex items-baseline justify-between border-t border-border-soft pt-3">
                     <span className="text-sm text-ink-muted">Estimated Total</span>
-                    <span className="text-xl font-semibold tabular-nums text-ink">{rupees(estimate.total)}</span>
+                    <span className="text-xl font-semibold tabular-nums text-ink">{formatRupees(estimate.total)}</span>
                   </div>
                 ) : null}
 
@@ -276,7 +275,7 @@ export function EnquiryEstimatePage() {
                         {canCollect && estimate ? (
                           <Button size="sm" onClick={handleCollect}>
                             <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            Collect {rupees(estimate.total)}
+                            Collect {formatRupees(estimate.total)}
                           </Button>
                         ) : estimateBill ? (
                           <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${estimateBill.paymentId}`)}>

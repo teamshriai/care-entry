@@ -44,13 +44,6 @@ export interface AppointmentRow extends AppointmentWithSlot {
   token: QueueToken | null
 }
 
-/** domain/selectors.getUpcomingAppointments's enriched row — no live token. */
-export interface UpcomingAppointmentRow extends AppointmentWithSlot {
-  patient: Patient | null
-  provider: Provider | null
-  visit: Visit | null
-}
-
 /** domain/selectors.getAppointmentsForPatient's enriched row. */
 export interface PatientAppointmentRow extends AppointmentWithSlot {
   provider: Provider | null

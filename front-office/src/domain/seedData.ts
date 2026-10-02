@@ -31,7 +31,7 @@ import type { Estimate, GuestPass, MlcRecord, RegistrationLogEntry, Tariff } fro
 import type { Payment, PaymentItem, PaymentMethod } from '../types/payment'
 import type { Admission } from '../types/admission'
 import { createAdmissionSeed } from './admissionSeedData'
-import { REGISTRATION_FEE, admissionBillItems, stayDays, sumItems } from '../utils/billing'
+import { REGISTRATION_FEE, admissionBillItems, formatRupees, stayDays, sumItems } from '../utils/billing'
 
 export { todayKey }
 
@@ -328,7 +328,6 @@ export function createSeedState(): AppState {
 
   const activityLog: ActivityLogEntry[] = []
   const logAt = (time: number, text: string, meta?: string) => activityLog.push({ id: '', time, text, meta })
-  const rupees = (amount: number) => `₹${amount.toLocaleString('en-IN')}`
 
   // ---------------------------------------------------------------- bills
   // Administrative bills only, never a clinical charge. Built through one
@@ -372,9 +371,9 @@ export function createSeedState(): AppState {
       cancelReason: cancelled?.reason ?? null,
     }
     payments.push(bill)
-    for (const c of collections) logAt(c.at, 'Payment collected', `${name} · ${rupees(c.amount)} · ${c.method}`)
-    for (const f of failed) logAt(f.at, 'Payment attempt failed', `${name} · ${rupees(f.amount)} · ${f.method} · ${f.reason}`)
-    if (refund) logAt(refund.at, 'Payment refunded', `${name} · ${rupees(paid)}`)
+    for (const c of collections) logAt(c.at, 'Payment collected', `${name} · ${formatRupees(c.amount)} · ${c.method}`)
+    for (const f of failed) logAt(f.at, 'Payment attempt failed', `${name} · ${formatRupees(f.amount)} · ${f.method} · ${f.reason}`)
+    if (refund) logAt(refund.at, 'Payment refunded', `${name} · ${formatRupees(paid)}`)
     return bill
   }
 
@@ -537,7 +536,7 @@ export function createSeedState(): AppState {
   // called in now, one still to come.
   book({ patientId: 'SHRI-0111045', providerId: 'dr-arun-kumar', offset: -7, status: 'Completed', method: 'UPI', fallbackDay: -1, slotIndex: 3, reason: 'Review with reports' })
   book({ patientId: 'SHRI-0091133', providerId: 'dr-arun-kumar', offset: -2, status: 'Checked-in', method: 'Card', arrivedAt: minutesAgo(24), tokenStatus: 'Called', reason: 'Follow-up' })
-  book({ patientId: 'SHRI-0125311', providerId: 'dr-arun-kumar', offset: 2, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(2) + 5 * MINUTE, reason: 'First visit' })
+  book({ patientId: 'SHRI-0125311', providerId: 'dr-arun-kumar', offset: 2, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(2) + 5 * MINUTE, reason: 'First consultation' })
 
   // Dr. Rahul Menon — behind schedule: patients checked in for slots already
   // past are still waiting, so the delay is derivable.
@@ -553,7 +552,7 @@ export function createSeedState(): AppState {
 
   // Dr. Ananya Rao — on a break, with one patient waiting and one after it.
   book({ patientId: 'SHRI-0117760', providerId: 'dr-ananya-rao', offset: -1, status: 'Checked-in', method: 'UPI', arrivedAt: minutesAgo(26) })
-  book({ patientId: 'SHRI-0129902', providerId: 'dr-ananya-rao', offset: 1, status: 'Confirmed', method: 'UPI', reason: 'First visit' })
+  book({ patientId: 'SHRI-0129902', providerId: 'dr-ananya-rao', offset: 1, status: 'Confirmed', method: 'UPI', reason: 'First consultation' })
 
   // Dr. Vikram Das — every slot taken: the morning's patients seen, the rest
   // booked and paid; nobody booked twice.
@@ -770,7 +769,7 @@ export function createSeedState(): AppState {
     estimateId: 'EST/00001',
     collections: [{ amount: 650, method: 'UPI', at: daysAgo(2) + 13 * MINUTE }],
   })
-  for (const estimate of estimates) logAt(estimate.updatedAt, 'Estimate saved', `${estimate.estimateId} · ${estimate.patientName} · ${rupees(estimate.total)}`)
+  for (const estimate of estimates) logAt(estimate.updatedAt, 'Estimate saved', `${estimate.estimateId} · ${estimate.patientName} · ${formatRupees(estimate.total)}`)
 
   // Receipts, transactions and failed attempts are numbered in the order
   // they happened, as the desk numbers them.

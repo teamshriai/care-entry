@@ -8,13 +8,11 @@ import type { AppState } from '../types/store'
 import type { Patient, PatientSearchMatch } from '../types/patient'
 import type { Provider, DoctorRow, DoctorStatus } from '../types/doctor'
 import type { DoctorLeave, DoctorSchedule, ScheduleBreak } from '../types/schedule'
-import type { Appointment, AppointmentRow, PatientAppointmentRow, SlotBoardEntry, UpcomingAppointmentRow } from '../types/appointment'
+import type { Appointment, AppointmentRow, PatientAppointmentRow, SlotBoardEntry } from '../types/appointment'
 import type { QueueTokenRow, QueueView } from '../types/queue'
 import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
-import type { ActivityLogEntry } from '../types/activity'
 import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
-import type { Tone } from '../utils/tone'
 import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
@@ -23,10 +21,6 @@ const RELEASED_APPOINTMENT_STATUSES = ['Cancelled']
 const LATE_THRESHOLD_MINUTES = 10
 const LONG_WAIT_MINUTES = 15
 
-export function getPatients(state: AppState): Patient[] {
-  return state.patients
-}
-
 /** The operational day (YYYY-MM-DD) the store is running on. */
 export function getToday(state: AppState): string {
   return state.today
@@ -34,10 +28,6 @@ export function getToday(state: AppState): string {
 
 export function getProviders(state: AppState): Provider[] {
   return state.providers
-}
-
-export function getActiveProviders(state: AppState): Provider[] {
-  return state.providers.filter((p) => p.status === 'Active')
 }
 
 export function getPatientById(state: AppState, patientId: string): Patient | null {
@@ -67,10 +57,6 @@ export function getGuestPasses(state: AppState): GuestPass[] {
 /** A patient's guest passes still out. */
 export function getActiveGuestPasses(state: AppState, patientId: string): GuestPass[] {
   return state.guestPasses.filter((p) => p.patientId === patientId && !p.returned)
-}
-
-export function getEstimates(state: AppState): Estimate[] {
-  return [...state.estimates].sort((a, b) => b.createdAt - a.createdAt)
 }
 
 export function getEstimateById(state: AppState, estimateId: string): Estimate | null {
@@ -413,26 +399,6 @@ export function getAppointmentsForDate(state: AppState, date: string = state.tod
     .sort((a, b) => a.slot.localeCompare(b.slot))
 }
 
-/** Appointments across the next N days (today included), soonest first. */
-export function getUpcomingAppointments(state: AppState, days: number = 7): UpcomingAppointmentRow[] {
-  const start = dayStartTimestamp(state.today)
-  const dates = new Set<string>()
-  for (let i = 0; i < days; i += 1) {
-    const d = new Date(start + i * 24 * 60 * 60 * 1000)
-    dates.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
-  }
-  return state.appointments
-    .filter((a) => dates.has(a.date))
-    .map((a) => ({
-      ...a,
-      patient: getPatientById(state, a.patientId),
-      provider: getProviderById(state, a.providerId),
-      visit: a.visitId ? state.visits.find((v) => v.visitId === a.visitId) ?? null : null,
-      slotTimestamp: slotToTimestamp(a.date, a.slot),
-    }))
-    .sort((a, b) => a.slotTimestamp - b.slotTimestamp)
-}
-
 export function getAppointmentsForPatient(state: AppState, patientId: string): PatientAppointmentRow[] {
   return state.appointments
     .filter((a) => a.patientId === patientId)
@@ -661,61 +627,6 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
   return items.sort((a, b) => ATTENTION_ORDER[a.tone] - ATTENTION_ORDER[b.tone])
 }
 
-export function getActivityLog(state: AppState): ActivityLogEntry[] {
-  return [...state.activityLog].sort((a, b) => b.time - a.time)
-}
-
-export interface ActivityCategoryCount {
-  label: string
-  value: number
-  tone: Tone
-}
-
-// Every text value below is a literal string actually written by
-// domain/actions.ts and domain/admissionActions.ts (see withActivity call
-// sites) — this only re-groups real activity-log entries into the counts
-// the Dashboard's chart shows, it never invents a count. Entries whose text
-// isn't one of these (ABHA linking, guest passes, MLC, doctor
-// registration/leave, estimates, queue/token events) aren't part of these
-// five categories and are left out of the chart, same as they were never
-// singled out in the list view either.
-const ACTIVITY_CATEGORY_TEXT: Record<string, string> = {
-  'Appointment booked': 'Appointments',
-  'Appointment confirmed': 'Appointments',
-  'Appointment rescheduled': 'Appointments',
-  'Consultation started': 'Appointments',
-  'Consultation completed': 'Appointments',
-  'New patient registered': 'Patients Registered',
-  'Payment bill created': 'Payments',
-  'Payment refunded': 'Payments',
-  'Patient admitted': 'Admissions',
-  'Admission billed': 'Admissions',
-  'Patient discharged': 'Admissions',
-  'Appointment cancelled': 'Cancellations',
-  'Admission cancelled': 'Cancellations',
-  'Payment bill cancelled': 'Cancellations',
-}
-
-const ACTIVITY_CATEGORY_TONE: Record<string, Tone> = {
-  Appointments: 'info',
-  'Patients Registered': 'teal',
-  Payments: 'warning',
-  Admissions: 'purple',
-  Cancellations: 'rose',
-}
-
-export function getActivitySummary(state: AppState): ActivityCategoryCount[] {
-  const counts = new Map<string, number>()
-  for (const entry of state.activityLog) {
-    const category = ACTIVITY_CATEGORY_TEXT[entry.text]
-    if (!category) continue
-    counts.set(category, (counts.get(category) ?? 0) + 1)
-  }
-  return [...counts.entries()]
-    .map(([label, value]) => ({ label, value, tone: ACTIVITY_CATEGORY_TONE[label] }))
-    .sort((a, b) => b.value - a.value)
-}
-
 export function getConnectivity(state: AppState): Connectivity {
   return state.connectivity
 }
@@ -909,11 +820,6 @@ export function getPaymentsForPatient(state: AppState, patientId: string): Payme
  *  here even if `balance` happens to be non-zero on the record. */
 export function getPendingPayments(state: AppState): Payment[] {
   return getPayments(state).filter(isBillDue)
-}
-
-/** A patient's bills with money still owed, failed collections first. */
-export function getDueBillsForPatient(state: AppState, patientId: string): Payment[] {
-  return dueFirst(getPaymentsForPatient(state, patientId).filter(isBillDue))
 }
 
 function dueFirst(bills: Payment[]): Payment[] {

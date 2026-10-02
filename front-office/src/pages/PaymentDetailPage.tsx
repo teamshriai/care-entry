@@ -16,7 +16,7 @@ import { cancelPayment, refundPayment } from '../domain/actions'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
-import { billNumberFor, formatRupees as rupees, isBillDue } from '../utils/billing'
+import { billNumberFor, formatRupees, isBillDue } from '../utils/billing'
 
 function timestampLabel(ts: number): string {
   return `${formatDateKey(todayKey(new Date(ts)))} · ${formatClock(ts)}`
@@ -80,7 +80,7 @@ export function PaymentDetailPage() {
     setError(null)
     try {
       refundPayment({ paymentId: payment.paymentId, amount: payment.paidAmount, reason: refundReason })
-      notify('Payment refunded', { detail: `${billNumberFor(payment)} · ${rupees(payment.paidAmount)}` })
+      notify('Payment refunded', { detail: `${billNumberFor(payment)} · ${formatRupees(payment.paidAmount)}` })
       setRefunding(false)
       setRefundReason('')
     } catch (err) {
@@ -134,12 +134,12 @@ export function PaymentDetailPage() {
               {payment.items.map((item) => (
                 <div key={item.code} className="flex items-center justify-between px-5 py-2.5 text-sm">
                   <span className="text-ink">{item.description}</span>
-                  <span className="font-medium tabular-nums text-ink">{rupees(item.amount)}</span>
+                  <span className="font-medium tabular-nums text-ink">{formatRupees(item.amount)}</span>
                 </div>
               ))}
               <div className="flex items-center justify-between px-5 py-3">
                 <span className="text-sm font-semibold text-ink">Total</span>
-                <span className="text-base font-semibold tabular-nums text-ink">{rupees(payment.totalAmount)}</span>
+                <span className="text-base font-semibold tabular-nums text-ink">{formatRupees(payment.totalAmount)}</span>
               </div>
             </div>
 
@@ -174,7 +174,7 @@ export function PaymentDetailPage() {
                         </p>
                       </div>
                       <span className={row.failed ? 'font-medium tabular-nums text-critical line-through' : 'font-medium tabular-nums text-stable'}>
-                        {rupees(row.amount)}
+                        {formatRupees(row.amount)}
                       </span>
                     </div>
                   ))}
@@ -186,7 +186,7 @@ export function PaymentDetailPage() {
                 <CardHeader title="Refund" />
                 <CardBody className="text-sm">
                   <p className="text-ink">
-                    {payment.refund.refundId} · {rupees(payment.refund.amount)} · {timestampLabel(payment.refund.refundedAt)}
+                    {payment.refund.refundId} · {formatRupees(payment.refund.amount)} · {timestampLabel(payment.refund.refundedAt)}
                   </p>
                   <p className="mt-1 text-xs text-ink-muted">{payment.refund.reason}</p>
                 </CardBody>
@@ -205,16 +205,16 @@ export function PaymentDetailPage() {
               <CardHeader title="Summary" />
               <CardBody className="flex flex-col gap-3">
                 <dl className="space-y-2 text-sm">
-                  <Row label="Total" value={rupees(payment.totalAmount)} />
-                  <Row label="Paid" value={rupees(payment.paidAmount)} />
-                  <Row label="Due" value={rupees(payment.balance)} />
+                  <Row label="Total" value={formatRupees(payment.totalAmount)} />
+                  <Row label="Paid" value={formatRupees(payment.paidAmount)} />
+                  <Row label="Due" value={formatRupees(payment.balance)} />
                   <Row label="Raised" value={timestampLabel(payment.createdAt)} />
                 </dl>
                 <div className="flex flex-col gap-2 border-t border-border-soft pt-3">
                   {canCollect ? (
                     <Button onClick={() => openFlow('billing', { uhid: payment.patientId, bill: payment.paymentId })}>
                       <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Collect {rupees(payment.balance)}
+                      Collect {formatRupees(payment.balance)}
                     </Button>
                   ) : null}
                   {canRefund ? (
@@ -268,7 +268,7 @@ export function PaymentDetailPage() {
         open={refunding}
         onClose={() => setRefunding(false)}
         title="Refund this payment"
-        description={`The full ${rupees(payment.paidAmount)} collected will be refunded.`}
+        description={`The full ${formatRupees(payment.paidAmount)} collected will be refunded.`}
       >
         <form onSubmit={handleRefund} className="flex flex-col gap-3">
           <label className="text-xs font-medium text-ink-muted" htmlFor="refund-reason">
@@ -283,7 +283,7 @@ export function PaymentDetailPage() {
           />
           <div className="flex justify-end pt-2">
             <Button type="submit" variant="danger" disabled={!refundReason.trim()}>
-              Refund {rupees(payment.paidAmount)}
+              Refund {formatRupees(payment.paidAmount)}
             </Button>
           </div>
         </form>

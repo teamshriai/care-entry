@@ -12,6 +12,7 @@ import { getState, setState } from './store'
 import { getAvailableSlots, getConsultationBillItems, getDoctorStatus } from './selectors'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, isValidMobile } from '../utils/phone'
+import { formatRupees } from '../utils/billing'
 import type { AppState } from '../types/store'
 import type { Patient, RegisterPatientInput, PatientDemographicsInput } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
@@ -414,7 +415,7 @@ export function openWalkInVisit({ patientId, providerId, department }: OpenWalkI
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Walk-in visit opened', meta: `${patientName(current, patientId)} · ${providerName(current, providerId)}` },
+      { text: 'Walk-in token issued', meta: `${patientName(current, patientId)} · ${providerName(current, providerId)}` },
       { text: 'Token generated', meta: `${tokenNumber} · ${patientName(current, patientId)}` },
     ])
     return {
@@ -994,7 +995,7 @@ export function saveEstimate(estimateId: string): Estimate {
   let saved!: Estimate
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Estimate saved', meta: `${estimateId} · ₹${estimate.total.toLocaleString('en-IN')} · ${estimate.patientName}` },
+      { text: 'Estimate saved', meta: `${estimateId} · ${formatRupees(estimate.total)} · ${estimate.patientName}` },
     ])
     const estimates = current.estimates.map((e) => {
       if (e.estimateId !== estimateId) return e
@@ -1131,7 +1132,7 @@ export function createPaymentBill({ patientId, items, appointmentId, estimateId,
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Payment bill created', meta: `${patient.name} · ₹${total.toLocaleString('en-IN')}` },
+      { text: 'Payment bill created', meta: `${patient.name} · ${formatRupees(total)}` },
     ])
     return {
       ...current,
@@ -1152,7 +1153,7 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
   }
   if (!(amount > 0)) throw new DomainError('VALIDATION', 'Enter an amount greater than zero.')
   if (amount > payment.balance) {
-    throw new DomainError('VALIDATION', `That is more than the ₹${payment.balance.toLocaleString('en-IN')} balance due.`)
+    throw new DomainError('VALIDATION', `That is more than the ${formatRupees(payment.balance)} balance due.`)
   }
   // Only a stay billed to an insurer, TPA or company is settled by that payer.
   if (method === 'Insurance/TPA') {
@@ -1194,8 +1195,8 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
         text: status === 'Paid' ? 'Payment collected' : 'Partial payment recorded',
         meta:
           status === 'Paid'
-            ? `${payment.patientName} · ₹${amount.toLocaleString('en-IN')}`
-            : `${payment.patientName} · ₹${paidAmount.toLocaleString('en-IN')} of ₹${payment.totalAmount.toLocaleString('en-IN')}`,
+            ? `${payment.patientName} · ${formatRupees(amount)}`
+            : `${payment.patientName} · ${formatRupees(paidAmount)} of ${formatRupees(payment.totalAmount)}`,
       },
       ...(shouldConfirmAppointment
         ? [{ text: 'Appointment confirmed', meta: `${payment.patientName} · payment received` }]
@@ -1228,7 +1229,7 @@ export function recordFailedPayment({ paymentId, amount, method, reason }: Recor
   }
   if (!(payment.balance > 0)) throw new DomainError('INVALID_TRANSITION', 'Nothing is due on this bill.')
   if (!(amount > 0) || amount > payment.balance) {
-    throw new DomainError('VALIDATION', `Enter an amount up to the ₹${payment.balance.toLocaleString('en-IN')} due.`)
+    throw new DomainError('VALIDATION', `Enter an amount up to the ${formatRupees(payment.balance)} due.`)
   }
 
   const now = Date.now()
@@ -1244,7 +1245,7 @@ export function recordFailedPayment({ paymentId, amount, method, reason }: Recor
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Payment attempt failed', meta: `${payment.patientName} · ₹${amount.toLocaleString('en-IN')} · ${method} · ${updated.failedAttempts[updated.failedAttempts.length - 1].reason}` },
+      { text: 'Payment attempt failed', meta: `${payment.patientName} · ${formatRupees(amount)} · ${method} · ${updated.failedAttempts[updated.failedAttempts.length - 1].reason}` },
     ])
     return {
       ...current,
@@ -1319,7 +1320,7 @@ export function refundPayment({ paymentId, amount, reason }: RefundPaymentInput)
     throw new DomainError('INVALID_TRANSITION', 'Refunds on a current inpatient’s bill are settled at discharge.')
   }
   if (!(amount > 0) || amount > payment.paidAmount) {
-    throw new DomainError('VALIDATION', `Enter an amount up to the ₹${payment.paidAmount.toLocaleString('en-IN')} collected.`)
+    throw new DomainError('VALIDATION', `Enter an amount up to the ${formatRupees(payment.paidAmount)} collected.`)
   }
   if (!reason?.trim()) throw new DomainError('VALIDATION', 'A refund reason is required.')
 
@@ -1333,7 +1334,7 @@ export function refundPayment({ paymentId, amount, reason }: RefundPaymentInput)
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Payment refunded', meta: `${payment.patientName} · ${payment.receiptNo} · ₹${amount.toLocaleString('en-IN')}` },
+      { text: 'Payment refunded', meta: `${payment.patientName} · ${payment.receiptNo} · ${formatRupees(amount)}` },
     ])
     return {
       ...current,

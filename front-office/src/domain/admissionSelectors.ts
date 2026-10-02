@@ -10,14 +10,6 @@ export function getBeds(state: AppState): Bed[] {
   return [...state.beds].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber))
 }
 
-export function getBedById(state: AppState, bedId: string): Bed | null {
-  return state.beds.find((b) => b.bedId === bedId) ?? null
-}
-
-export function getAvailableBeds(state: AppState): Bed[] {
-  return getBeds(state).filter((b) => b.status === 'Available')
-}
-
 /** A ward's beds, in room order. */
 export function getBedsForWard(state: AppState, ward: Ward): Bed[] {
   return getBeds(state).filter((b) => b.ward === ward)
@@ -36,9 +28,6 @@ export function getAdmissionById(state: AppState, admissionId: string): Admissio
   return state.admissions.find((a) => a.admissionId === admissionId) ?? null
 }
 
-export function getAdmissionsForPatient(state: AppState, patientId: string): Admission[] {
-  return getAdmissions(state).filter((a) => a.patientId === patientId)
-}
 
 // ------------------------------------------------- Inpatients
 

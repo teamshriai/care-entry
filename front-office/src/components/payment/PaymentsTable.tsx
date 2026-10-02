@@ -7,7 +7,7 @@ import { formatClock } from '../../utils/format'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import { cn } from '../../utils/cn'
-import { billNumberFor, formatRupees as rupees } from '../../utils/billing'
+import { billNumberFor, formatRupees } from '../../utils/billing'
 import type { Payment } from '../../types/payment'
 
 /** The bill list — the Billing page passes in whichever bills its filter
@@ -67,7 +67,7 @@ export function PaymentsTable({
                 </span>
               </td>
               <td className="whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums text-ink">
-                {rupees(payment.totalAmount)}
+                {formatRupees(payment.totalAmount)}
               </td>
               {showBalance ? (
                 <td
@@ -76,7 +76,7 @@ export function PaymentsTable({
                     payment.balance > 0 ? 'text-warning' : 'text-ink-faint',
                   )}
                 >
-                  {rupees(payment.balance)}
+                  {formatRupees(payment.balance)}
                 </td>
               ) : null}
               <td className="whitespace-nowrap px-5 py-3">
