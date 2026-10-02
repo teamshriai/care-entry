@@ -6,6 +6,7 @@ import { PatientProvider } from './contexts/PatientContext'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { FrontOfficeHomePage } from './pages/FrontOfficeHomePage'
 import { FindPatientPage } from './pages/FindPatientPage'
+import { PatientListPage } from './pages/PatientListPage'
 import { RegisterPatientPage } from './pages/RegisterPatientPage'
 import { PatientProfilePage } from './pages/PatientProfilePage'
 import { DoctorDirectoryPage } from './pages/DoctorDirectoryPage'
@@ -19,10 +20,10 @@ import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
 import { BillingDashboardPage } from './pages/BillingDashboardPage'
 import { BillsListPage } from './pages/BillsListPage'
+import { AdmissionsBedManagementPage } from './pages/AdmissionsBedManagementPage'
 import { AdmitPatientPage } from './pages/AdmitPatientPage'
-import { AdmissionsListPage } from './pages/AdmissionsListPage'
+import { DischargePage } from './pages/DischargePage'
 import { AdmissionDetailPage } from './pages/AdmissionDetailPage'
-import { BedAvailabilityPage } from './pages/BedAvailabilityPage'
 import { PendingPaymentsPage } from './pages/PendingPaymentsPage'
 import { CollectPaymentPage } from './pages/CollectPaymentPage'
 import { PaymentHistoryPage } from './pages/PaymentHistoryPage'
@@ -53,6 +54,7 @@ function App() {
             <Route path="/" element={<FrontOfficeHomePage />} />
 
             {/* Patients */}
+            <Route path="/patients" element={<PatientListPage />} />
             <Route path="/patients/search" element={<FindPatientPage />} />
             <Route path="/patients/:uhid" element={<PatientProfilePage />} />
             <Route
@@ -105,7 +107,7 @@ function App() {
             <Route path="/billing/bills" element={<BillsListPage />} />
 
             {/* IP Admission */}
-            <Route path="/admissions" element={<AdmissionsListPage />} />
+            <Route path="/admissions" element={<AdmissionsBedManagementPage />} />
             <Route
               path="/admissions/new"
               element={
@@ -115,7 +117,8 @@ function App() {
               }
             />
             <Route path="/admissions/list" element={<Navigate to="/admissions" replace />} />
-            <Route path="/admissions/beds" element={<BedAvailabilityPage />} />
+            <Route path="/admissions/beds" element={<Navigate to="/admissions" replace />} />
+            <Route path="/admissions/discharge" element={<DischargePage />} />
             <Route path="/admissions/:admissionId" element={<AdmissionDetailPage />} />
 
             {/* Payments — folded into Billing & Accounts; the dashboard now

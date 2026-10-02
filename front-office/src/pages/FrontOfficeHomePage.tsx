@@ -4,6 +4,9 @@ import {
   CalendarPlus,
   Stethoscope,
   IdCard,
+  BedDouble,
+  ClipboardPlus,
+  LogOut,
   Receipt,
   FileWarning,
   CalendarClock,
@@ -18,7 +21,6 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card, CardHeader } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
-import { PatientSelfRegistrationCard } from '../components/frontoffice/PatientSelfRegistrationCard'
 import { DashboardPatientSearch } from '../components/frontoffice/DashboardPatientSearch'
 import { QuickActionTile } from '../components/frontoffice/QuickActionTile'
 import { OperationalSummaryChart } from '../components/frontoffice/OperationalSummaryChart'
@@ -32,6 +34,7 @@ import {
   getAppointmentsForDate,
   getNeedsAttention,
 } from '../domain/selectors'
+import { getDischargesToday } from '../domain/admissionSelectors'
 import { formatHeaderDateTime } from '../utils/format'
 import { cn } from '../utils/cn'
 import { TONE_STYLES } from '../utils/tone'
@@ -42,14 +45,17 @@ interface PrimaryAction {
   label: string
   icon: ElementType
   to?: string
-  color: 'blue' | 'teal' | 'violet' | 'amber'
+  color: 'blue' | 'emerald' | 'coral' | 'amber' | 'purple' | 'turquoise' | 'magenta'
 }
 
 const PRIMARY_ACTIONS: PrimaryAction[] = [
   { key: 'register', label: 'Register Patient', icon: UserPlus, to: '/register/new', color: 'blue' },
-  { key: 'book-appointment', label: 'Schedule Appointment', icon: CalendarPlus, to: '/appointments/new', color: 'teal' },
-  { key: 'find-doctor', label: 'Find Doctor', icon: Stethoscope, to: '/doctors', color: 'violet' },
+  { key: 'book-appointment', label: 'Schedule Appointment', icon: CalendarPlus, to: '/appointments/new', color: 'emerald' },
+  { key: 'find-doctor', label: 'Find Doctor', icon: Stethoscope, to: '/doctors', color: 'coral' },
   { key: 'payment', label: 'Payment Status', icon: IndianRupee, to: '/billing', color: 'amber' },
+  { key: 'ward-status', label: 'Ward Status', icon: BedDouble, to: '/admissions', color: 'purple' },
+  { key: 'admit-patient', label: 'Admit Patient', icon: ClipboardPlus, to: '/admissions/new', color: 'turquoise' },
+  { key: 'discharge', label: 'Discharge', icon: LogOut, to: '/admissions/discharge', color: 'magenta' },
 ]
 
 const ATTENTION_ICON: Record<Tone, ElementType> = {
@@ -72,6 +78,7 @@ export function FrontOfficeHomePage() {
   const now = useNow(15000)
 
   const summary = useStoreValue(getOperationalSummary, now)
+  const dischargesToday = useStoreValue(getDischargesToday)
   const doctorRows = useStoreValue(getDoctorRows, now)
   const allAppointments = useStoreValue(getAppointmentsForDate)
   // Display order only: open appointments first so finished consultations
@@ -93,11 +100,12 @@ export function FrontOfficeHomePage() {
           <div className="mb-4">
             <DashboardPatientSearch />
           </div>
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
             {PRIMARY_ACTIONS.map((action) => (
-              <QuickActionTile key={action.key} icon={action.icon} label={action.label} to={action.to} variant="primary" primaryColor={action.color} />
+              <QuickActionTile key={action.key} icon={action.icon} label={action.label} to={action.to} variant="primary" primaryColor={action.color}
+                count={action.key === 'discharge' && dischargesToday > 0 ? dischargesToday : undefined}
+              />
             ))}
-            <PatientSelfRegistrationCard />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
             <QuickActionTile icon={IdCard} iconTone="brand" label="Attendant Pass" to="/services/attendant-pass" dense />

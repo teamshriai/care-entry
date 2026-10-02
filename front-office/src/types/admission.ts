@@ -4,6 +4,8 @@
 // Doctor/Provider, Bill and Payment are the existing entities, referenced
 // by id — this module owns only Bed/Admission/Attendant.
 
+import type { PaymentMethod } from './payment'
+
 export type Ward = 'General Ward' | 'Private Ward' | 'Semi-Private Ward' | 'ICU' | 'Emergency'
 
 export const WARDS: Ward[] = ['General Ward', 'Private Ward', 'Semi-Private Ward', 'ICU', 'Emergency']
@@ -75,6 +77,22 @@ export const PAYMENT_TYPES: PaymentType[] = ['Self Pay', 'Insurance', 'TPA', 'Co
  *  reason the plan lists it, not because this version implements transfer. */
 export type AdmissionStatus = 'Pending' | 'Bed Reserved' | 'Admitted' | 'Transferred' | 'Discharged' | 'Cancelled'
 
+export type DischargeType = 'Normal Discharge' | 'Discharge Against Medical Advice' | 'Transfer' | 'Death'
+
+export const DISCHARGE_TYPES: DischargeType[] = [
+  'Normal Discharge',
+  'Discharge Against Medical Advice',
+  'Transfer',
+  'Death',
+]
+
+export interface DischargeDetails {
+  /** When the patient left the bed. Defaults to now. */
+  dischargedAt?: number
+  dischargeType: DischargeType
+  remarks?: string
+}
+
 export interface Admission {
   admissionId: string
   admissionNumber: string
@@ -101,10 +119,18 @@ export interface Admission {
   status: AdmissionStatus
   admittedAt: number | null
   dischargedAt: number | null
+  /** Recorded by the Discharge workflow; absent on admissions discharged before it existed. */
+  dischargeType?: DischargeType | null
+  dischargeRemarks?: string | null
   cancelledAt: number | null
   cancelReason: string | null
   createdAt: number
   updatedAt: number
+}
+
+export interface AdmissionPaymentInput {
+  method: PaymentMethod
+  amount: number
 }
 
 export interface CreateAdmissionInput {
@@ -120,4 +146,6 @@ export interface CreateAdmissionInput {
   paymentType: PaymentType
   insuranceProvider?: string | null
   policyNumber?: string | null
+  /** The initial charges collected at admission — required to admit. */
+  initialPayment: AdmissionPaymentInput
 }

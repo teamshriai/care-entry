@@ -11,6 +11,7 @@
 import { getState, setState } from './store'
 import { getAvailableSlots } from './selectors'
 import { DomainError } from './errors'
+import { MOBILE_ERROR, isValidMobile } from '../utils/phone'
 import type { AppState } from '../types/store'
 import type { Patient, RegisterPatientInput, PatientDemographicsInput } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
@@ -99,6 +100,7 @@ function requirePayment(state: AppState, paymentId: string): Payment {
 export function registerPatient({ name, age, sex, mobile, abhaId }: RegisterPatientInput): Patient {
   if (!name?.trim()) throw new DomainError('VALIDATION', 'Patient name is required.')
   if (!mobile?.trim()) throw new DomainError('VALIDATION', 'Mobile number is required.')
+  if (!isValidMobile(mobile.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
 
   const state = getState()
   const seq = state.nextIds.patient
@@ -532,6 +534,7 @@ export function registerDoctor(input: RegisterDoctorInput): Provider {
   if (!input.department) throw new DomainError('VALIDATION', 'Department is required.')
   if (!input.specialty?.trim()) throw new DomainError('VALIDATION', 'Specialty is required.')
   if (!input.mobile?.trim()) throw new DomainError('VALIDATION', 'Mobile number is required.')
+  if (!isValidMobile(input.mobile.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
   if (!input.registrationNumber?.trim()) {
     throw new DomainError('VALIDATION', 'Medical registration number is required.')
   }
@@ -683,6 +686,7 @@ export function updatePatientDemographics(patientId: string, changes: PatientDem
   const state = getState()
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('NOT_FOUND', 'That patient no longer exists.')
+  if (changes.mobile !== undefined && !isValidMobile(changes.mobile.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [

@@ -621,6 +621,21 @@ export function getPatientSearchResults(state: AppState, rawQuery: string): Pati
   })
 }
 
+/** Every patient in the store, most recently registered first — the Patient
+ *  List shown when nothing has been searched. Reads the same `state.patients`
+ *  that registration writes to, so a newly registered patient appears at once. */
+export function getPatientList(state: AppState): PatientSearchResult[] {
+  const appointments = getAppointmentsForDate(state)
+  return [...state.patients]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .map((patient) => {
+      const todays = appointments
+        .filter((a) => a.patientId === patient.patientId && a.status !== 'Cancelled')
+        .sort((a, b) => a.slot.localeCompare(b.slot))
+      return { patient, matchedOn: 'Name', appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
+    })
+}
+
 // -------------------------------------------------------------- payments
 
 export function getPayments(state: AppState): Payment[] {

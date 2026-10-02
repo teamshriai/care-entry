@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CheckCircle2, UserPlus } from 'lucide-react'
@@ -6,6 +6,7 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Alert } from '../components/ui/Alert'
+import { MobileInput } from '../components/ui/MobileInput'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { useStoreValue } from '../hooks/useStore'
@@ -18,6 +19,9 @@ import { cn } from '../utils/cn'
 import type { Patient, Sex } from '../types/patient'
 
 const SEXES: Sex[] = ['Male', 'Female', 'Other']
+
+/** How long the success confirmation stays up before the Patient List opens (1 second). */
+const SUCCESS_REDIRECT_MS = 1000
 
 interface RegisterPatientLocationState {
   prefillName?: string
@@ -49,6 +53,17 @@ export function RegisterPatientPage() {
   const [error, setError] = useState<string | null>(null)
   const [registered, setRegistered] = useState<Patient | null>(null)
 
+  // Show the confirmation for 1s, then open the Patient List (it reads the same
+  // store the new patient was just written to). The cleanup cancels the timer if
+  // the user leaves, or clicks "Register another", before it fires.
+  useEffect(() => {
+    if (!registered) return undefined
+    const timer = window.setTimeout(() => {
+      navigate('/patients', { state: { justRegistered: registered.uhid } })
+    }, SUCCESS_REDIRECT_MS)
+    return () => window.clearTimeout(timer)
+  }, [registered, navigate])
+
   const duplicateQuery = useMemo(() => ({ name: form.name, mobile: form.mobile }), [form.name, form.mobile])
   const duplicates = useStoreValue(findPossibleDuplicatesFor, duplicateQuery)
 
@@ -63,7 +78,6 @@ export function RegisterPatientPage() {
       const patient = registerPatient(form)
       setPatient(patient)
       setRegistered(patient)
-      notify('Patient registered', { detail: `${patient.name} · ${patient.uhid}` })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -78,42 +92,18 @@ export function RegisterPatientPage() {
   }
 
   if (registered) {
+    // Success state: only the confirmation box, centred in the content area (no page
+    // title, no actions). The effect above opens the Patient List after 1 second.
     return (
-      <div>
-        <PageHeader title="Register Patient" subtitle="Patient created and selected — continue the workflow." />
-        <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-2xl">
-            <CardBody className="flex flex-col gap-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stable-bg">
-                  <CheckCircle2 className="h-5 w-5 text-stable" strokeWidth={1.75} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-ink">{registered.name} registered</p>
-                  <p className="mt-0.5 text-sm text-ink-muted">
-                    UHID <span className="font-medium text-ink">{registered.uhid}</span> · {registered.age ?? '—'} yrs ·{' '}
-                    {registered.sex} · {registered.mobile}
-                  </p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2.5 border-t border-border-soft pt-4">
-                <Button onClick={() => navigate('/appointments/new')}>Schedule appointment</Button>
-                <Button variant="secondary" onClick={() => navigate('/doctors')}>
-                  Start walk-in visit
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setRegistered(null)
-                    setForm({ name: '', age: '', sex: 'Male', mobile: '', abhaId: '' })
-                  }}
-                >
-                  Register another
-                </Button>
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6 py-10">
+        <Card className="w-full max-w-md" role="status">
+          <CardBody className="flex flex-col items-center gap-4 px-8 py-10 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stable-bg">
+              <CheckCircle2 className="h-6 w-6 text-stable" strokeWidth={1.75} aria-hidden="true" />
+            </div>
+            <p className="text-xl font-semibold text-ink">Patient Registration Completed Successfully</p>
+          </CardBody>
+        </Card>
       </div>
     )
   }
@@ -170,10 +160,10 @@ export function RegisterPatientPage() {
               </div>
 
               <Field label="Mobile number" required hint="Used to match against existing records">
-                <input
+                <MobileInput
                   value={form.mobile}
-                  onChange={(event) => update('mobile', event.target.value)}
-                  placeholder="+91 ..........."
+                  onValueChange={(value) => update('mobile', value)}
+                  placeholder="10-digit mobile number"
                   className={inputClass}
                 />
               </Field>
@@ -195,7 +185,7 @@ export function RegisterPatientPage() {
               </Field>
 
               <div className="flex justify-end gap-2.5 border-t border-border-soft pt-4">
-                <Button type="button" variant="secondary" onClick={() => navigate('/')}>
+                <Button type="button" variant="secondary" onClick={() => navigate('/front-office')}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={!form.name.trim() || !form.mobile.trim()}>

@@ -4,6 +4,9 @@ import { ClipboardPlus, Search } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { MobileInput } from '../components/ui/MobileInput'
+import { MOBILE_ERROR, isValidMobile } from '../utils/phone'
+import { ADMISSION_CHARGE, DAILY_BED_CHARGE, IP_PAYMENT_METHODS, formatRupees } from '../utils/billing'
 import { Avatar } from '../components/ui/Avatar'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -20,8 +23,9 @@ import {
   REFERRAL_SOURCES,
   WARDS,
 } from '../types/admission'
-import type { AdmissionType, AttendantRelationship, PaymentType, ReferralSource, Ward } from '../types/admission'
+import type { Admission, AdmissionType, AttendantRelationship, PaymentType, ReferralSource, Ward } from '../types/admission'
 import type { Patient } from '../types/patient'
+import type { PaymentMethod } from '../types/payment'
 
 const inputClass =
   'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
@@ -43,6 +47,8 @@ interface AdmissionDraft {
   paymentType: PaymentType
   insuranceProvider: string
   policyNumber: string
+  /** How the initial charges are paid (Cash / UPI / Card / Other). */
+  paymentMethod: PaymentMethod | ''
 }
 
 const EMPTY_DRAFT: AdmissionDraft = {
@@ -60,14 +66,21 @@ const EMPTY_DRAFT: AdmissionDraft = {
   paymentType: 'Self Pay',
   insuranceProvider: '',
   policyNumber: '',
+  paymentMethod: '',
 }
 
-/** An admission can never be created without a patient — this page enforces
+/** The admission workflow (the IP Admission → Admit Patient page).
+ *  An admission can never be created without a patient — this form enforces
  *  that by gating the whole form behind patient selection, then walks
  *  through details -> bed -> attendant -> payment -> a review step before
  *  actually creating anything. */
-export function AdmitPatientPage() {
-  const navigate = useNavigate()
+export function AdmitPatientForm({
+  onCancel,
+  onAdmitted,
+}: {
+  onCancel: () => void
+  onAdmitted: (admission: Admission) => void
+}) {
   const { notify } = useToast()
 
   const [query, setQuery] = useState('')
@@ -83,6 +96,9 @@ export function AdmitPatientPage() {
   const doctor = providers.find((p) => p.providerId === draft.doctorId) ?? null
   const bedsForWard = useMemo(() => availableBeds.filter((b) => !draft.ward || b.ward === draft.ward), [availableBeds, draft.ward])
   const selectedBed = availableBeds.find((b) => b.bedId === draft.bedId) ?? null
+  // Initial charges follow the chosen bed's room type (changing ward/bed updates them).
+  const dailyCharge = selectedBed ? DAILY_BED_CHARGE[selectedBed.roomType] : 0
+  const initialAmount = selectedBed ? ADMISSION_CHARGE + dailyCharge : 0
 
   function selectPatient(next: Patient) {
     setPatient(next)
@@ -100,8 +116,10 @@ export function AdmitPatientPage() {
     Boolean(draft.doctorId) &&
     draft.reason.trim().length > 0 &&
     Boolean(draft.bedId) &&
+    Boolean(draft.paymentMethod) &&
+    initialAmount > 0 &&
     draft.attendantName.trim().length > 0 &&
-    draft.attendantPhone.trim().length > 0 &&
+    isValidMobile(draft.attendantPhone) &&
     (draft.paymentType === 'Self Pay' || draft.paymentType === 'Corporate' || draft.insuranceProvider.trim().length > 0)
 
   function handleConfirm() {
@@ -126,9 +144,12 @@ export function AdmitPatientPage() {
         paymentType: draft.paymentType,
         insuranceProvider: draft.paymentType === 'Self Pay' || draft.paymentType === 'Corporate' ? null : draft.insuranceProvider,
         policyNumber: draft.paymentType === 'Self Pay' || draft.paymentType === 'Corporate' ? null : draft.policyNumber,
+        initialPayment: { method: draft.paymentMethod as PaymentMethod, amount: initialAmount },
       })
-      notify('Patient admitted', { detail: `${admission.admissionNumber} · ${admission.bedNumber}` })
-      navigate(`/admissions/${admission.admissionId}`)
+      notify('Patient admitted', {
+        detail: `${admission.admissionNumber} · ${admission.bedNumber} · ${formatRupees(initialAmount)} paid`,
+      })
+      onAdmitted(admission)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -139,9 +160,7 @@ export function AdmitPatientPage() {
 
   return (
     <div>
-      <PageHeader title="Admit Patient" subtitle="Find a patient, allocate a bed, and confirm the admission." />
-
-      <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[380px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[380px_minmax(0,1fr)]">
         <Card className="min-w-0">
           <CardHeader title="Find patient" />
           <CardBody className="flex flex-col gap-3">
@@ -216,6 +235,7 @@ export function AdmitPatientPage() {
               draft={draft}
               doctorName={doctor?.name ?? ''}
               bedLabel={selectedBed ? `${selectedBed.roomNumber} · ${selectedBed.bedNumber}` : '—'}
+              initialAmount={initialAmount}
               error={error}
               onBack={() => setPhase('form')}
               onConfirm={handleConfirm}
@@ -274,9 +294,14 @@ export function AdmitPatientPage() {
                       className={inputClass}
                     >
                       <option value="">Select a ward</option>
-                      {WARDS.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
+                      {WARDS.map((option) => {
+                        const free = availableBeds.filter((b) => b.ward === option).length
+                        return (
+                          <option key={option} value={option}>
+                            {option} — {free} {free === 1 ? 'bed' : 'beds'} available
+                          </option>
+                        )
+                      })}
                     </select>
                   </Field>
                   {draft.ward ? (
@@ -305,6 +330,22 @@ export function AdmitPatientPage() {
                 </CardBody>
               </Card>
 
+              {selectedBed ? (
+                <Card className="min-w-0">
+                  <CardHeader title="Initial Charges" subtitle="Updates automatically when the ward or bed changes" />
+                  <CardBody>
+                    <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                      <ChargeRow label="Ward" value={selectedBed.ward} />
+                      <ChargeRow label="Bed" value={selectedBed.bedNumber} />
+                      <ChargeRow label="Bed/Room Type" value={selectedBed.roomType} />
+                      <ChargeRow label="Daily Bed/Room Charge" value={`${formatRupees(dailyCharge)}/day`} />
+                      <ChargeRow label="Admission Charge" value={formatRupees(ADMISSION_CHARGE)} />
+                      <ChargeRow label="Initial Amount" value={formatRupees(initialAmount)} strong />
+                    </dl>
+                  </CardBody>
+                </Card>
+              ) : null}
+
               <Card className="min-w-0">
                 <CardHeader title="Attendant Details" />
                 <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -319,7 +360,17 @@ export function AdmitPatientPage() {
                     </select>
                   </Field>
                   <Field label="Phone">
-                    <input value={draft.attendantPhone} onChange={(e) => update({ attendantPhone: e.target.value })} className={inputClass} />
+                    <MobileInput
+                      value={draft.attendantPhone}
+                      onValueChange={(value) => update({ attendantPhone: value })}
+                      placeholder="10-digit mobile number"
+                      className={inputClass}
+                    />
+                    {draft.attendantPhone.length > 0 && !isValidMobile(draft.attendantPhone) ? (
+                      <span className="text-xs font-normal text-critical-fg" role="alert">
+                        {MOBILE_ERROR}
+                      </span>
+                    ) : null}
                   </Field>
                   <Field label="Address (optional)">
                     <input value={draft.attendantAddress} onChange={(e) => update({ attendantAddress: e.target.value })} className={inputClass} />
@@ -350,8 +401,34 @@ export function AdmitPatientPage() {
                 </CardBody>
               </Card>
 
+              <Card className="min-w-0">
+                <CardHeader title="Payment" subtitle="The initial amount is collected now, before the admission is confirmed" />
+                <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Amount to Pay">
+                    <input value={initialAmount > 0 ? formatRupees(initialAmount) : '—'} readOnly className={`${inputClass} font-semibold`} />
+                  </Field>
+                  <Field label="Payment Method">
+                    <select
+                      value={draft.paymentMethod}
+                      onChange={(e) => update({ paymentMethod: e.target.value as PaymentMethod | '' })}
+                      className={inputClass}
+                    >
+                      <option value="">Select payment method</option>
+                      {IP_PAYMENT_METHODS.map((method) => (
+                        <option key={method}>{method}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="flex flex-col gap-1 sm:col-span-2" aria-live="polite">
+                    {!draft.ward ? <FieldNote>Select a ward.</FieldNote> : null}
+                    {draft.ward && !draft.bedId ? <FieldNote>Select an available bed to see the charges.</FieldNote> : null}
+                    {draft.bedId && !draft.paymentMethod ? <FieldNote>Select a payment method.</FieldNote> : null}
+                  </div>
+                </CardBody>
+              </Card>
+
               <div className="flex justify-end gap-2">
-                <Button variant="secondary" onClick={() => navigate('/admissions')}>
+                <Button variant="secondary" onClick={onCancel}>
                   Cancel
                 </Button>
                 <Button disabled={!formValid} onClick={() => setPhase('review')}>
@@ -371,6 +448,7 @@ function ReviewSection({
   draft,
   doctorName,
   bedLabel,
+  initialAmount,
   error,
   onBack,
   onConfirm,
@@ -379,6 +457,7 @@ function ReviewSection({
   draft: AdmissionDraft
   doctorName: string
   bedLabel: string
+  initialAmount: number
   error: string | null
   onBack: () => void
   onConfirm: () => void
@@ -416,6 +495,8 @@ function ReviewSection({
 
         <ReviewGroup title="Payment">
           <Row label="Payment Type" value={draft.paymentType} />
+          <Row label="Amount to Pay" value={formatRupees(initialAmount)} />
+          <Row label="Payment Method" value={draft.paymentMethod || '—'} />
           {draft.paymentType === 'Insurance' || draft.paymentType === 'TPA' ? <Row label="Provider" value={draft.insuranceProvider || '—'} /> : null}
         </ReviewGroup>
 
@@ -423,7 +504,7 @@ function ReviewSection({
           <Button variant="secondary" onClick={onBack}>
             Back
           </Button>
-          <Button onClick={onConfirm}>Confirm Admission</Button>
+          <Button onClick={onConfirm}>Confirm Payment &amp; Admit Patient</Button>
         </div>
       </CardBody>
     </Card>
@@ -457,4 +538,37 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   )
+}
+
+/** IP Admission → Admit Patient: a page of its own, separate from Admissions &
+ *  Bed Management. Admitting writes to the same bed/admission records that page
+ *  reads, so it shows the new admission and the occupied bed straight away. */
+export function AdmitPatientPage() {
+  const navigate = useNavigate()
+  return (
+    <div>
+      <PageHeader
+        title="Admit Patient"
+        subtitle="Find a patient, choose an available bed, and admit them."
+        illustration={<ClipboardPlus className="h-6 w-6" strokeWidth={1.75} />}
+        illustrationTone="purple"
+      />
+      <div className="px-4 py-5 sm:px-6 lg:px-8">
+        <AdmitPatientForm onCancel={() => navigate('/admissions')} onAdmitted={() => navigate('/admissions')} />
+      </div>
+    </div>
+  )
+}
+
+function ChargeRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div>
+      <dt className="text-xs text-ink-muted">{label}</dt>
+      <dd className={strong ? 'mt-0.5 text-base font-semibold text-ink' : 'mt-0.5 font-medium text-ink'}>{value}</dd>
+    </div>
+  )
+}
+
+function FieldNote({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-medium text-critical-fg">{children}</p>
 }

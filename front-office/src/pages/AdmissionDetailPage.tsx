@@ -12,7 +12,7 @@ import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { getAdmissionById } from '../domain/admissionSelectors'
 import { getPatientById, getPaymentById, getProviderById } from '../domain/selectors'
-import { cancelAdmission, createBillForAdmission, dischargeAdmission } from '../domain/admissionActions'
+import { cancelAdmission, createBillForAdmission } from '../domain/admissionActions'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
@@ -83,13 +83,6 @@ export function AdmissionDetailPage() {
         { code: 'ADM-DEP', description: `Room/Bed Deposit (${admission!.roomType ?? 'General'})`, amount: deposit },
       ])
       notify('Bill created', { detail: updated.admissionNumber })
-    })
-  }
-
-  function handleDischarge() {
-    act(() => {
-      dischargeAdmission(admission!.admissionId)
-      notify('Patient discharged', { detail: admission!.admissionNumber })
     })
   }
 
@@ -225,7 +218,10 @@ export function AdmissionDetailPage() {
               <CardHeader title="Actions" />
               <CardBody className="flex flex-col gap-2">
                 {canDischarge ? (
-                  <Button size="sm" onClick={handleDischarge}>
+                  <Button
+                    size="sm"
+                    onClick={() => navigate('/admissions/discharge', { state: { admissionId: admission.admissionId } })}
+                  >
                     Discharge Patient
                   </Button>
                 ) : null}

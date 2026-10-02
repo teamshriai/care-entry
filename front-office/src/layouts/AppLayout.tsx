@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { Sidebar } from '../components/layout/Sidebar'
 import { AppBar } from '../components/layout/AppBar'
-import { PatientContextBar } from '../components/patient/PatientContextBar'
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -37,10 +36,9 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="print:hidden">
           <AppBar onMenuClick={() => setMobileNavOpen(true)} />
-          <PatientContextBar />
         </div>
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
-          <div className="mx-auto w-full max-w-7xl">
+          <div className="w-full">
             <Outlet />
           </div>
         </main>

@@ -5,6 +5,8 @@ import { ArrowLeft, UserCog, ShieldPlus, CalendarDays, Receipt, Hospital } from 
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { MobileInput } from '../components/ui/MobileInput'
+import { toEditableMobile } from '../utils/phone'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { Alert } from '../components/ui/Alert'
@@ -81,7 +83,7 @@ export function PatientProfilePage() {
       name: patient!.name,
       age: patient!.age != null ? String(patient!.age) : '',
       sex: patient!.sex,
-      mobile: patient!.mobile,
+      mobile: toEditableMobile(patient!.mobile),
       email: patient!.email ?? '',
       address: patient!.address ?? '',
     })
@@ -178,7 +180,7 @@ export function PatientProfilePage() {
                       ))}
                     </select>
                   </div>
-                  <input value={draft.mobile} onChange={(e) => setDraft({ ...draft, mobile: e.target.value })} className={inputClass} placeholder="Mobile" />
+                  <MobileInput value={draft.mobile} onValueChange={(value) => setDraft({ ...draft, mobile: value })} className={inputClass} placeholder="Mobile (10 digits)" />
                   <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} className={inputClass} placeholder="Email" />
                   <input value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} className={inputClass} placeholder="Address" />
                   <div className="flex gap-2">
@@ -237,7 +239,7 @@ export function PatientProfilePage() {
             icon={CalendarDays}
             iconTone="info"
             title="Appointment history"
-            subtitle="Operational history only — no clinical record is shown in Care Entry"
+            subtitle="Operational history only — no clinical record is shown in the Front Office"
             action={<span className="text-xs tabular-nums text-ink-faint">{appointments.length}</span>}
           />
           {appointments.length === 0 ? (

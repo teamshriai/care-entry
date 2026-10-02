@@ -28,6 +28,16 @@ export function createAdmissionSeed(now: number = Date.now()): AdmissionSeed {
     { bedId: 'bed-11', bedNumber: 'ICU-02-B', roomNumber: 'ICU-02', ward: 'ICU', roomType: 'ICU', status: 'Available', currentAdmissionId: null },
     { bedId: 'bed-12', bedNumber: 'ER-01-B', roomNumber: 'ER-01', ward: 'Emergency', roomType: 'General', status: 'Available', currentAdmissionId: null },
     { bedId: 'bed-13', bedNumber: 'ER-02-B', roomNumber: 'ER-02', ward: 'Emergency', roomType: 'General', status: 'Reserved', currentAdmissionId: null },
+    { bedId: 'bed-14', bedNumber: 'G-106-B', roomNumber: 'G-106', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-15', bedNumber: 'G-107-B', roomNumber: 'G-107', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-16', bedNumber: 'G-108-B', roomNumber: 'G-108', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-17', bedNumber: 'P-203-B', roomNumber: 'P-203', ward: 'Private Ward', roomType: 'Private', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-18', bedNumber: 'P-204-B', roomNumber: 'P-204', ward: 'Private Ward', roomType: 'Private', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-19', bedNumber: 'SP-303-B', roomNumber: 'SP-303', ward: 'Semi-Private Ward', roomType: 'Semi-Private', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-20', bedNumber: 'SP-304-B', roomNumber: 'SP-304', ward: 'Semi-Private Ward', roomType: 'Semi-Private', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-21', bedNumber: 'ICU-03-B', roomNumber: 'ICU-03', ward: 'ICU', roomType: 'ICU', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-22', bedNumber: 'ICU-04-B', roomNumber: 'ICU-04', ward: 'ICU', roomType: 'ICU', status: 'Available', currentAdmissionId: null },
+    { bedId: 'bed-23', bedNumber: 'ER-03-B', roomNumber: 'ER-03', ward: 'Emergency', roomType: 'General', status: 'Available', currentAdmissionId: null },
   ]
 
   function attendant(name: string, relationship: Admission['attendant']['relationship'], phone: string): Admission['attendant'] {

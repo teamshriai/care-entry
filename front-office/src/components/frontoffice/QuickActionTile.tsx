@@ -8,10 +8,13 @@ import { IconBadge } from '../ui/IconBadge'
 // Tab+Space all work with no extra wiring. No AI badge or decoration here —
 // AI touchpoints belong inside the destination screens, not the launcher.
 const PRIMARY_TILE = {
-  blue: 'bg-tile-blue text-tile-blue-fg',
-  teal: 'bg-tile-teal text-tile-teal-fg',
-  violet: 'bg-tile-violet text-tile-violet-fg',
-  amber: 'bg-tile-amber text-tile-amber-fg',
+  blue: 'bg-action-blue text-white',
+  emerald: 'bg-action-emerald text-white',
+  coral: 'bg-action-coral text-white',
+  amber: 'bg-action-amber text-white',
+  purple: 'bg-action-purple text-white',
+  turquoise: 'bg-action-turquoise text-white',
+  magenta: 'bg-action-magenta text-white',
 } as const
 
 export function QuickActionTile({
@@ -19,6 +22,7 @@ export function QuickActionTile({
   iconTone,
   primaryColor,
   label,
+  count,
   to,
   state,
   variant = 'secondary',
@@ -29,9 +33,11 @@ export function QuickActionTile({
    *  tile's icon stays white on its solid brand background). Reuses the
    *  app's existing tone palette (see utils/tone.ts). */
   iconTone?: Tone
-  /** Solid tile hue for a primary tile's fill (design system §4.4 tier 3: --color-tile-*). */
-  primaryColor?: 'blue' | 'teal' | 'violet' | 'amber'
+  /** Solid tile hue for a primary tile's fill (--color-action-*, bright solid fills). */
+  primaryColor?: 'blue' | 'emerald' | 'coral' | 'amber' | 'purple' | 'turquoise' | 'magenta'
   label: string
+  /** Optional figure shown opposite the icon (e.g. today's discharges). */
+  count?: number
   to?: string
   state?: Record<string, unknown>
   variant?: 'primary' | 'secondary'
@@ -58,18 +64,23 @@ export function QuickActionTile({
           : 'border-border bg-surface-1 hover:border-border-strong',
       )}
     >
-      {isPrimary ? (
-        <span
-          className={cn(
-            'flex items-center justify-center rounded-lg bg-white/15 transition-transform duration-150 group-hover:scale-105',
-            dense ? 'h-7 w-7' : 'h-9 w-9',
-          )}
-        >
-          <Icon className={cn(dense ? 'h-4 w-4' : 'h-[18px] w-[18px]', 'text-current')} strokeWidth={2} />
-        </span>
-      ) : (
-        <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size={dense ? 'xs' : 'sm'} interactive />
-      )}
+      <div className={count !== undefined ? 'flex w-full items-start justify-between gap-2' : undefined}>
+        {isPrimary ? (
+          <span
+            className={cn(
+              'flex items-center justify-center rounded-lg bg-white/15 transition-transform duration-150 group-hover:scale-105',
+              dense ? 'h-7 w-7' : 'h-9 w-9',
+            )}
+          >
+            <Icon className={cn(dense ? 'h-4 w-4' : 'h-[18px] w-[18px]', 'text-current')} strokeWidth={2} />
+          </span>
+        ) : (
+          <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size={dense ? 'xs' : 'sm'} interactive />
+        )}
+        {count !== undefined ? (
+          <span className="text-2xl font-semibold leading-none tabular-nums text-current">{count}</span>
+        ) : null}
+      </div>
       <span className={cn(dense ? 'text-xs font-medium' : 'text-sm font-semibold', isPrimary ? 'text-current' : 'text-ink')}>
         {label}
       </span>

@@ -5,6 +5,15 @@ import type { Tone } from '../../utils/tone'
 import { IconBadge } from '../ui/IconBadge'
 import { Card, CardHeader } from '../ui/Card'
 
+// Vivid solid bar fills per tone (tokens in index.css; lighter steps in dark theme).
+const BAR_COLOR: Partial<Record<Tone, string>> = {
+  info: 'var(--color-bar-blue)',
+  indigo: 'var(--color-bar-indigo)',
+  stable: 'var(--color-bar-green)',
+  warning: 'var(--color-bar-amber)',
+  rose: 'var(--color-bar-rose)',
+}
+
 export interface OperationalSummaryDatum {
   label: string
   value: number
@@ -40,7 +49,7 @@ export function OperationalSummaryChart({ data }: { data: OperationalSummaryDatu
               <span className="relative h-2.5 min-w-0 flex-1 basis-0 rounded-full bg-surface-3">
                 <span
                   className={cn('block h-full rounded-full', styles.bar)}
-                  style={{ width: `${widthPercent}%` }}
+                  style={{ width: `${widthPercent}%`, backgroundColor: BAR_COLOR[d.tone] }}
                 />
                 <span
                   role="tooltip"

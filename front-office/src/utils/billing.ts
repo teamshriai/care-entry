@@ -30,3 +30,52 @@ export function paymentStatusTone(status: PaymentStatus): Tone {
   if (status === 'Pending') return 'critical'
   return toneFor(status)
 }
+
+// ------------------------------------------------------------- IP admission
+// Admission charges. The admission's Payment record (the same Payment/Bill every
+// module uses) holds these as ordinary line items, so there is no second billing
+// system: initial payment at admission and the pending balance at discharge are
+// both just collections against that one record.
+import type { RoomType } from '../types/admission'
+import type { PaymentMethod } from '../types/payment'
+
+export const ADMISSION_CHARGE = 500
+
+/** Daily bed/room charge by room type (mock rate card, ₹ per day). */
+export const DAILY_BED_CHARGE: Record<RoomType, number> = {
+  General: 2000,
+  'Semi-Private': 3500,
+  Private: 5000,
+  ICU: 8000,
+}
+
+/** The ways a patient can pay at admission and at discharge. */
+export const IP_PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'UPI', 'Card', 'Other']
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Days billed for a stay — every started 24 hours counts, minimum one. */
+export function stayDays(admittedAt: number, asOf: number): number {
+  return Math.max(1, Math.ceil((asOf - admittedAt) / DAY_MS))
+}
+
+/** Line items for an admission: the admission charge plus the bed/room charge for N days. */
+export function admissionBillItems(roomType: RoomType, days: number): PaymentItem[] {
+  return [
+    { code: 'ADM-FEE', description: 'Admission charge', amount: ADMISSION_CHARGE },
+    {
+      code: `BED-${roomType.toUpperCase().replace(/[^A-Z]/g, '')}`,
+      description: `${roomType} bed/room charge × ${days} ${days === 1 ? 'day' : 'days'}`,
+      amount: DAILY_BED_CHARGE[roomType] * days,
+    },
+  ]
+}
+
+export function sumItems(items: PaymentItem[]): number {
+  return items.reduce((total, item) => total + item.amount, 0)
+}
+
+/** ₹ with Indian digit grouping, e.g. ₹18,500. */
+export function formatRupees(value: number): string {
+  return `₹${value.toLocaleString('en-IN')}`
+}

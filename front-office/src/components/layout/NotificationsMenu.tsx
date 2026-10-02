@@ -34,7 +34,7 @@ export function NotificationsMenu() {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={`Notifications (${notifications.length} unread)`}
-        className="relative rounded-full p-2 text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
+        className="relative rounded-full p-2 text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
       >
         <Bell className="h-4 w-4" strokeWidth={1.75} />
         {notifications.length > 0 ? (

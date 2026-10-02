@@ -6,6 +6,7 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { DoctorIllustration } from '../components/ui/illustrations/DoctorIllustration'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
+import { MobileInput } from '../components/ui/MobileInput'
 import { Alert } from '../components/ui/Alert'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
@@ -236,10 +237,10 @@ export function RegisterDoctorPage() {
                   />
                 </Field>
                 <Field label="Mobile number" required>
-                  <input
+                  <MobileInput
                     value={form.mobile}
-                    onChange={(e) => update('mobile', e.target.value)}
-                    placeholder="+91 ..........."
+                    onValueChange={(value) => update('mobile', value)}
+                    placeholder="10-digit mobile number"
                     className={inputClass}
                   />
                 </Field>

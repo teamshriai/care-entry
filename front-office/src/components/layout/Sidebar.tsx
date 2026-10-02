@@ -4,13 +4,12 @@ import {
   LayoutGrid,
   Users,
   UserPlus,
-  UserRoundPlus,
   IdCard,
   Receipt,
   FileWarning,
-  ClipboardList,
-  ClipboardPlus,
   BedDouble,
+  ClipboardPlus,
+  ClipboardCheck,
 } from 'lucide-react'
 import { currentFrontOfficeUser } from '../../data/currentUser'
 import { Avatar } from '../ui/Avatar'
@@ -48,12 +47,6 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Doctors',
-    items: [
-      { to: '/doctors/register', label: 'Register Doctor', icon: UserRoundPlus, tone: 'indigo' },
-    ],
-  },
-  {
     label: 'Services',
     items: [
       { to: '/services/attendant-pass', label: 'Attendant Pass', icon: IdCard, tone: 'brand' },
@@ -64,9 +57,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'IP Admission',
     items: [
+      { to: '/admissions', label: 'Ward Status', icon: BedDouble, end: true, tone: 'purple' },
       { to: '/admissions/new', label: 'Admit Patient', icon: ClipboardPlus, tone: 'purple' },
-      { to: '/admissions', label: 'Admissions', icon: ClipboardList, end: true, tone: 'purple' },
-      { to: '/admissions/beds', label: 'Bed & Ward Availability', icon: BedDouble, tone: 'purple' },
+      { to: '/admissions/discharge', label: 'Discharge', icon: ClipboardCheck, tone: 'purple' },
     ],
   },
 ]
@@ -78,7 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
 // active highlight on a near-black page.
 export function Sidebar() {
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-border-soft bg-surface-1">
+    <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-border-soft bg-bg">
       <div className="flex h-16 items-center gap-2.5 border-b border-border-soft px-5">
         <img src={logo} alt="" className="h-9 w-auto" />
         <div className="min-w-0">
@@ -101,9 +94,9 @@ export function Sidebar() {
                   end={end}
                   className={({ isActive }) =>
                     cn(
-                      'focus-ring inline-flex min-h-11 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 text-sm font-medium transition-colors',
+                      'focus-ring inline-flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium leading-snug transition-colors',
                       isActive
-                        ? 'bg-primary-50 text-primary-text'
+                        ? 'bg-surface-1 text-primary-text shadow-card'
                         : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
                     )
                   }
