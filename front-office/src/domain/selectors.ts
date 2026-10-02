@@ -573,37 +573,174 @@ export function getConnectivity(state: AppState): Connectivity {
   return state.connectivity
 }
 
-const MIN_QUERY_LENGTH = 2
-
 function digitsOf(value: string): string {
   return value.replace(/[^0-9]/g, '')
 }
 
-/** Client-side patient index search — stands in for a real patient-index
- *  API. The alias list simulates transliteration matching; it is not a real
- *  identity-matching implementation. */
+// ------------------------------------------------------------ patient search
+// Client-side patient index search — stands in for a real patient-index API.
+// Every field is scored on the same scale and the best field wins:
+//   4 exact · 3 starts with · 2 every word of the query starts a word · 1 contains
+// "Contains" needs two or more characters, so a single keystroke only ever
+// shows names, numbers and IDs that START with it. The alias list simulates
+// transliteration matching; it is not a real identity-matching implementation.
+
+type MatchField = PatientSearchMatch['matchedOn']
+
+function normText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[.,'’_/\\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function textTier(value: string, query: string): number {
+  if (!value || !query) return 0
+  if (value === query) return 4
+  if (value.startsWith(query)) return 3
+  const words = value.split(' ')
+  if (query.split(' ').every((part) => words.some((word) => word.startsWith(part)))) return 2
+  if (query.length >= 2 && value.includes(query)) return 1
+  return 0
+}
+
+/** Mobile numbers match on their last ten digits, so "+91" never matches everyone. */
+function mobileTier(mobile: string, raw: string): number {
+  if (!/^[+\d\s()-]+$/.test(raw)) return 0
+  let digits = digitsOf(raw)
+  if (raw.startsWith('+91') && digits.startsWith('91')) digits = digits.slice(2)
+  if (digits.length > 10) digits = digits.slice(-10)
+  if (!digits) return 0
+  const number = digitsOf(mobile).slice(-10)
+  if (digits === number) return 4
+  if (number.startsWith(digits)) return 3
+  if (digits.length >= 4 && number.endsWith(digits)) return 2
+  if (digits.length >= 3 && number.includes(digits)) return 1
+  return 0
+}
+
+/** A UHID matches on its number — "SHRI" on its own, or "sh", matches nobody. */
+function uhidTier(uhid: string, raw: string): number {
+  const typed = raw.toLowerCase().replace(/^shri/, '').replace(/[\s-]/g, '')
+  if (!/^\d+$/.test(typed)) return 0
+  const full = digitsOf(uhid)
+  const typedCore = typed.replace(/^0+/, '')
+  const fullCore = full.replace(/^0+/, '')
+  if (!typedCore) return 0
+  if (typedCore === fullCore) return 4
+  if (fullCore.startsWith(typedCore) || full.startsWith(typed)) return 3
+  if (typedCore.length >= 3 && fullCore.includes(typedCore)) return 1
+  return 0
+}
+
+/** ABHA address ("name@abdm") on the part before "@"; ABHA number on its digits. */
+function abhaTier(abha: string | null, raw: string, query: string): number {
+  if (!abha) return 0
+  const value = abha.toLowerCase()
+  if (value.includes('@')) {
+    const typed = raw.toLowerCase()
+    if (value === typed) return 4
+    // Typing the address itself ("lakshmanan.r@ab…") matches it as it grows.
+    if (typed.includes('@')) return value.startsWith(typed) ? 3 : 0
+    return textTier(normText(value.split('@')[0]), query)
+  }
+  if (!/^[\d\s-]+$/.test(raw)) return 0
+  const digits = digitsOf(raw)
+  const number = digitsOf(value)
+  if (!digits) return 0
+  if (digits === number) return 4
+  if (number.startsWith(digits)) return 3
+  if (digits.length >= 4 && number.includes(digits)) return 1
+  return 0
+}
+
+/** Ranked patient search: best match first, then the patients the desk
+ *  opens most, then the newest registrations. */
 export function searchPatients(state: AppState, rawQuery: string): PatientSearchMatch[] {
-  const query = rawQuery.trim().toLowerCase()
-  if (query.length < MIN_QUERY_LENGTH) return []
-  const queryDigits = digitsOf(query)
+  const raw = rawQuery.trim()
+  if (!raw) return []
+  const query = normText(raw)
+  const opens = (patientId: string) => state.patientOpens[patientId]?.count ?? 0
 
   return state.patients
     .map((patient): PatientSearchMatch | null => {
-      if (patient.uhid.toLowerCase().includes(query)) return { patient, matchedOn: 'UHID' }
-      if (patient.name.toLowerCase().includes(query)) return { patient, matchedOn: 'Name' }
-      if (patient.nameNative && patient.nameNative.includes(rawQuery.trim())) {
-        return { patient, matchedOn: 'Name (native script)' }
-      }
-      if (patient.aliases?.some((alias) => alias.includes(query))) {
-        return { patient, matchedOn: 'Name (known alias)' }
-      }
-      if (queryDigits.length >= 3 && digitsOf(patient.mobile).includes(queryDigits)) {
-        return { patient, matchedOn: 'Phone' }
-      }
-      if (patient.abhaId && patient.abhaId.toLowerCase().includes(query)) return { patient, matchedOn: 'ABHA' }
-      return null
+      // Listed in tie-break order: on equal scores the earlier field is named.
+      const scores: [MatchField, number][] = [
+        ['UHID', uhidTier(patient.uhid, raw)],
+        ['Mobile', mobileTier(patient.mobile, raw)],
+        ['ABHA', abhaTier(patient.abhaId, raw, query)],
+        ['Name', textTier(normText(patient.name), query)],
+        ['Name (native script)', patient.nameNative ? textTier(normText(patient.nameNative), query) : 0],
+        ['Name (known alias)', Math.max(0, ...(patient.aliases ?? []).map((alias) => textTier(normText(alias), query)))],
+      ]
+      let best: [MatchField, number] | null = null
+      for (const entry of scores) if (entry[1] > (best?.[1] ?? 0)) best = entry
+      return best ? { patient, matchedOn: best[0], tier: best[1] } : null
     })
     .filter((result): result is PatientSearchMatch => result !== null)
+    .sort(
+      (a, b) =>
+        b.tier - a.tier ||
+        opens(b.patient.patientId) - opens(a.patient.patientId) ||
+        b.patient.createdAt - a.patient.createdAt ||
+        a.patient.patientId.localeCompare(b.patient.patientId),
+    )
+}
+
+/** A bill typed into search — "BIL-000102", "RCT-102", "bil 102". */
+export function findBillByNumber(state: AppState, rawQuery: string): Payment | null {
+  const match = rawQuery.trim().toLowerCase().match(/^(bil|rct)[\s-]*0*(\d+)$/)
+  if (!match) return null
+  const wanted = Number(match[2])
+  return state.payments.find((p) => Number(digitsOf(p.receiptNo)) === wanted) ?? null
+}
+
+export interface PatientSearchSuggestions {
+  recent: Patient[]
+  mostOpened: Patient[]
+}
+
+/** What the search box offers before anything is typed: the newest
+ *  registrations and the profiles the desk opens most (never both). */
+export function getPatientSearchSuggestions(state: AppState): PatientSearchSuggestions {
+  const recent = [...state.patients].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5)
+  const recentIds = new Set(recent.map((p) => p.patientId))
+  const mostOpened = state.patients
+    .filter((p) => !recentIds.has(p.patientId) && (state.patientOpens[p.patientId]?.count ?? 0) > 0)
+    .sort((a, b) => {
+      const sa = state.patientOpens[a.patientId]
+      const sb = state.patientOpens[b.patientId]
+      return sb.count - sa.count || sb.lastOpenedAt - sa.lastOpenedAt
+    })
+    .slice(0, 5)
+  return { recent, mostOpened }
+}
+
+export interface PatientFlags {
+  /** Bed number while admitted. */
+  bed: string | null
+  /** Money still owed across the patient's bills. */
+  due: number
+  /** A collection on one of those bills failed and nothing has been paid since. */
+  failed: boolean
+}
+
+/** The small status marks shown beside a patient wherever they are listed. */
+export function getPatientFlags(state: AppState): Record<string, PatientFlags> {
+  const flags: Record<string, PatientFlags> = {}
+  const of = (patientId: string) => (flags[patientId] ??= { bed: null, due: 0, failed: false })
+  for (const admission of state.admissions) {
+    if (admission.status === 'Admitted') of(admission.patientId).bed = admission.bedNumber
+  }
+  for (const payment of state.payments) {
+    if (!isBillDue(payment)) continue
+    const entry = of(payment.patientId)
+    entry.due += payment.balance
+    if (billDisplayStatus(payment) === 'Failed') entry.failed = true
+  }
+  return flags
 }
 
 export interface PatientSearchResult extends PatientSearchMatch {
@@ -633,7 +770,7 @@ export function getPatientList(state: AppState): PatientSearchResult[] {
       const todays = appointments
         .filter((a) => a.patientId === patient.patientId && a.status !== 'Cancelled')
         .sort((a, b) => a.slot.localeCompare(b.slot))
-      return { patient, matchedOn: 'Name', appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
+      return { patient, matchedOn: 'Name', tier: 0, appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
     })
 }
 

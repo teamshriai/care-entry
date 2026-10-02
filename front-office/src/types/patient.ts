@@ -42,5 +42,7 @@ export interface PatientDemographicsInput {
 /** One row of domain/selectors.searchPatients / getPatientSearchResults. */
 export interface PatientSearchMatch {
   patient: Patient
-  matchedOn: 'UHID' | 'Name' | 'Name (native script)' | 'Name (known alias)' | 'Phone' | 'ABHA'
+  matchedOn: 'UHID' | 'Name' | 'Name (native script)' | 'Name (known alias)' | 'Mobile' | 'ABHA'
+  /** How well it matched: 4 exact · 3 starts with · 2 word starts · 1 contains. */
+  tier: number
 }

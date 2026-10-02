@@ -14,6 +14,7 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
+import { useCountPatientOpen } from '../hooks/useCountPatientOpen'
 import { getPatientById, getAppointmentsForPatient, getConnectivity, getPaymentsForPatient } from '../domain/selectors'
 import { getAdmissionsForPatient } from '../domain/admissionSelectors'
 import { updatePatientDemographics, linkAbha } from '../domain/actions'
@@ -50,6 +51,7 @@ export function PatientProfilePage() {
   const { setPatient } = usePatientContext()
 
   const patient = useStoreValue(getPatientById, uhid ?? '')
+  useCountPatientOpen(patient?.patientId)
   const appointments = useStoreValue(getAppointmentsForPatient, uhid ?? '')
   const bills = useStoreValue(getPaymentsForPatient, uhid ?? '')
   const admissionHistory = useStoreValue(getAdmissionsForPatient, uhid ?? '')

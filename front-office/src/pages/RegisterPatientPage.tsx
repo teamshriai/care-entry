@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CheckCircle2, UserPlus } from 'lucide-react'
+import { UserPlus, UserRoundCheck } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -9,6 +9,7 @@ import { Alert } from '../components/ui/Alert'
 import { MobileInput } from '../components/ui/MobileInput'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
+import { AckCard } from '../components/flow/AckCard'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { usePatientContext } from '../hooks/usePatientContext'
@@ -20,11 +21,17 @@ import type { Patient, Sex } from '../types/patient'
 
 const SEXES: Sex[] = ['Male', 'Female', 'Other']
 
-/** How long the success confirmation stays up before the Patient List opens (1 second). */
-const SUCCESS_REDIRECT_MS = 1000
-
 interface RegisterPatientLocationState {
   prefillName?: string
+}
+
+/** What the desk typed into the search box before pressing Register. */
+function prefillFrom(search: string, state: RegisterPatientLocationState | null): { name: string; mobile: string } {
+  const query = new URLSearchParams(search)
+  return {
+    name: query.get('name')?.trim() ?? state?.prefillName ?? '',
+    mobile: (query.get('mobile') ?? '').replace(/[^0-9]/g, '').slice(-10),
+  }
 }
 
 interface PatientFormState {
@@ -41,28 +48,12 @@ export function RegisterPatientPage() {
   const { notify } = useToast()
   const { setPatient } = usePatientContext()
   const connectivity = useStoreValue(getConnectivity)
-  const locationState = location.state as RegisterPatientLocationState | null
-
-  const [form, setForm] = useState<PatientFormState>({
-    name: locationState?.prefillName ?? '',
-    age: '',
-    sex: 'Male',
-    mobile: '',
-    abhaId: '',
+  const [form, setForm] = useState<PatientFormState>(() => {
+    const prefill = prefillFrom(location.search, location.state as RegisterPatientLocationState | null)
+    return { name: prefill.name, age: '', sex: 'Male', mobile: prefill.mobile, abhaId: '' }
   })
   const [error, setError] = useState<string | null>(null)
   const [registered, setRegistered] = useState<Patient | null>(null)
-
-  // Show the confirmation for 1s, then open the Patient List (it reads the same
-  // store the new patient was just written to). The cleanup cancels the timer if
-  // the user leaves, or clicks "Register another", before it fires.
-  useEffect(() => {
-    if (!registered) return undefined
-    const timer = window.setTimeout(() => {
-      navigate('/patients', { state: { justRegistered: registered.uhid } })
-    }, SUCCESS_REDIRECT_MS)
-    return () => window.clearTimeout(timer)
-  }, [registered, navigate])
 
   const duplicateQuery = useMemo(() => ({ name: form.name, mobile: form.mobile }), [form.name, form.mobile])
   const duplicates = useStoreValue(findPossibleDuplicatesFor, duplicateQuery)
@@ -85,24 +76,30 @@ export function RegisterPatientPage() {
     }
   }
 
-  function selectExistingPatient(patient: Patient) {
+  function openExistingPatient(patient: Patient) {
     setPatient(patient)
-    notify('Existing patient selected', { detail: `${patient.name} · ${patient.uhid}` })
-    navigate('/appointments/new')
+    navigate(`/patients/${patient.uhid}`, { replace: true })
   }
 
   if (registered) {
-    // Success state: only the confirmation box, centred in the content area (no page
-    // title, no actions). The effect above opens the Patient List after 1 second.
+    // The acknowledgement, then the new patient's profile. `replace` drops the
+    // filled-in form from history, so Back never lands on it again.
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6 py-10">
-        <Card className="w-full max-w-md" role="status">
-          <CardBody className="flex flex-col items-center gap-4 px-8 py-10 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stable-bg">
-              <CheckCircle2 className="h-6 w-6 text-stable" strokeWidth={1.75} aria-hidden="true" />
-            </div>
-            <p className="text-xl font-semibold text-ink">Patient Registration Completed Successfully</p>
-          </CardBody>
+        <Card className="w-full max-w-md">
+          <AckCard
+            title="Patient Registered"
+            icon={UserRoundCheck}
+            onDone={() => navigate(`/patients/${registered.uhid}`, { replace: true })}
+          >
+            <p className="text-base font-semibold text-ink">{registered.name}</p>
+            <p className="text-2xl font-semibold tracking-wide tabular-nums text-primary-text">{registered.uhid}</p>
+            <p>
+              {registered.age ? `${registered.age} yrs · ` : ''}
+              {registered.sex} · {registered.mobile}
+            </p>
+            {registered.abhaId ? <p>ABHA {registered.abhaId}</p> : null}
+          </AckCard>
         </Card>
       </div>
     )
@@ -184,12 +181,10 @@ export function RegisterPatientPage() {
                 />
               </Field>
 
-              <div className="flex justify-end gap-2.5 border-t border-border-soft pt-4">
-                <Button type="button" variant="secondary" onClick={() => navigate('/front-office')}>
-                  Cancel
-                </Button>
+              <div className="flex justify-end border-t border-border-soft pt-4">
                 <Button type="submit" disabled={!form.name.trim() || !form.mobile.trim()}>
-                  Register patient
+                  <UserPlus className="h-4 w-4" strokeWidth={1.75} />
+                  Register
                 </Button>
               </div>
             </form>
@@ -217,7 +212,7 @@ export function RegisterPatientPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge status={candidate.abhaId ? 'Linked' : 'Not linked'} className="hidden text-2xs xl:inline-flex" />
-                      <Button size="sm" variant="secondary" onClick={() => selectExistingPatient(candidate)}>
+                      <Button size="sm" variant="secondary" onClick={() => openExistingPatient(candidate)}>
                         Use this patient
                       </Button>
                     </div>

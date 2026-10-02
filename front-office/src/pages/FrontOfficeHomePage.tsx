@@ -21,7 +21,6 @@ import { PageHeader } from '../components/layout/PageHeader'
 import { Button } from '../components/ui/Button'
 import { Card, CardHeader } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
-import { DashboardPatientSearch } from '../components/frontoffice/DashboardPatientSearch'
 import { QuickActionTile } from '../components/frontoffice/QuickActionTile'
 import { OperationalSummaryChart } from '../components/frontoffice/OperationalSummaryChart'
 import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
@@ -97,9 +96,6 @@ export function FrontOfficeHomePage() {
       <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
         {/* Quick actions */}
         <section aria-label="Quick actions">
-          <div className="mb-4">
-            <DashboardPatientSearch />
-          </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-7">
             {PRIMARY_ACTIONS.map((action) => (
               <QuickActionTile key={action.key} icon={action.icon} label={action.label} to={action.to} variant="primary" primaryColor={action.color}

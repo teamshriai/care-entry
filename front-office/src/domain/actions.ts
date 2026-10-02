@@ -683,6 +683,19 @@ export function removeDoctorLeave(leaveId: string): void {
 
 // --------------------------------------------------------- patient records
 
+/** Counts a profile being opened — feeds the search box's "Most opened". */
+export function recordPatientOpen(patientId: string): void {
+  const state = getState()
+  if (!state.patients.some((p) => p.patientId === patientId)) return
+  setState((current) => {
+    const stat = current.patientOpens[patientId]
+    return {
+      ...current,
+      patientOpens: { ...current.patientOpens, [patientId]: { count: (stat?.count ?? 0) + 1, lastOpenedAt: Date.now() } },
+    }
+  })
+}
+
 export function updatePatientDemographics(patientId: string, changes: PatientDemographicsInput): void {
   const state = getState()
   const patient = state.patients.find((p) => p.patientId === patientId)
