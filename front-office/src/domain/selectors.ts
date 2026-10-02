@@ -15,7 +15,7 @@ import type { ActivityLogEntry } from '../types/activity'
 import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
 import type { Tone } from '../utils/tone'
-import { REGISTRATION_FEE, billDisplayStatus, isBillDue } from '../utils/billing'
+import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -514,45 +514,6 @@ export function getQueueView(state: AppState, now: number = Date.now()): QueueVi
   }
 }
 
-export function getAverageWaitMinutes(state: AppState, now: number = Date.now()): number {
-  const { waiting } = getQueueView(state, now)
-  if (waiting.length === 0) return 0
-  return Math.round(waiting.reduce((sum, t) => sum + (t.waitingMinutes ?? 0), 0) / waiting.length)
-}
-
-export interface OperationalSummary {
-  todaysRegistrations: number
-  todaysAppointments: number
-  cancelledAppointments: number
-  waitingPatients: number
-  averageWaitMinutes: number
-  pendingPayments: number
-  doctorsAvailable: number
-  doctorsOnDuty: number
-  doctorsTotal: number
-  pendingActions: number
-}
-
-export function getOperationalSummary(state: AppState, now: number = Date.now()): OperationalSummary {
-  const date = state.today
-  const appointments = getAppointmentsForDate(state, date)
-  const queue = getQueueView(state, now)
-  const doctorRows = getDoctorRows(state, now, date)
-
-  return {
-    todaysRegistrations: state.registrationLog.length,
-    todaysAppointments: appointments.filter((a) => a.status !== 'Cancelled').length,
-    cancelledAppointments: appointments.filter((a) => a.status === 'Cancelled').length,
-    waitingPatients: queue.waiting.length,
-    averageWaitMinutes: getAverageWaitMinutes(state, now),
-    pendingPayments: getPendingPayments(state).length,
-    doctorsAvailable: doctorRows.filter((r) => r.status === 'Available').length,
-    doctorsOnDuty: doctorRows.filter((r) => !['On leave', 'Not scheduled', 'Inactive'].includes(r.status)).length,
-    doctorsTotal: doctorRows.filter((r) => r.provider.status === 'Active').length,
-    pendingActions: getNeedsAttention(state, now).length,
-  }
-}
-
 /** Patient records that look like the same human being — matched on an
  *  identical mobile number, derived from the records themselves. */
 export function getPossibleDuplicates(state: AppState): Patient[][] {
@@ -585,15 +546,63 @@ export function findPossibleDuplicatesFor(
   })
 }
 
+/** The one thing the desk does about an item — the dashboard turns it into
+ *  a single button. */
+export type AttentionAction =
+  | { kind: 'collect'; patientId: string; paymentId: string }
+  | { kind: 'admit'; patientId: string }
+  | { kind: 'return-pass'; passId: string }
+  | { kind: 'open'; label: string; to: string }
+
 export interface NeedsAttentionItem {
   id: string
   tone: 'warning' | 'neutral' | 'info' | 'critical'
   title: string
   detail: string
+  action: AttentionAction | null
 }
 
+const ATTENTION_ORDER: Record<NeedsAttentionItem['tone'], number> = { critical: 0, warning: 1, info: 2, neutral: 3 }
+
+/** What the front desk should deal with now, most urgent first. */
 export function getNeedsAttention(state: AppState, now: number = Date.now()): NeedsAttentionItem[] {
   const items: NeedsAttentionItem[] = []
+
+  const dayMs = 24 * 60 * 60 * 1000
+  for (const pass of state.guestPasses) {
+    if (!pass.returned && now - pass.issuedAt > dayMs) {
+      items.push({
+        id: `na-pass-${pass.passId}`,
+        tone: 'critical',
+        title: 'Guest pass overdue',
+        detail: `${pass.passId} (${pass.patientName}, ${pass.ward}) has not been returned.`,
+        action: { kind: 'return-pass', passId: pass.passId },
+      })
+    }
+  }
+
+  for (const bill of state.payments) {
+    if (isBillDue(bill) && billDisplayStatus(bill) === 'Failed') {
+      items.push({
+        id: `na-failed-${bill.paymentId}`,
+        tone: 'critical',
+        title: 'Payment failed',
+        detail: `${bill.patientName} · ${billNumberFor(bill)} · ${formatRupees(bill.balance)} still due — the last attempt failed.`,
+        action: { kind: 'collect', patientId: bill.patientId, paymentId: bill.paymentId },
+      })
+    }
+  }
+
+  for (const record of state.mlcRecords) {
+    if (record.acknowledgedAt) continue
+    items.push({
+      id: `na-mlc-${record.mlcId}`,
+      tone: 'warning',
+      title: record.intimationSent ? 'MLC acknowledgement awaited' : 'MLC intimation not sent',
+      detail: `${record.mlcId} · ${record.patientName} · ${record.policeStation}`,
+      action: { kind: 'open', label: 'MLC', to: '/services/mlc' },
+    })
+  }
 
   for (const group of getPossibleDuplicates(state)) {
     items.push({
@@ -601,6 +610,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
       tone: 'warning',
       title: 'Possible duplicate patient',
       detail: `${group.map((p) => p.uhid).join(' and ')} share a mobile number (${group[0].name})`,
+      action: { kind: 'open', label: 'Review', to: '/patients?filter=duplicates' },
     })
   }
 
@@ -611,6 +621,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Patient awaiting doctor',
         detail: `${token.patient?.name ?? 'A patient'} has been awaiting the doctor for ${token.waitingMinutes} minutes (${token.tokenNumber}).`,
+        action: { kind: 'open', label: 'Queue', to: '/op-queue' },
       })
     }
   }
@@ -622,6 +633,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Doctor running late',
         detail: `${row.provider.name} is about ${row.delayMinutes} minutes behind schedule.`,
+        action: { kind: 'open', label: 'Queue', to: '/op-queue' },
       })
     }
     if (row.status === 'On leave') {
@@ -630,34 +642,23 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'neutral',
         title: 'Doctor unavailable',
         detail: `${row.provider.name} is on leave today — no bookable slots in ${row.provider.department}.`,
+        action: { kind: 'open', label: 'Doctor', to: `/doctors/${row.provider.providerId}` },
       })
     }
   }
 
-  for (const appointment of getAppointmentsForDate(state)) {
-    if (appointment.status === 'Scheduled' && appointment.slotTimestamp <= now + 60 * 60000) {
-      items.push({
-        id: `na-confirm-${appointment.appointmentId}`,
-        tone: 'info',
-        title: 'Appointment needs confirmation',
-        detail: `${appointment.patient?.name ?? 'A patient'} at ${appointment.slot} with ${appointment.provider?.name ?? ''}.`,
-      })
-    }
+  for (const admission of state.admissions) {
+    if (admission.status !== 'Pending' && admission.status !== 'Bed Reserved') continue
+    items.push({
+      id: `na-bed-${admission.admissionId}`,
+      tone: 'info',
+      title: 'Waiting for a bed',
+      detail: `${admission.patientName} · ${admission.admissionNumber} · ${admission.doctorName}`,
+      action: { kind: 'admit', patientId: admission.patientId },
+    })
   }
 
-  const dayMs = 24 * 60 * 60 * 1000
-  for (const pass of state.guestPasses) {
-    if (!pass.returned && now - pass.issuedAt > dayMs) {
-      items.push({
-        id: `na-pass-${pass.passId}`,
-        tone: 'critical',
-        title: 'Guest pass overdue',
-        detail: `${pass.passId} (${pass.patientName}, ward ${pass.ward}) has not been returned.`,
-      })
-    }
-  }
-
-  return items
+  return items.sort((a, b) => ATTENTION_ORDER[a.tone] - ATTENTION_ORDER[b.tone])
 }
 
 export function getActivityLog(state: AppState): ActivityLogEntry[] {

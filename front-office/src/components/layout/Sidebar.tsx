@@ -3,16 +3,15 @@ import type { LucideIcon } from 'lucide-react'
 import {
   LayoutGrid,
   Users,
-  UserPlus,
+  CalendarClock,
+  ListOrdered,
+  BedDouble,
+  IndianRupee,
+  Stethoscope,
   IdCard,
   Receipt,
   FileWarning,
-  BedDouble,
-  ClipboardPlus,
-  ClipboardCheck,
 } from 'lucide-react'
-import { currentFrontOfficeUser } from '../../data/currentUser'
-import { Avatar } from '../ui/Avatar'
 import { cn } from '../../utils/cn'
 import { TONE_STYLES } from '../../utils/tone'
 import type { Tone } from '../../utils/tone'
@@ -30,20 +29,33 @@ interface NavItem {
 }
 
 interface NavGroup {
-  label: string
+  /** A heading for the group; the plain places have none. */
+  label?: string
   items: NavItem[]
 }
 
-// One sidebar for the whole portal — there is no separate patient or doctor
-// navigation. Contextual operations (demographics, ABHA linking, MLC against
-// a patient, visit opening) live inside their workflows, not here.
+// Places only. Actions — register, schedule, admit, discharge, collect —
+// start from the search in the app bar or the patient's profile, so none of
+// them has a second home here.
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Care Entry',
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
       { to: '/patients', label: 'Patients', icon: Users, tone: 'teal' },
-      { to: '/register/new', label: 'Register Patient', icon: UserPlus, tone: 'teal' },
+    ],
+  },
+  {
+    label: 'Outpatients',
+    items: [
+      { to: '/appointments', label: 'Appointments', icon: CalendarClock, tone: 'info' },
+      { to: '/op-queue', label: 'Queue', icon: ListOrdered, tone: 'info' },
+    ],
+  },
+  {
+    items: [
+      { to: '/admissions', label: 'Inpatients', icon: BedDouble, tone: 'purple' },
+      { to: '/billing', label: 'Billing', icon: IndianRupee, tone: 'stable' },
+      { to: '/doctors', label: 'Doctors', icon: Stethoscope, tone: 'indigo' },
     ],
   },
   {
@@ -52,14 +64,6 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/services/guest-pass', label: 'Guest Pass', icon: IdCard, tone: 'brand' },
       { to: '/services/enquiry', label: 'Enquiry & Estimate', icon: Receipt, tone: 'stable' },
       { to: '/services/mlc', label: 'MLC', icon: FileWarning, tone: 'warning' },
-    ],
-  },
-  {
-    label: 'IP Admission',
-    items: [
-      { to: '/admissions', label: 'Inpatients', icon: BedDouble, end: true, tone: 'purple' },
-      { to: '/admissions/new', label: 'Admit Patient', icon: ClipboardPlus, tone: 'purple' },
-      { to: '/admissions/discharge', label: 'Discharge', icon: ClipboardCheck, tone: 'purple' },
     ],
   },
 ]
@@ -81,11 +85,11 @@ export function Sidebar() {
       </div>
 
       <nav aria-label="Main navigation" className="mt-3 flex flex-1 flex-col gap-4 px-3 pb-4">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label}>
-            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              {group.label}
-            </p>
+        {NAV_GROUPS.map((group, index) => (
+          <div key={group.label ?? `places-${index}`}>
+            {group.label ? (
+              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">{group.label}</p>
+            ) : null}
             <div className="flex flex-col gap-0.5">
               {group.items.map(({ to, label, icon: Icon, end, tone }) => (
                 <NavLink
@@ -119,14 +123,6 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-
-      <div className="flex items-center gap-2.5 border-t border-border-soft px-4 py-3">
-        <Avatar initials={currentFrontOfficeUser.initials} size="sm" />
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold text-ink">{currentFrontOfficeUser.name}</p>
-          <p className="truncate text-xs text-ink-subtle">{currentFrontOfficeUser.role}</p>
-        </div>
-      </div>
     </aside>
   )
 }

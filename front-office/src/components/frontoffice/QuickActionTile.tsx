@@ -23,6 +23,7 @@ export function QuickActionTile({
   primaryColor,
   label,
   count,
+  hint,
   to,
   state,
   variant = 'secondary',
@@ -36,8 +37,10 @@ export function QuickActionTile({
   /** Solid tile hue for a primary tile's fill (--color-action-*, bright solid fills). */
   primaryColor?: 'blue' | 'emerald' | 'coral' | 'amber' | 'purple' | 'turquoise' | 'magenta'
   label: string
-  /** Optional figure shown opposite the icon (e.g. today's discharges). */
-  count?: number
+  /** Optional figure shown opposite the icon (e.g. today's discharges, ₹ due). */
+  count?: number | string
+  /** A line under the label that says what the figure is made of. */
+  hint?: string
   to?: string
   state?: Record<string, unknown>
   variant?: 'primary' | 'secondary'
@@ -64,7 +67,7 @@ export function QuickActionTile({
           : 'border-border bg-surface-1 hover:border-border-strong',
       )}
     >
-      <div className={count !== undefined ? 'flex w-full items-start justify-between gap-2' : undefined}>
+      <div className={count !== undefined ? 'flex w-full flex-wrap items-start justify-between gap-2' : undefined}>
         {isPrimary ? (
           <span
             className={cn(
@@ -78,11 +81,12 @@ export function QuickActionTile({
           <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size={dense ? 'xs' : 'sm'} interactive />
         )}
         {count !== undefined ? (
-          <span className="text-2xl font-semibold leading-none tabular-nums text-current">{count}</span>
+          <span className="text-xl font-semibold leading-none tabular-nums text-current sm:text-2xl">{count}</span>
         ) : null}
       </div>
       <span className={cn(dense ? 'text-xs font-medium' : 'text-sm font-semibold', isPrimary ? 'text-current' : 'text-ink')}>
         {label}
+        {hint ? <span className="mt-0.5 block text-2xs font-normal text-ink-subtle">{hint}</span> : null}
       </span>
     </button>
   )

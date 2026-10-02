@@ -210,12 +210,3 @@ export function previewDischargeBill(state: AppState, admissionId: string, asOf:
     canDischarge: billing.pending === 0,
   }
 }
-
-/** Patients discharged today — counted from the admission records the Discharge
- *  workflow writes to. */
-export function getDischargesToday(state: AppState): number {
-  const today = todayKey()
-  return state.admissions.filter(
-    (a) => a.status === 'Discharged' && a.dischargedAt !== null && todayKey(new Date(a.dischargedAt)) === today,
-  ).length
-}
