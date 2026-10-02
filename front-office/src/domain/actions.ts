@@ -325,7 +325,11 @@ export function rescheduleAppointment(appointmentId: string, newSlot: string): v
 export function checkInAppointment(appointmentId: string): CheckInResult {
   const state = getState()
   const appointment = requireAppointment(state, appointmentId)
-  if (!['Scheduled', 'Payment Pending', 'Confirmed'].includes(appointment.status)) {
+  // No pay-later: only a paid (Confirmed) booking joins the queue.
+  if (appointment.status === 'Scheduled' || appointment.status === 'Payment Pending') {
+    throw new DomainError('INVALID_TRANSITION', 'This booking is not paid yet — collect the payment first.')
+  }
+  if (appointment.status !== 'Confirmed') {
     throw new DomainError('INVALID_TRANSITION', `Cannot queue an appointment that is ${appointment.status}.`)
   }
 

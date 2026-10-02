@@ -174,7 +174,14 @@ export function cancelAdmission(admissionId: string, reason: string): Admission 
       return updated
     })
     const beds = admission.bedId ? setBedStatus(current, admission.bedId, 'Available', null) : current.beds
-    return { ...current, admissions, beds, activityLog, nextIds: { ...current.nextIds, activity: activitySeq } }
+    // Its bill goes with it while nothing has been paid; a paid deposit stays
+    // on the bill for a refund.
+    const payments = current.payments.map((p) =>
+      p.paymentId === admission.paymentId && p.status === 'Pending' && p.paidAmount === 0
+        ? { ...p, status: 'Cancelled' as const, cancelledAt: now, cancelReason: 'Admission cancelled', updatedAt: now }
+        : p,
+    )
+    return { ...current, admissions, beds, payments, activityLog, nextIds: { ...current.nextIds, activity: activitySeq } }
   })
 
   return updated
