@@ -18,15 +18,11 @@ import { OpQueuePage } from './pages/OpQueuePage'
 import { GuestPassPage } from './pages/GuestPassPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
-import { BillingDashboardPage } from './pages/BillingDashboardPage'
-import { BillsListPage } from './pages/BillsListPage'
+import { BillingPage } from './pages/BillingPage'
 import { AdmissionsBedManagementPage } from './pages/AdmissionsBedManagementPage'
 import { AdmitPatientPage } from './pages/AdmitPatientPage'
 import { DischargePage } from './pages/DischargePage'
 import { AdmissionDetailPage } from './pages/AdmissionDetailPage'
-import { PendingPaymentsPage } from './pages/PendingPaymentsPage'
-import { CollectPaymentPage } from './pages/CollectPaymentPage'
-import { PaymentHistoryPage } from './pages/PaymentHistoryPage'
 import { PaymentDetailPage } from './pages/PaymentDetailPage'
 import { PaymentReceiptPage } from './pages/PaymentReceiptPage'
 
@@ -102,9 +98,9 @@ function App() {
             <Route path="/services/enquiry" element={<EnquiryEstimatePage />} />
             <Route path="/services/mlc" element={<MlcPage />} />
 
-            {/* Billing & Accounts */}
-            <Route path="/billing" element={<BillingDashboardPage />} />
-            <Route path="/billing/bills" element={<BillsListPage />} />
+            {/* Billing — one page; collecting happens in the billing flow */}
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/billing/bills" element={<Navigate to="/billing?filter=all" replace />} />
 
             {/* IP Admission */}
             <Route path="/admissions" element={<AdmissionsBedManagementPage />} />
@@ -121,21 +117,13 @@ function App() {
             <Route path="/admissions/discharge" element={<DischargePage />} />
             <Route path="/admissions/:admissionId" element={<AdmissionDetailPage />} />
 
-            {/* Payments — folded into Billing & Accounts; the dashboard now
-                lives at /billing, this stays as a redirect so no old link
-                dead-ends. The rest are still-active payment functionality
-                Billing & Accounts links into directly. */}
+            {/* Payments — the old list pages now land on Billing's filters, and
+                Collect Payment opens the billing flow; one bill and its
+                receipt keep their own pages. */}
             <Route path="/payments" element={<Navigate to="/billing" replace />} />
-            <Route path="/payments/pending" element={<PendingPaymentsPage />} />
-            <Route path="/payments/history" element={<PaymentHistoryPage />} />
-            <Route
-              path="/payments/collect"
-              element={
-                <FreshOnNavigate>
-                  <CollectPaymentPage />
-                </FreshOnNavigate>
-              }
-            />
+            <Route path="/payments/pending" element={<Navigate to="/billing?filter=due" replace />} />
+            <Route path="/payments/history" element={<Navigate to="/billing?filter=all" replace />} />
+            <Route path="/payments/collect" element={<Navigate to="/billing?filter=due&flow=billing" replace />} />
             <Route path="/payments/:paymentId" element={<PaymentDetailPage />} />
             <Route path="/payments/:paymentId/receipt" element={<PaymentReceiptPage />} />
 

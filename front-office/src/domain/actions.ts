@@ -33,6 +33,7 @@ import type {
   CollectPaymentInput,
   CreatePaymentInput,
   Payment,
+  RecordFailedPaymentInput,
   RefundPaymentInput,
 } from '../types/payment'
 
@@ -1056,7 +1057,7 @@ export function createPaymentBill({ patientId, items, appointmentId, estimateId,
   return payment
 }
 
-export function collectPayment({ paymentId, amount, method }: CollectPaymentInput): Payment {
+export function collectPayment({ paymentId, amount, method, tenderedAmount }: CollectPaymentInput): Payment {
   const state = getState()
   const payment = requirePayment(state, paymentId)
   if (payment.status === 'Cancelled' || payment.status === 'Refunded') {
@@ -1065,6 +1066,9 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
   if (!(amount > 0)) throw new DomainError('VALIDATION', 'Enter an amount greater than zero.')
   if (amount > payment.balance) {
     throw new DomainError('VALIDATION', `That is more than the ₹${payment.balance.toLocaleString('en-IN')} balance due.`)
+  }
+  if (tenderedAmount !== undefined && tenderedAmount < amount) {
+    throw new DomainError('VALIDATION', 'The cash received is less than the amount being collected.')
   }
 
   const now = Date.now()
@@ -1077,7 +1081,16 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
     paidAmount,
     balance: Math.max(0, balance),
     status,
-    transactions: [...payment.transactions, { transactionId, amount, method, collectedAt: now }],
+    transactions: [
+      ...payment.transactions,
+      {
+        transactionId,
+        amount,
+        method,
+        collectedAt: now,
+        ...(tenderedAmount !== undefined && tenderedAmount > amount ? { tenderedAmount } : {}),
+      },
+    ],
     updatedAt: now,
   }
 
@@ -1122,9 +1135,69 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
   return updated
 }
 
+/** Records a collection that did not go through — the UPI payment never
+ *  arrived, the card was declined. No money moves; the bill reads "Failed"
+ *  until the next successful collection. */
+export function recordFailedPayment({ paymentId, amount, method, reason }: RecordFailedPaymentInput): Payment {
+  const state = getState()
+  const payment = requirePayment(state, paymentId)
+  if (payment.status === 'Cancelled' || payment.status === 'Refunded') {
+    throw new DomainError('INVALID_TRANSITION', `This bill is ${payment.status.toLowerCase()}.`)
+  }
+  if (!(payment.balance > 0)) throw new DomainError('INVALID_TRANSITION', 'Nothing is due on this bill.')
+  if (!(amount > 0) || amount > payment.balance) {
+    throw new DomainError('VALIDATION', `Enter an amount up to the ₹${payment.balance.toLocaleString('en-IN')} due.`)
+  }
+
+  const now = Date.now()
+  const seq = state.nextIds.attempt
+  const updated: Payment = {
+    ...payment,
+    failedAttempts: [
+      ...payment.failedAttempts,
+      { attemptId: `ATT-${String(seq).padStart(6, '0')}`, amount, method, reason: reason.trim() || 'Payment not completed', attemptedAt: now },
+    ],
+    updatedAt: now,
+  }
+
+  setState((current) => {
+    const { activityLog, activitySeq } = withActivity(current, [
+      { text: 'Payment attempt failed', meta: `${payment.patientName} · ₹${amount.toLocaleString('en-IN')} · ${method} · ${updated.failedAttempts[updated.failedAttempts.length - 1].reason}` },
+    ])
+    return {
+      ...current,
+      payments: current.payments.map((p) => (p.paymentId === paymentId ? updated : p)),
+      activityLog,
+      nextIds: { ...current.nextIds, attempt: seq + 1, activity: activitySeq },
+    }
+  })
+
+  return updated
+}
+
+/** A bill that belongs to something still open — a booked appointment or a
+ *  current admission — is closed through that record, never on its own. */
+function liveOwnerOf(state: AppState, payment: Payment): string | null {
+  if (payment.appointmentId) {
+    const appointment = state.appointments.find((a) => a.appointmentId === payment.appointmentId)
+    if (appointment && ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in'].includes(appointment.status)) {
+      return 'This bill belongs to an open appointment — cancel the appointment instead.'
+    }
+  }
+  if (payment.admissionId) {
+    const admission = state.admissions.find((a) => a.admissionId === payment.admissionId)
+    if (admission && ['Pending', 'Bed Reserved', 'Admitted'].includes(admission.status)) {
+      return 'This is a current inpatient’s bill — it is settled at discharge or closed with the admission.'
+    }
+  }
+  return null
+}
+
 export function cancelPayment({ paymentId, reason }: CancelPaymentInput): void {
   const state = getState()
   const payment = requirePayment(state, paymentId)
+  const owner = liveOwnerOf(state, payment)
+  if (owner) throw new DomainError('INVALID_TRANSITION', owner)
   if (payment.paidAmount > 0) {
     throw new DomainError(
       'INVALID_TRANSITION',
@@ -1159,6 +1232,9 @@ export function refundPayment({ paymentId, amount, reason }: RefundPaymentInput)
   const payment = requirePayment(state, paymentId)
   if (payment.status !== 'Paid' && payment.status !== 'Partially Paid') {
     throw new DomainError('INVALID_TRANSITION', 'Only a payment with money collected against it can be refunded.')
+  }
+  if (payment.admissionId && state.admissions.some((a) => a.admissionId === payment.admissionId && a.status === 'Admitted')) {
+    throw new DomainError('INVALID_TRANSITION', 'Refunds on a current inpatient’s bill are settled at discharge.')
   }
   if (!(amount > 0) || amount > payment.paidAmount) {
     throw new DomainError('VALIDATION', `Enter an amount up to the ₹${payment.paidAmount.toLocaleString('en-IN')} collected.`)

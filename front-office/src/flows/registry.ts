@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { FlowName, FlowParams } from './flowParams'
+import { BillingFlow } from './billing/BillingFlow'
 
 export interface FlowProps {
   params: FlowParams
@@ -9,4 +10,6 @@ export interface FlowProps {
 
 /** Every flow FlowHost can open. A name in the URL that isn't here is
  *  stripped from the address. */
-export const FLOWS: Partial<Record<FlowName, ComponentType<FlowProps>>> = {}
+export const FLOWS: Partial<Record<FlowName, ComponentType<FlowProps>>> = {
+  billing: BillingFlow,
+}

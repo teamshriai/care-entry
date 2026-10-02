@@ -6,6 +6,16 @@ import type { Tone } from './tone'
  *  definition of what "Registration Fee" means as a charge. */
 export const REGISTRATION_FEE: PaymentItem = { code: 'REG-FEE', description: 'Registration Fee', amount: 100 }
 
+/** The administrative charges the counter can raise on the spot. Everything
+ *  else — consultations, admissions — is billed by the action itself. */
+export const SERVICE_CHARGE: PaymentItem = { code: 'SVC-CHG', description: 'Service Charge', amount: 200 }
+export const COUNTER_CHARGES: PaymentItem[] = [REGISTRATION_FEE, SERVICE_CHARGE]
+
+/** A bill with money still owed on it. */
+export function isBillDue(payment: Payment): boolean {
+  return payment.balance > 0 && payment.status !== 'Cancelled' && payment.status !== 'Refunded'
+}
+
 // Billing & Accounts reuses the Payment record as the "Bill" — a Payment
 // already carries everything a front-desk bill needs (items, total, paid,
 // balance, a Draft→Paid lifecycle). Rather than a second, parallel Bill

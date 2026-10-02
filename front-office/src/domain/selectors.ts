@@ -15,6 +15,7 @@ import type { ActivityLogEntry } from '../types/activity'
 import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentSummary } from '../types/payment'
 import type { Tone } from '../utils/tone'
+import { billDisplayStatus, isBillDue } from '../utils/billing'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -654,9 +655,21 @@ export function getPaymentsForPatient(state: AppState, patientId: string): Payme
  *  Cancelled and Refunded bills carry no live balance, so they never appear
  *  here even if `balance` happens to be non-zero on the record. */
 export function getPendingPayments(state: AppState): Payment[] {
-  return getPayments(state).filter(
-    (p) => p.balance > 0 && p.status !== 'Cancelled' && p.status !== 'Refunded',
-  )
+  return getPayments(state).filter(isBillDue)
+}
+
+/** A patient's bills with money still owed, failed collections first. */
+export function getDueBillsForPatient(state: AppState, patientId: string): Payment[] {
+  return dueFirst(getPaymentsForPatient(state, patientId).filter(isBillDue))
+}
+
+function dueFirst(bills: Payment[]): Payment[] {
+  const failed = (p: Payment) => (billDisplayStatus(p) === 'Failed' ? 0 : 1)
+  return [...bills].sort((a, b) => failed(a) - failed(b) || b.createdAt - a.createdAt)
+}
+
+function collectedToday(state: AppState, payment: Payment): boolean {
+  return payment.transactions.some((txn) => todayKey(new Date(txn.collectedAt)) === state.today)
 }
 
 /** Today's headline figures — the same derivation feeds the Payment
@@ -684,23 +697,40 @@ export function getPaymentSummary(state: AppState): PaymentSummary {
   return { collectedToday, pendingAmount, transactionsToday, refundsToday }
 }
 
-/** The Billing & Accounts dashboard's own headline figures — built on the
- *  same Payment records as getPaymentSummary, just counted from the bill's
- *  own side (how many were raised today) rather than the collection side. */
-export function getBillingSummary(state: AppState): {
-  billsToday: number
-  collectedToday: number
-  pendingPayments: number
-  outstandingAmount: number
-} {
-  const paymentSummary = getPaymentSummary(state)
-  const billsToday = state.payments.filter((p) => todayKey(new Date(p.createdAt)) === state.today).length
-  const pending = getPendingPayments(state)
+export type BillFilter = 'due' | 'failed' | 'collected-today' | 'all'
 
+export interface BillingOverview {
+  dueAmount: number
+  dueCount: number
+  failedCount: number
+  collectedToday: number
+  collectedTodayCount: number
+  allCount: number
+}
+
+/** The Billing page's figures — one per filter, from the same bills the
+ *  filtered list shows, so a number and its list can never disagree. */
+export function getBillingOverview(state: AppState): BillingOverview {
+  const due = getPendingPayments(state)
   return {
-    billsToday,
-    collectedToday: paymentSummary.collectedToday,
-    pendingPayments: pending.length,
-    outstandingAmount: paymentSummary.pendingAmount,
+    dueAmount: due.reduce((sum, p) => sum + p.balance, 0),
+    dueCount: due.length,
+    failedCount: due.filter((p) => billDisplayStatus(p) === 'Failed').length,
+    collectedToday: getPaymentSummary(state).collectedToday,
+    collectedTodayCount: state.payments.filter((p) => collectedToday(state, p)).length,
+    allCount: state.payments.length,
+  }
+}
+
+export function getBillsByFilter(state: AppState, filter: BillFilter): Payment[] {
+  switch (filter) {
+    case 'due':
+      return dueFirst(getPendingPayments(state))
+    case 'failed':
+      return getPendingPayments(state).filter((p) => billDisplayStatus(p) === 'Failed')
+    case 'collected-today':
+      return getPayments(state).filter((p) => collectedToday(state, p))
+    default:
+      return getPayments(state)
   }
 }

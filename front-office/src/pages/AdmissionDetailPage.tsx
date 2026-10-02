@@ -11,6 +11,7 @@ import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
+import { useFlow } from '../flows/useFlow'
 import { getAdmissionById } from '../domain/admissionSelectors'
 import { getPatientById, getPaymentById, getProviderById } from '../domain/selectors'
 import { cancelAdmission, createBillForAdmission } from '../domain/admissionActions'
@@ -39,6 +40,7 @@ export function AdmissionDetailPage() {
   const { admissionId } = useParams<{ admissionId: string }>()
   const navigate = useNavigate()
   const { notify } = useToast()
+  const { openFlow } = useFlow()
   const id = admissionId ?? ''
 
   const admission = useStoreValue(getAdmissionById, id)
@@ -57,7 +59,7 @@ export function AdmissionDetailPage() {
         <div className="px-6 py-6 lg:px-8">
           <Card className="max-w-xl">
             <CardBody>
-              <EmptyState title="No such admission" description="Return to Admissions to find another." action={<Button size="sm" onClick={() => navigate('/admissions/list')}>Admissions</Button>} />
+              <EmptyState title="No such admission" description="Return to Admissions to find another." action={<Button size="sm" onClick={() => navigate('/admissions')}>Inpatients</Button>} />
             </CardBody>
           </Card>
         </div>
@@ -199,10 +201,16 @@ export function AdmissionDetailPage() {
                       <span className="text-xs text-ink-muted">Payment Status</span>
                       <BillStatusBadge payment={payment} />
                     </div>
-                    <Button size="sm" onClick={() => navigate(`/payments/${payment.paymentId}`)}>
-                      <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      {payment.balance > 0 ? 'Collect Payment' : 'View Bill'}
-                    </Button>
+                    {payment.balance > 0 ? (
+                      <Button size="sm" onClick={() => openFlow('billing', { uhid: payment.patientId, bill: payment.paymentId })}>
+                        <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        Collect
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${payment.paymentId}`)}>
+                        View bill
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>

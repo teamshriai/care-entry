@@ -7,14 +7,11 @@ import { formatClock } from '../../utils/format'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import { cn } from '../../utils/cn'
+import { billNumberFor, formatRupees as rupees } from '../../utils/billing'
 import type { Payment } from '../../types/payment'
 
-function rupees(value: number): string {
-  return `₹${value.toLocaleString('en-IN')}`
-}
-
-/** Shared table for Payment History and Pending Payments — the two lists
- *  differ only in which rows they pass in and which columns they need. */
+/** The bill list — the Billing page passes in whichever bills its filter
+ *  selects, plus the row action. */
 export function PaymentsTable({
   payments,
   emptyTitle = 'No payments to show',
@@ -37,7 +34,7 @@ export function PaymentsTable({
       <table className="w-full min-w-[880px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border-soft text-left text-xs font-medium uppercase tracking-wide text-ink-faint">
-            <th className="px-5 py-2.5 font-medium">Receipt No.</th>
+            <th className="px-5 py-2.5 font-medium">Bill no.</th>
             <th className="px-5 py-2.5 font-medium">Patient</th>
             <th className="px-5 py-2.5 font-medium">Date &amp; Time</th>
             <th className="px-5 py-2.5 font-medium">Description</th>
@@ -52,7 +49,7 @@ export function PaymentsTable({
             <tr key={payment.paymentId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-subtle">
               <td className="whitespace-nowrap px-5 py-3">
                 <Link to={`/payments/${payment.paymentId}`} className="font-medium text-primary-text hover:underline">
-                  {payment.receiptNo}
+                  {billNumberFor(payment)}
                 </Link>
               </td>
               <td className="px-5 py-3">

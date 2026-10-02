@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -26,9 +26,9 @@ interface ReceiptLocationState {
   autoPrint?: boolean
 }
 
-/** The printable receipt. Reachable from the Collect Payment success step
- *  and from every payment row in History/Detail — the same view either
- *  way, so what staff hand a patient always matches what's on record. */
+/** The printable receipt. Reachable from a payment's acknowledgement and
+ *  from the bill itself — the same view either way, so what staff hand a
+ *  patient always matches what's on record. */
 export function PaymentReceiptPage() {
   const { paymentId } = useParams<{ paymentId: string }>()
   const navigate = useNavigate()
@@ -54,8 +54,8 @@ export function PaymentReceiptPage() {
             <CardBody>
               <EmptyState
                 title="No such receipt"
-                description="Return to Payment History to find the payment you're looking for."
-                action={<Button size="sm" onClick={() => navigate('/payments/history')}>Payment History</Button>}
+                description="Every bill is listed on the Billing page."
+                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Billing</Button>}
               />
             </CardBody>
           </Card>
@@ -72,16 +72,10 @@ export function PaymentReceiptPage() {
         title="Payment Receipt"
         subtitle={payment.receiptNo}
         actions={
-          <>
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${payment.paymentId}`)} className="print:hidden">
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Back
-            </Button>
-            <Button size="sm" onClick={() => window.print()} className="print:hidden">
-              <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Print
-            </Button>
-          </>
+          <Button size="sm" onClick={() => window.print()} className="print:hidden">
+            <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Print
+          </Button>
         }
       />
 
