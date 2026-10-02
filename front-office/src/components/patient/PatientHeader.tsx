@@ -101,10 +101,15 @@ export function PatientHeader({
                 </Badge>
               </button>
               {inpatient ? (
-                <Badge tone={inpatient.critical ? 'critical' : 'info'}>
-                  <BedDouble className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-                  Inpatient · {inpatient.ward} · {inpatient.bed} · Day {inpatient.day}
-                </Badge>
+                <span title={`Inpatient · ${inpatient.ward} · ${inpatient.bed} · Day ${inpatient.day}`} className="flex min-w-0 max-w-full">
+                  <Badge tone={inpatient.critical ? 'critical' : 'info'} className="max-w-full">
+                    <BedDouble className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
+                    <span className="min-w-0 truncate">
+                      <span className="hidden sm:inline">Inpatient · </span>
+                      {inpatient.ward} · {inpatient.bed} · Day {inpatient.day}
+                    </span>
+                  </Badge>
+                </span>
               ) : admission ? (
                 <Badge tone="warning">
                   <BedDouble className="h-3 w-3" strokeWidth={2} aria-hidden="true" />

@@ -278,7 +278,7 @@ function PatientCell({ name, detail, onOpen }: { name: string; detail: string; o
       >
         {name}
       </button>
-      <span className="block text-xs text-ink-subtle">{detail}</span>
+      <span className="block whitespace-nowrap text-xs text-ink-subtle">{detail}</span>
     </td>
   )
 }

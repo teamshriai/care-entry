@@ -120,7 +120,7 @@ export function RegisterPatientPage() {
                 />
               </Field>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 min-[360px]:grid-cols-[6rem_minmax(0,1fr)]">
                 <Field label="Age">
                   <input
                     value={form.age}
