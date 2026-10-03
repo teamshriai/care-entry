@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CORRECT_OTP, MAX_OTP_ATTEMPTS, MOCK_PATIENTS, formatAadhaar, generateSystemId, maskAadhaar, maskMobile } from '../data';
+import { CORRECT_OTP, MAX_OTP_ATTEMPTS, MOBILE_ERROR, MOCK_PATIENTS, dobBounds, dobError, formatAadhaar, generateSystemId, isValidMobile, maskAadhaar, maskMobile } from '../data';
 import { Icon, IconBadge } from './Icon';
 import { LockedValue } from './LockedValue';
 import { trackSpotlight } from '../ui';
@@ -125,8 +125,8 @@ export function Step1Search({
       setSearched(false);
       return;
     }
-    if (mobile.length !== 10) {
-      setSearchError('Enter a 10-digit mobile number.');
+    if (!isValidMobile(mobile)) {
+      setSearchError(MOBILE_ERROR);
       setSearched(false);
       return;
     }
@@ -195,8 +195,13 @@ export function Step1Search({
       setFormError('First name, last name and mobile number are required.');
       return;
     }
-    if (newMobile.length !== 10) {
-      setFormError('Enter a 10-digit mobile number.');
+    if (!isValidMobile(newMobile)) {
+      setFormError(MOBILE_ERROR);
+      return;
+    }
+    const dobProblem = dobError(dob);
+    if (dobProblem) {
+      setFormError(dobProblem);
       return;
     }
     const aadhaarDigits = newAadhaar.replace(/\D/g, '');
@@ -486,7 +491,7 @@ export function Step1Search({
                 {locked ? (
                   <LockedValue value={displayDob(dob)} />
                 ) : (
-                  <input className="field-input" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                  <input className="field-input" type="date" min={dobBounds().min} max={dobBounds().max} value={dob} onChange={(e) => setDob(e.target.value)} />
                 )}
               </label>
               <label className="field">

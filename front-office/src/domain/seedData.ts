@@ -284,7 +284,7 @@ export function createSeedState(): AppState {
     patient({ uhid: 'SHRI-0129901', name: 'Mohan Raj', nameNative: 'மோகன் ராஜ்', age: 38, sex: 'Male', mobile: '+91 97890 22144', address: '19 Sathy Road, Saravanampatti, Coimbatore 641035', createdAt: minutesAgo(150) }),
 
     // Waiting for a bed
-    patient({ uhid: 'SHRI-0111045', name: 'Mohammed Irfan', age: 35, sex: 'Male', mobile: '+91 90031 77812', address: '21 Cross Cut Road, Gandhipuram, Coimbatore 641012', abhaId: 'm.irfan@abdm', aliases: ['mohamed irfan', 'muhammad irfan'], createdAt: daysAgo(60) }),
+    patient({ uhid: 'SHRI-0111045', name: 'Mohammed Irfan', age: 35, sex: 'Male', mobile: '+91 90031 77812', address: '21 Cross Cut Road, Gandhipuram, Coimbatore 641012', abhaId: 'mohammed.irfan@abdm', aliases: ['mohamed irfan', 'muhammad irfan'], createdAt: daysAgo(60) }),
     patient({ uhid: 'SHRI-0122871', name: 'Kavitha Balaji', nameNative: 'கவிதா பாலாஜி', age: 56, sex: 'Female', mobile: '+91 99438 12055', address: '14 Bharathi Park Road, Saibaba Colony, Coimbatore 641011', abhaId: 'kavitha.b@abdm', createdAt: daysAgo(20) }),
 
     // Outpatients in the queue today

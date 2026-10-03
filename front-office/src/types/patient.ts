@@ -23,16 +23,20 @@ export interface Patient {
 /** actions.registerPatient's input shape. */
 export interface RegisterPatientInput {
   name: string
-  age?: number | string
-  sex?: Sex
+  age: number | string
+  sex: Sex | ''
   mobile: string
   abhaId?: string
+  /** An age of 100 or more has been confirmed with the patient. */
+  ageConfirmed?: boolean
 }
 
 /** actions.updatePatientDemographics's input shape — a partial edit. */
 export interface PatientDemographicsInput {
   name?: string
-  age?: number | null
+  age?: number | string
+  /** An age of 100 or more has been confirmed with the patient. */
+  ageConfirmed?: boolean
   sex?: Sex
   mobile?: string
   email?: string | null

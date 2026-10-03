@@ -14,6 +14,7 @@ import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
 import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
 import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
+import { abhaError, normalizeAbha } from '../utils/validation'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -493,15 +494,24 @@ export function getPossibleDuplicates(state: AppState): Patient[][] {
   return [...byMobile.values()].filter((group) => group.length > 1)
 }
 
+/** The patient an ABHA is already linked to, if any — one ABHA, one patient. */
+export function findAbhaHolder(state: AppState, abhaId: string): Patient | null {
+  if (!abhaId.trim() || abhaError(abhaId)) return null
+  const wanted = normalizeAbha(abhaId)
+  return state.patients.find((p) => p.abhaId && normalizeAbha(p.abhaId) === wanted) ?? null
+}
+
 export function findPossibleDuplicatesFor(
   state: AppState,
-  { name = '', mobile = '' }: { name?: string; mobile?: string },
+  { name = '', mobile = '', abhaId = '' }: { name?: string; mobile?: string; abhaId?: string },
 ): Patient[] {
   const digits = mobile.replace(/[^0-9]/g, '').slice(-10)
   const normalizedName = name.trim().toLowerCase()
-  if (digits.length < 10 && normalizedName.length < 3) return []
+  const abhaHolder = findAbhaHolder(state, abhaId)
+  if (digits.length < 10 && normalizedName.length < 3 && !abhaHolder) return []
 
   return state.patients.filter((patient) => {
+    if (patient === abhaHolder) return true
     const patientDigits = patient.mobile.replace(/[^0-9]/g, '').slice(-10)
     if (digits.length === 10 && patientDigits === digits) return true
     if (normalizedName.length >= 3) {

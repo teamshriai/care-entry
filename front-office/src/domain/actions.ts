@@ -9,12 +9,24 @@
 // applies a server-sent event). Callers already treat these as fallible, so
 // no component needs to change.
 import { getState, setState } from './store'
-import { getAvailableSlots, getConsultationBillItems, getDoctorStatus } from './selectors'
+import { findAbhaHolder, getAvailableSlots, getConsultationBillItems, getDoctorStatus } from './selectors'
 import { DomainError } from './errors'
-import { MOBILE_ERROR, isValidMobile } from '../utils/phone'
+import { MOBILE_ERROR, formatMobile, isValidMobile } from '../utils/phone'
+import {
+  abhaError,
+  addressError,
+  ageError,
+  ageNeedsConfirmation,
+  emailError,
+  mobileError,
+  nameError,
+  normalizeAbha,
+  normalizeName,
+  sexError,
+} from '../utils/validation'
 import { formatRupees } from '../utils/billing'
 import type { AppState } from '../types/store'
-import type { Patient, RegisterPatientInput, PatientDemographicsInput } from '../types/patient'
+import type { Patient, RegisterPatientInput, PatientDemographicsInput, Sex } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
 import type { Appointment, BookAppointmentInput } from '../types/appointment'
 import type { CheckInResult, OpenWalkInVisitInput } from '../types/queue'
@@ -100,25 +112,45 @@ function requirePayment(state: AppState, paymentId: string): Payment {
 
 // ---------------------------------------------------------------- patients
 
-export function registerPatient({ name, age, sex, mobile, abhaId }: RegisterPatientInput): Patient {
-  if (!name?.trim()) throw new DomainError('VALIDATION', 'Patient name is required.')
-  if (!mobile?.trim()) throw new DomainError('VALIDATION', 'Mobile number is required.')
-  if (!isValidMobile(mobile.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
+/** The registration rules every patient record must meet — the same checks
+ *  the form shows inline (utils/validation.ts). */
+function assertPatientFields(input: { name: string; age: string | number; sex: Sex | ''; mobile: string; abhaId?: string; ageConfirmed?: boolean }) {
+  const problem =
+    nameError(input.name) ?? ageError(input.age) ?? sexError(input.sex) ?? mobileError(input.mobile) ?? abhaError(input.abhaId)
+  if (problem) throw new DomainError('VALIDATION', problem)
+  if (ageNeedsConfirmation(input.age) && !input.ageConfirmed) {
+    throw new DomainError('VALIDATION', `Confirm the age (${Number(input.age)}) with the patient first.`)
+  }
+}
+
+/** One ABHA belongs to one patient. */
+function assertAbhaFree(state: AppState, abhaId: string, exceptPatientId?: string) {
+  const holder = findAbhaHolder(state, abhaId)
+  if (holder && holder.patientId !== exceptPatientId) {
+    throw new DomainError('DUPLICATE', `This ABHA is already linked to ${holder.name} (${holder.uhid}).`)
+  }
+}
+
+export function registerPatient(input: RegisterPatientInput): Patient {
+  assertPatientFields(input)
+  const { name, age, sex, mobile } = input
+  const abhaId = input.abhaId?.trim() ? normalizeAbha(input.abhaId) : null
 
   const state = getState()
+  if (abhaId) assertAbhaFree(state, abhaId)
   const seq = state.nextIds.patient
   const uhid = `SHRI-${String(130000 + seq).padStart(7, '0')}`
   const patient: Patient = {
     patientId: uhid,
     uhid,
-    name: name.trim(),
+    name: normalizeName(name),
     nameNative: null,
-    age: Number(age) || null,
-    sex: sex ?? 'Other',
-    mobile: mobile.trim(),
+    age: Number(age),
+    sex: sex as Sex,
+    mobile: formatMobile(mobile),
     email: null,
     address: null,
-    abhaId: abhaId?.trim() ? abhaId.trim() : null,
+    abhaId,
     registrationStatus: 'Registered',
     createdAt: Date.now(),
   }
@@ -772,7 +804,26 @@ export function updatePatientDemographics(patientId: string, changes: PatientDem
   const state = getState()
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('NOT_FOUND', 'That patient no longer exists.')
-  if (changes.mobile !== undefined && !isValidMobile(changes.mobile.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
+  // Same rules as registration, for whichever fields are being changed.
+  const problem =
+    (changes.name !== undefined ? nameError(changes.name) : null) ??
+    (changes.age !== undefined ? ageError(changes.age) : null) ??
+    (changes.sex !== undefined ? sexError(changes.sex) : null) ??
+    (changes.mobile !== undefined ? mobileError(changes.mobile) : null) ??
+    (changes.email !== undefined ? emailError(changes.email) : null) ??
+    (changes.address !== undefined ? addressError(changes.address) : null)
+  if (problem) throw new DomainError('VALIDATION', problem)
+  if (changes.age !== undefined && Number(changes.age) !== patient.age && ageNeedsConfirmation(changes.age) && !changes.ageConfirmed) {
+    throw new DomainError('VALIDATION', `Confirm the age (${Number(changes.age)}) with the patient first.`)
+  }
+
+  const next: Partial<Patient> = {}
+  if (changes.name !== undefined) next.name = normalizeName(changes.name)
+  if (changes.age !== undefined) next.age = Number(changes.age)
+  if (changes.sex !== undefined) next.sex = changes.sex
+  if (changes.mobile !== undefined) next.mobile = formatMobile(changes.mobile)
+  if (changes.email !== undefined) next.email = changes.email?.trim() || null
+  if (changes.address !== undefined) next.address = changes.address?.trim() || null
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
@@ -780,7 +831,7 @@ export function updatePatientDemographics(patientId: string, changes: PatientDem
     ])
     return {
       ...current,
-      patients: current.patients.map((p) => (p.patientId === patientId ? { ...p, ...changes } : p)),
+      patients: current.patients.map((p) => (p.patientId === patientId ? { ...p, ...next } : p)),
       activityLog,
       nextIds: { ...current.nextIds, activity: activitySeq },
     }
@@ -792,14 +843,18 @@ export function linkAbha(patientId: string, abhaId: string): void {
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('NOT_FOUND', 'That patient no longer exists.')
   if (!abhaId?.trim()) throw new DomainError('VALIDATION', 'Enter an ABHA number or address.')
+  const problem = abhaError(abhaId)
+  if (problem) throw new DomainError('VALIDATION', problem)
+  const value = normalizeAbha(abhaId)
+  assertAbhaFree(state, value, patientId)
 
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'ABHA linked', meta: `${patient.name} · ${abhaId.trim()}` },
+      { text: 'ABHA linked', meta: `${patient.name} · ${value}` },
     ])
     return {
       ...current,
-      patients: current.patients.map((p) => (p.patientId === patientId ? { ...p, abhaId: abhaId.trim() } : p)),
+      patients: current.patients.map((p) => (p.patientId === patientId ? { ...p, abhaId: value } : p)),
       activityLog,
       nextIds: { ...current.nextIds, activity: activitySeq },
     }
