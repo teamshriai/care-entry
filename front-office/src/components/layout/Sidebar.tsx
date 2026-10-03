@@ -115,6 +115,14 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+
+      {/* Which build this is — the time it was made, and its commit on hover. */}
+      <p
+        className="border-t border-border-soft px-5 py-3 text-2xs font-medium tabular-nums tracking-wide text-ink-subtle"
+        title={`Build ${__BUILD_STAMP__} · commit ${__BUILD_COMMIT__}`}
+      >
+        Version {__BUILD_STAMP__}
+      </p>
     </aside>
   )
 }

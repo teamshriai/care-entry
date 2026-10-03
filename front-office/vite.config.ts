@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import { execSync } from 'node:child_process'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
@@ -34,11 +35,34 @@ function portalRoute(): Plugin {
   }
 }
 
+// ─── Build stamp ─────────────────────────────────────────────────────────────
+// Shown at the foot of the sidebar so anyone can tell which build they are
+// looking at: "OCT 3 - 12:05 @26" (India time, when this build was made),
+// with the commit it was built from in its tooltip.
+function buildStamp(at: Date): string {
+  const part = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', ...options }).format(at)
+  const time = part({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  return `${part({ month: 'short' }).toUpperCase()} ${part({ day: 'numeric' })} - ${time} @${part({ year: '2-digit' })}`
+}
+
+function buildCommit(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    return 'unknown'
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   // Deployment sub-path, e.g. BASE_PATH=/dev/care-entry/ (defaults to the site root)
   base: process.env.BASE_PATH ?? '/',
   plugins: [react(), tailwindcss(), portalRoute()],
+  define: {
+    __BUILD_STAMP__: JSON.stringify(buildStamp(new Date())),
+    __BUILD_COMMIT__: JSON.stringify(buildCommit()),
+  },
   // Listen on all network interfaces so colleagues on the same LAN can open the app
   server: { host: true },
   preview: { host: true },
