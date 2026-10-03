@@ -76,13 +76,18 @@ const NAV_GROUPS: NavGroup[] = [
 export function Sidebar() {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-border-soft bg-bg">
-      <div className="flex h-16 items-center gap-2.5 border-b border-border-soft px-5">
+      {/* The SHRI Health mark leads back to the SHRI apps home. */}
+      <a
+        href="https://shri-ai.org/dev/"
+        aria-label="SHRI Health — all apps (shri-ai.org/dev)"
+        className="focus-ring flex h-16 items-center gap-2.5 border-b border-border-soft px-5 transition-colors hover:bg-surface-2"
+      >
         <img src={logo} alt="" className="h-9 w-auto" />
         <div className="min-w-0">
           <p className="whitespace-nowrap text-[15px] font-bold uppercase leading-tight tracking-[0.06em] text-ink">SHRI Health</p>
           <p className="text-xs font-medium leading-tight text-ink-subtle">Care Entry</p>
         </div>
-      </div>
+      </a>
 
       <nav aria-label="Main navigation" className="mt-3 flex flex-1 flex-col gap-4 px-3 pb-4">
         {NAV_GROUPS.map((group, index) => (

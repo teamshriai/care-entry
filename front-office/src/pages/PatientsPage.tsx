@@ -133,7 +133,9 @@ export function PatientsPage() {
                         </td>
                         <td className="whitespace-nowrap px-5 py-3 tabular-nums text-ink-muted">{patient.uhid}</td>
                         <td className="whitespace-nowrap px-5 py-3 tabular-nums text-ink-muted">{patient.mobile}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{patient.abhaId ? 'Linked' : '—'}</td>
+                        <td className="max-w-[14rem] truncate whitespace-nowrap px-5 py-3 text-ink-muted" title={patient.abhaId ?? undefined}>
+                          {patient.abhaId ?? '—'}
+                        </td>
                         <td className="px-5 py-3">
                           <div className="flex flex-wrap gap-1.5">
                             {isToday(row) ? <Badge tone="stable">Registered today</Badge> : null}

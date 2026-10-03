@@ -46,6 +46,14 @@ export function PatientHeader({
   const { notify } = useToast()
   const { risk, payment, inpatient, admission } = summary
 
+  function copyAbha() {
+    if (!patient.abhaId) return
+    void navigator.clipboard?.writeText(patient.abhaId).then(
+      () => notify('ABHA copied', { detail: patient.abhaId ?? '' }),
+      () => notify('Could not copy the ABHA', { tone: 'error' }),
+    )
+  }
+
   function copyUhid() {
     void navigator.clipboard?.writeText(patient.uhid).then(
       () => notify('UHID copied', { detail: patient.uhid }),
@@ -84,10 +92,23 @@ export function PatientHeader({
                 <Phone className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 {patient.mobile}
               </a>
-              <span className={cn('inline-flex items-center gap-1', patient.abhaId ? 'text-stable' : 'text-ink-subtle')}>
-                <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                {patient.abhaId ? 'ABHA linked' : 'ABHA not linked'}
-              </span>
+              {patient.abhaId ? (
+                <button
+                  type="button"
+                  onClick={copyAbha}
+                  className="inline-flex min-w-0 items-center gap-1 text-stable hover:text-primary-text"
+                  title="Copy ABHA"
+                >
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                  <span className="truncate">ABHA {patient.abhaId}</span>
+                  <Copy className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-ink-subtle">
+                  <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                  ABHA not linked
+                </span>
+              )}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <button type="button" onClick={actions.billing} title="Open billing" className="rounded-lg">

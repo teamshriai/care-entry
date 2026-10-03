@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BedDouble, IndianRupee, ReceiptText, Search, UserPlus } from 'lucide-react'
+import { BedDouble, IndianRupee, ReceiptText, Search, ShieldCheck, UserPlus } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { useStoreValue } from '../../hooks/useStore'
@@ -13,12 +13,14 @@ import type { PatientFlags } from '../../domain/selectors'
 import { billNumberFor, formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
 import { cn } from '../../utils/cn'
-import type { Patient } from '../../types/patient'
+import type { Patient, PatientSearchMatch } from '../../types/patient'
 import type { Payment } from '../../types/payment'
 
 const MAX_MATCHES = 8
 
-type Option = { kind: 'patient'; patient: Patient; section: string } | { kind: 'bill'; bill: Payment; section: string }
+type Option =
+  | { kind: 'patient'; patient: Patient; section: string; matchedOn?: PatientSearchMatch['matchedOn'] }
+  | { kind: 'bill'; bill: Payment; section: string }
 
 type PatientSearchProps =
   | { mode: 'navigate' }
@@ -67,7 +69,7 @@ export function PatientSearch(props: PatientSearchProps) {
   if (query.trim()) {
     if (bill && props.mode === 'navigate') options.push({ kind: 'bill', bill, section: 'Bill' })
     for (const match of matches.filter((m) => allowed(m.patient)).slice(0, MAX_MATCHES)) {
-      options.push({ kind: 'patient', patient: match.patient, section: 'Patients' })
+      options.push({ kind: 'patient', patient: match.patient, section: 'Patients', matchedOn: match.matchedOn })
     }
   } else if (inpatientsOnly) {
     // Picking an inpatient: an empty box lists everyone in a bed.
@@ -188,7 +190,7 @@ export function PatientSearch(props: PatientSearchProps) {
             index === activeIndex ? 'bg-primary-50' : 'hover:bg-surface-2',
           )}
         >
-          {option.kind === 'bill' ? <BillRow bill={option.bill} /> : <PatientRow patient={option.patient} flags={flags[option.patient.patientId]} />}
+          {option.kind === 'bill' ? <BillRow bill={option.bill} /> : <PatientRow patient={option.patient} flags={flags[option.patient.patientId]} matchedOn={option.matchedOn} />}
         </div>
       </li>
     )
@@ -248,7 +250,7 @@ export function PatientSearch(props: PatientSearchProps) {
   )
 }
 
-function PatientRow({ patient, flags }: { patient: Patient; flags?: PatientFlags }) {
+function PatientRow({ patient, flags, matchedOn }: { patient: Patient; flags?: PatientFlags; matchedOn?: PatientSearchMatch['matchedOn'] }) {
   return (
     <>
       <Avatar initials={initialsOf(patient.name)} size="sm" />
@@ -262,6 +264,17 @@ function PatientRow({ patient, flags }: { patient: Patient; flags?: PatientFlags
         <span className="block truncate text-xs text-ink-muted">
           {patient.uhid} · {patient.mobile}
         </span>
+        {patient.abhaId ? (
+          <span
+            className={cn(
+              'flex items-center gap-1 truncate text-xs',
+              matchedOn === 'ABHA' ? 'font-semibold text-primary-text' : 'text-ink-subtle',
+            )}
+          >
+            <ShieldCheck className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
+            <span className="truncate">ABHA {patient.abhaId}</span>
+          </span>
+        ) : null}
       </span>
       <span className="flex shrink-0 items-center gap-2">
         {flags?.bed ? (
