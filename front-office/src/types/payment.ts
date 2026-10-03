@@ -43,12 +43,14 @@ export interface FailedPaymentAttempt {
   attemptedAt: number
 }
 
-/** A basic, single refund against an already-collected bill. */
+/** A single, full refund of everything collected on a bill. */
 export interface PaymentRefund {
   refundId: string
   amount: number
   reason: string
   refundedAt: number
+  /** Where the money goes back — the methods it was collected by. */
+  methods: PaymentMethod[]
 }
 
 export interface Payment {
@@ -108,10 +110,9 @@ export interface CancelPaymentInput {
   reason: string
 }
 
-/** actions.refundPayment's input shape. */
+/** actions.refundPayment's input shape — a refund is always in full. */
 export interface RefundPaymentInput {
   paymentId: string
-  amount: number
   reason: string
 }
 

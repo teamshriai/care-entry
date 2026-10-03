@@ -825,6 +825,40 @@ export function getPaymentsForPatient(state: AppState, patientId: string): Payme
   return getPayments(state).filter((p) => p.patientId === patientId)
 }
 
+/** A booking's live bills, oldest first: the consultation bill, then any
+ *  fee-difference bill from a move to a dearer doctor. */
+export function getBillsForAppointment(state: AppState, appointmentId: string): Payment[] {
+  return state.payments
+    .filter((p) => p.appointmentId === appointmentId && p.status !== 'Cancelled')
+    .sort((a, b) => a.createdAt - b.createdAt)
+}
+
+const OPEN_BOOKING = ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in']
+const OPEN_STAY = ['Pending', 'Bed Reserved', 'Admitted']
+
+/** Why a bill can't be cancelled or refunded on its own — null when it can.
+ *  A booking's bills move only with the booking: cancelling it because the
+ *  doctor is unavailable refunds them, and once it has closed the fee is
+ *  kept. A current inpatient's bill is settled at discharge. */
+export function getBillLock(state: AppState, payment: Payment): string | null {
+  if (payment.appointmentId) {
+    const appointment = state.appointments.find((a) => a.appointmentId === payment.appointmentId)
+    if (appointment && OPEN_BOOKING.includes(appointment.status)) {
+      return 'This bill belongs to a booked appointment — cancel or reschedule the appointment instead.'
+    }
+    if (appointment && payment.paidAmount > 0) {
+      return 'A consultation fee is refunded only when the doctor is unavailable. This appointment has closed, so its fee is kept.'
+    }
+  }
+  if (payment.admissionId) {
+    const admission = state.admissions.find((a) => a.admissionId === payment.admissionId)
+    if (admission && OPEN_STAY.includes(admission.status)) {
+      return 'This is a current inpatient’s bill — it is settled at discharge or closed with the admission.'
+    }
+  }
+  return null
+}
+
 /** Everything a patient still owes money on — the front desk's worklist.
  *  Cancelled and Refunded bills carry no live balance, so they never appear
  *  here even if `balance` happens to be non-zero on the record. */

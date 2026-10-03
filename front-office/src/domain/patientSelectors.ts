@@ -10,7 +10,7 @@ import type { Provider } from '../types/doctor'
 import type { QueueToken } from '../types/queue'
 import type { Patient } from '../types/patient'
 import { computeAdmissionBilling } from './admissionSelectors'
-import { getAppointmentsForPatient, getPatientFlags, getPossibleDuplicates, getProviderById } from './selectors'
+import { getAppointmentsForPatient, getBillsForAppointment, getPatientFlags, getPossibleDuplicates, getProviderById } from './selectors'
 import { billDisplayStatus, billNumberFor, billServicesSummary, formatRupees, isBillDue, stayDays } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
 import { formatDateKey } from '../utils/dates'
@@ -163,7 +163,7 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
         id: appointment.appointmentId,
         at: appointment.slotTimestamp,
         appointment,
-        bill: state.payments.find((p) => p.appointmentId === appointment.appointmentId && p.status !== 'Cancelled') ?? null,
+        bill: getBillsForAppointment(state, appointment.appointmentId)[0] ?? null,
       })
       continue
     }

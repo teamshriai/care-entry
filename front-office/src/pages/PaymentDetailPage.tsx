@@ -11,12 +11,19 @@ import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
-import { getPaymentById } from '../domain/selectors'
+import { getBillLock, getPaymentById } from '../domain/selectors'
 import { cancelPayment, refundPayment } from '../domain/actions'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
 import { billNumberFor, formatRupees, isBillDue } from '../utils/billing'
+import type { AppState } from '../types/store'
+
+/** Why this bill can't be refunded or cancelled on its own, if it can't. */
+function billLockOf(state: AppState, paymentId: string): string | null {
+  const payment = getPaymentById(state, paymentId)
+  return payment ? getBillLock(state, payment) : null
+}
 
 function timestampLabel(ts: number): string {
   return `${formatDateKey(todayKey(new Date(ts)))} · ${formatClock(ts)}`
@@ -31,6 +38,7 @@ export function PaymentDetailPage() {
   const { openFlow } = useFlow()
 
   const payment = useStoreValue(getPaymentById, paymentId ?? '')
+  const lock = useStoreValue(billLockOf, paymentId ?? '')
 
   const [cancelling, setCancelling] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
@@ -79,7 +87,7 @@ export function PaymentDetailPage() {
     if (!payment) return
     setError(null)
     try {
-      refundPayment({ paymentId: payment.paymentId, amount: payment.paidAmount, reason: refundReason })
+      refundPayment({ paymentId: payment.paymentId, reason: refundReason })
       notify('Payment refunded', { detail: `${billNumberFor(payment)} · ${formatRupees(payment.paidAmount)}` })
       setRefunding(false)
       setRefundReason('')
@@ -91,8 +99,9 @@ export function PaymentDetailPage() {
   }
 
   const canCollect = isBillDue(payment)
-  const canCancel = payment.status === 'Pending' && payment.paidAmount === 0
-  const canRefund = payment.status === 'Paid' || payment.status === 'Partially Paid'
+  const canCancel = !lock && payment.status === 'Pending' && payment.paidAmount === 0
+  const canRefund = !lock && (payment.status === 'Paid' || payment.status === 'Partially Paid')
+  const collectedBy = [...new Set(payment.transactions.map((t) => t.method))].join(' + ')
   const linkedTo = payment.admissionId
     ? 'Inpatient admission'
     : payment.appointmentId
@@ -186,7 +195,8 @@ export function PaymentDetailPage() {
                 <CardHeader title="Refund" />
                 <CardBody className="text-sm">
                   <p className="text-ink">
-                    {payment.refund.refundId} · {formatRupees(payment.refund.amount)} · {timestampLabel(payment.refund.refundedAt)}
+                    {payment.refund.refundId} · {formatRupees(payment.refund.amount)}
+                    {payment.refund.methods.length > 0 ? ` to ${payment.refund.methods.join(' + ')}` : ''} · {timestampLabel(payment.refund.refundedAt)}
                   </p>
                   <p className="mt-1 text-xs text-ink-muted">{payment.refund.reason}</p>
                 </CardBody>
@@ -229,7 +239,9 @@ export function PaymentDetailPage() {
                       Cancel bill
                     </Button>
                   ) : null}
-                  {!canCollect && !canRefund && !canCancel ? (
+                  {lock && payment.status !== 'Cancelled' && payment.status !== 'Refunded' ? (
+                    <p className="text-xs text-ink-muted">{lock}</p>
+                  ) : !canCollect && !canRefund && !canCancel ? (
                     <p className="text-xs text-ink-subtle">Nothing further can be done on this bill.</p>
                   ) : null}
                 </div>
@@ -268,7 +280,7 @@ export function PaymentDetailPage() {
         open={refunding}
         onClose={() => setRefunding(false)}
         title="Refund this payment"
-        description={`The full ${formatRupees(payment.paidAmount)} collected will be refunded.`}
+        description={`The full ${formatRupees(payment.paidAmount)} collected goes back by ${collectedBy || 'the method it came in'}.`}
       >
         <form onSubmit={handleRefund} className="flex flex-col gap-3">
           <label className="text-xs font-medium text-ink-muted" htmlFor="refund-reason">
@@ -278,7 +290,7 @@ export function PaymentDetailPage() {
             id="refund-reason"
             value={refundReason}
             onChange={(event) => setRefundReason(event.target.value)}
-            placeholder="e.g. Duplicate booking cancelled by patient"
+            placeholder="e.g. Charged twice for the same service"
             className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
           />
           <div className="flex justify-end pt-2">

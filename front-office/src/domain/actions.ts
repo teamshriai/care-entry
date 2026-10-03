@@ -9,7 +9,8 @@
 // applies a server-sent event). Callers already treat these as fallible, so
 // no component needs to change.
 import { getState, setState } from './store'
-import { findAbhaHolder, getAvailableSlots, getConsultationBillItems, getDoctorStatus } from './selectors'
+import { findAbhaHolder, getAvailableSlots, getBillLock, getConsultationBillItems, getDoctorStatus } from './selectors'
+import { todayKey } from './time'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, formatMobile, isValidMobile } from '../utils/phone'
 import {
@@ -25,10 +26,11 @@ import {
   sexError,
 } from '../utils/validation'
 import { formatRupees } from '../utils/billing'
+import { formatDateKey } from '../utils/dates'
 import type { AppState } from '../types/store'
 import type { Patient, RegisterPatientInput, PatientDemographicsInput, Sex } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
-import type { Appointment, BookAppointmentInput } from '../types/appointment'
+import type { Appointment, BookAppointmentInput, ConsultMode } from '../types/appointment'
 import type { CheckInResult, OpenWalkInVisitInput } from '../types/queue'
 import type {
   AddEstimateItemInput,
@@ -73,6 +75,20 @@ export function withActivity(current: AppState, entries: ActivityInput[]): { act
     meta: entry.meta,
   }))
   return { activityLog: [...current.activityLog, ...appended], activitySeq: seq }
+}
+
+/** A pure state step: the next state and what the step made. An action
+ *  chains the steps it needs and commits once, so a booking, its bill and
+ *  its payment land together or not at all. */
+interface Step<T> {
+  state: AppState
+  value: T
+}
+
+/** The state with these entries added to the activity log. */
+function logged(state: AppState, entries: ActivityInput[]): AppState {
+  const { activityLog, activitySeq } = withActivity(state, entries)
+  return { ...state, activityLog, nextIds: { ...state.nextIds, activity: activitySeq } }
 }
 
 function patientName(state: AppState, patientId: string): string {
@@ -173,78 +189,68 @@ export function registerPatient(input: RegisterPatientInput): Patient {
 
 // ------------------------------------------------------------ appointments
 
-export function bookAppointment({ patientId, providerId, department, slot, date, reason }: BookAppointmentInput): Appointment {
-  const state = getState()
-  const targetDate = date ?? state.today
-
-  if (!getAvailableSlots(state, providerId, Date.now(), targetDate).includes(slot)) {
-    throw new DomainError(
-      'SLOT_ALREADY_BOOKED',
-      'That slot was just taken (or has passed). Please choose another one.',
-    )
+/** Reserves the slot and records the booking, awaiting its payment. */
+function applyBooking(
+  state: AppState,
+  { patientId, providerId, department, slot, date, reason, mode = 'In person' }: BookAppointmentInput,
+  now: number,
+): Step<Appointment> {
+  const targetDate = date ?? todayKey(new Date(now))
+  if (!getAvailableSlots(state, providerId, now, targetDate).includes(slot)) {
+    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken (or has passed). Please choose another one.')
   }
-
-  const appointmentId = `apt-${state.nextIds.appointment}`
   const appointment: Appointment = {
-    appointmentId,
+    appointmentId: `apt-${state.nextIds.appointment}`,
     patientId,
     providerId,
     department,
     date: targetDate,
     slot,
-    // Booking now always creates a bill in the same step (see the
-    // Schedule Appointment / Care-entry-via-appointment flow), so a fresh
-    // appointment starts out awaiting that payment, not merely "Scheduled".
+    // The bill is raised and paid in the same save (bookAndPayAppointment);
+    // collecting it is what confirms the booking.
     status: 'Payment Pending',
     visitId: null,
     reason: reason?.trim() || null,
-    createdAt: Date.now(),
+    mode,
+    createdAt: now,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancelReason: null,
+    reschedules: [],
   }
-
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      {
-        text: 'Appointment booked',
-        meta: `${patientName(current, patientId)} → ${providerName(current, providerId)} at ${slot}`,
-      },
-    ])
-    return {
-      ...current,
-      appointments: [...current.appointments, appointment],
-      activityLog,
-      nextIds: { ...current.nextIds, appointment: current.nextIds.appointment + 1, activity: activitySeq },
-    }
-  })
-
-  return appointment
+  const next = logged(
+    {
+      ...state,
+      appointments: [...state.appointments, appointment],
+      nextIds: { ...state.nextIds, appointment: state.nextIds.appointment + 1 },
+    },
+    [{ text: 'Appointment booked', meta: `${patientName(state, patientId)} → ${providerName(state, providerId)} at ${slot}` }],
+  )
+  return { state: next, value: appointment }
 }
 
 /** A consultation's bill — registration fee the first time, then the
- *  doctor's own fee — through the same createPaymentBill as everything else. */
-export function raiseConsultationBill({
-  patientId,
-  providerId,
-  appointmentId = null,
-}: {
-  patientId: string
-  providerId: string
-  appointmentId?: string | null
-}): Payment {
-  const items = getConsultationBillItems(getState(), patientId, providerId)
+ *  doctor's own fee — raised like every other bill. */
+function applyConsultationBill(
+  state: AppState,
+  { patientId, providerId, appointmentId = null }: { patientId: string; providerId: string; appointmentId?: string | null },
+  now: number,
+): Step<Payment> {
+  const items = getConsultationBillItems(state, patientId, providerId)
   if (items.length === 0) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
-  return createPaymentBill({ patientId, items, appointmentId })
+  return applyNewBill(state, { patientId, items, appointmentId }, now)
 }
 
-/** Books a slot, raises its bill and takes the payment as one step. The
- *  hospital has no pay-later: nothing is saved until the payment has gone
- *  through, so an abandoned or failed payment leaves no booking behind.
- *  Everything is checked before anything is saved. */
+/** Books a slot, raises its bill and takes the payment, saved together. The
+ *  hospital has no pay-later: if any part fails nothing is saved, so an
+ *  abandoned or failed payment leaves no booking behind. */
 export function bookAndPayAppointment({
   patientId,
   providerId,
   date,
   slot,
   reason,
+  mode,
   method,
 }: {
   patientId: string
@@ -252,21 +258,25 @@ export function bookAndPayAppointment({
   date: string
   slot: string
   reason?: string
+  mode?: ConsultMode
   method: PaymentMethod
 }): { appointment: Appointment; bill: Payment } {
   const state = getState()
+  const now = Date.now()
   if (!state.patients.some((p) => p.patientId === patientId)) throw new DomainError('VALIDATION', 'Select a patient first.')
   const provider = state.providers.find((p) => p.providerId === providerId)
   if (!provider || provider.status !== 'Active') throw new DomainError('VALIDATION', 'That doctor is not taking bookings.')
-  const booked = bookAppointment({ patientId, providerId, department: provider.department, slot, date, reason })
-  const bill = raiseConsultationBill({ patientId, providerId, appointmentId: booked.appointmentId })
-  // Fully paid → collectPayment confirms the appointment it belongs to.
-  const paid = collectPayment({ paymentId: bill.paymentId, amount: bill.balance, method })
-  return { appointment: requireAppointment(getState(), booked.appointmentId), bill: paid }
+
+  const booked = applyBooking(state, { patientId, providerId, department: provider.department, slot, date, reason, mode }, now)
+  const billed = applyConsultationBill(booked.state, { patientId, providerId, appointmentId: booked.value.appointmentId }, now)
+  // Fully paid → the collection confirms the booking it belongs to.
+  const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
+  setState(paid.state)
+  return { appointment: requireAppointment(paid.state, booked.value.appointmentId), bill: paid.value }
 }
 
 /** Start Consultation: a walk-in token for a doctor in session now, its bill
- *  and the payment, as one step — the token exists only once it is paid. */
+ *  and the payment, saved together — the token exists only once it is paid. */
 export function startPaidWalkIn({
   patientId,
   providerId,
@@ -276,75 +286,15 @@ export function startPaidWalkIn({
   providerId: string
   method: PaymentMethod
 }): CheckInResult & { bill: Payment } {
-  const provider = getState().providers.find((p) => p.providerId === providerId)
-  if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
-  const visit = openWalkInVisit({ patientId, providerId, department: provider.department })
-  const bill = raiseConsultationBill({ patientId, providerId })
-  const paid = collectPayment({ paymentId: bill.paymentId, amount: bill.balance, method })
-  return { ...visit, bill: paid }
-}
-
-export function cancelAppointment(appointmentId: string, reason: string = 'Cancelled at front desk'): void {
   const state = getState()
-  const appointment = requireAppointment(state, appointmentId)
-  if (['Completed', 'Cancelled', 'Checked-in'].includes(appointment.status)) {
-    throw new DomainError('INVALID_TRANSITION', `Cannot cancel an appointment that is ${appointment.status}.`)
-  }
-  // Its bill goes with it while nothing has been paid; money already taken
-  // stays on the bill for a refund.
-  const unpaidBill = state.payments.find(
-    (p) => p.appointmentId === appointmentId && p.status === 'Pending' && p.paidAmount === 0,
-  )
   const now = Date.now()
-
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      {
-        text: 'Appointment cancelled',
-        meta: `${patientName(current, appointment.patientId)} · ${appointment.slot} · ${reason}`,
-      },
-    ])
-    return {
-      ...current,
-      appointments: current.appointments.map((a) =>
-        a.appointmentId === appointmentId ? { ...a, status: 'Cancelled' as const } : a,
-      ),
-      payments: unpaidBill
-        ? current.payments.map((p) =>
-            p.paymentId === unpaidBill.paymentId
-              ? { ...p, status: 'Cancelled' as const, cancelledAt: now, cancelReason: 'Appointment cancelled', updatedAt: now }
-              : p,
-          )
-        : current.payments,
-      activityLog,
-      nextIds: { ...current.nextIds, activity: activitySeq },
-    }
-  })
-}
-
-export function rescheduleAppointment(appointmentId: string, newSlot: string): void {
-  const state = getState()
-  const appointment = requireAppointment(state, appointmentId)
-  if (!getAvailableSlots(state, appointment.providerId, Date.now(), appointment.date).includes(newSlot)) {
-    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot is no longer available. Please choose another.')
-  }
-
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      {
-        text: 'Appointment rescheduled',
-        meta: `${patientName(current, appointment.patientId)} · ${appointment.slot} → ${newSlot}`,
-      },
-    ])
-    return {
-      ...current,
-      appointments: current.appointments.map((a) =>
-        a.appointmentId === appointmentId ? { ...a, slot: newSlot } : a,
-      ),
-      activityLog,
-      nextIds: { ...current.nextIds, activity: activitySeq },
-    }
-  })
+  const provider = state.providers.find((p) => p.providerId === providerId)
+  if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
+  const visit = applyWalkIn(state, { patientId, providerId, department: provider.department }, now)
+  const billed = applyConsultationBill(visit.state, { patientId, providerId }, now)
+  const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
+  setState(paid.state)
+  return { ...visit.value, bill: paid.value }
 }
 
 // ------------------------------------------------------- visits and tokens
@@ -364,6 +314,15 @@ export function checkInAppointment(appointmentId: string): CheckInResult {
   }
   if (appointment.status !== 'Confirmed') {
     throw new DomainError('INVALID_TRANSITION', `Cannot queue an appointment that is ${appointment.status}.`)
+  }
+  const today = todayKey()
+  if (appointment.date !== today) {
+    throw new DomainError(
+      'INVALID_TRANSITION',
+      appointment.date > today
+        ? `This booking is for ${formatDateKey(appointment.date)} — check the patient in on that day.`
+        : `This booking was for ${formatDateKey(appointment.date)} — it can't be checked in now.`,
+    )
   }
 
   const now = Date.now()
@@ -424,13 +383,11 @@ export function checkInAppointment(appointmentId: string): CheckInResult {
   return { visitId, tokenId, tokenNumber }
 }
 
-/** Walk-in: same visit + token creation, with no prior appointment. */
-export function openWalkInVisit({ patientId, providerId, department }: OpenWalkInVisitInput): CheckInResult {
-  const state = getState()
-  const now = Date.now()
+/** Walk-in: the same visit and token as a check-in, with no booking. */
+function applyWalkIn(state: AppState, { patientId, providerId, department }: OpenWalkInVisitInput, now: number): Step<CheckInResult> {
   const provider = state.providers.find((p) => p.providerId === providerId)
   if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
-  const status = getDoctorStatus(state, providerId, now, state.today)
+  const status = getDoctorStatus(state, providerId, now, todayKey(new Date(now)))
   if (!['Available', 'Running late', 'In consultation', 'On break', 'Fully booked'].includes(status)) {
     throw new DomainError('INVALID_TRANSITION', `${provider.name} is not seeing patients right now (${status.toLowerCase()}).`)
   }
@@ -445,28 +402,15 @@ export function openWalkInVisit({ patientId, providerId, department }: OpenWalkI
   const tokenId = `tok-${state.nextIds.token}`
   const { tokenNumber, tokenCounters } = issueTokenNumber(state, department)
 
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Walk-in token issued', meta: `${patientName(current, patientId)} · ${providerName(current, providerId)}` },
-      { text: 'Token generated', meta: `${tokenNumber} · ${patientName(current, patientId)}` },
-    ])
-    return {
-      ...current,
+  const next = logged(
+    {
+      ...state,
       visits: [
-        ...current.visits,
-        {
-          visitId,
-          patientId,
-          appointmentId: null,
-          providerId,
-          status: 'Open' as const,
-          arrivalTime: now,
-          checkInTime: now,
-          closedAt: null,
-        },
+        ...state.visits,
+        { visitId, patientId, appointmentId: null, providerId, status: 'Open' as const, arrivalTime: now, checkInTime: now, closedAt: null },
       ],
       queueTokens: [
-        ...current.queueTokens,
+        ...state.queueTokens,
         {
           tokenId,
           tokenNumber,
@@ -482,17 +426,14 @@ export function openWalkInVisit({ patientId, providerId, department }: OpenWalkI
         },
       ],
       tokenCounters,
-      activityLog,
-      nextIds: {
-        ...current.nextIds,
-        visit: current.nextIds.visit + 1,
-        token: current.nextIds.token + 1,
-        activity: activitySeq,
-      },
-    }
-  })
-
-  return { visitId, tokenId, tokenNumber }
+      nextIds: { ...state.nextIds, visit: state.nextIds.visit + 1, token: state.nextIds.token + 1 },
+    },
+    [
+      { text: 'Walk-in token issued', meta: `${patientName(state, patientId)} · ${providerName(state, providerId)}` },
+      { text: 'Token generated', meta: `${tokenNumber} · ${patientName(state, patientId)}` },
+    ],
+  )
+  return { state: next, value: { visitId, tokenId, tokenNumber } }
 }
 
 // ------------------------------------------------------- queue progression
@@ -1154,15 +1095,18 @@ function paymentTransactionId(state: AppState): { transactionId: string; nextSeq
   return { transactionId: `TXN-${String(seq).padStart(6, '0')}`, nextSeq: seq + 1 }
 }
 
-export function createPaymentBill({ patientId, items, appointmentId, estimateId, admissionId }: CreatePaymentInput): Payment {
-  const state = getState()
+/** Raises a bill. */
+function applyNewBill(
+  state: AppState,
+  { patientId, items, appointmentId, estimateId, admissionId }: CreatePaymentInput,
+  now: number,
+): Step<Payment> {
   const patient = state.patients.find((p) => p.patientId === patientId)
   if (!patient) throw new DomainError('VALIDATION', 'Select a patient first.')
   if (!items?.length) throw new DomainError('VALIDATION', 'Add at least one charge to the bill.')
 
   const seq = state.nextIds.payment
   const total = items.reduce((sum, item) => sum + item.amount, 0)
-  const now = Date.now()
   const payment: Payment = {
     paymentId: `pay-${seq}`,
     receiptNo: `RCT-${String(seq).padStart(6, '0')}`,
@@ -1184,24 +1128,16 @@ export function createPaymentBill({ patientId, items, appointmentId, estimateId,
     cancelledAt: null,
     cancelReason: null,
   }
-
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Payment bill created', meta: `${patient.name} · ${formatRupees(total)}` },
-    ])
-    return {
-      ...current,
-      payments: [...current.payments, payment],
-      activityLog,
-      nextIds: { ...current.nextIds, payment: seq + 1, activity: activitySeq },
-    }
-  })
-
-  return payment
+  const next = logged(
+    { ...state, payments: [...state.payments, payment], nextIds: { ...state.nextIds, payment: seq + 1 } },
+    [{ text: 'Payment bill created', meta: `${patient.name} · ${formatRupees(total)}` }],
+  )
+  return { state: next, value: payment }
 }
 
-export function collectPayment({ paymentId, amount, method }: CollectPaymentInput): Payment {
-  const state = getState()
+/** Records money collected on a bill. Fully paying a booking's bill
+ *  confirms that one booking. */
+function applyCollection(state: AppState, { paymentId, amount, method }: CollectPaymentInput, now: number): Step<Payment> {
   const payment = requirePayment(state, paymentId)
   if (payment.status === 'Cancelled' || payment.status === 'Refunded') {
     throw new DomainError('INVALID_TRANSITION', `Cannot collect against a payment that is ${payment.status}.`)
@@ -1218,7 +1154,6 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
     }
   }
 
-  const now = Date.now()
   const { transactionId, nextSeq } = paymentTransactionId(state)
   const paidAmount = payment.paidAmount + amount
   const balance = payment.totalAmount - paidAmount
@@ -1232,45 +1167,92 @@ export function collectPayment({ paymentId, amount, method }: CollectPaymentInpu
     updatedAt: now,
   }
 
-  // A bill raised from booking an appointment carries that appointment's
-  // id — once it's fully paid, that ONE appointment (never every
-  // appointment for the patient) moves from "awaiting payment" to
-  // Confirmed. An appointment already Checked-in/Completed/Cancelled by
-  // the time payment lands is left alone; only the still-pending state
-  // this payment was blocking gets released.
+  // Only the booking this bill was blocking moves from "awaiting payment"
+  // to Confirmed — never every booking the patient has, and never one that
+  // has already moved on.
   const linkedAppointment =
-    status === 'Paid' && payment.appointmentId
-      ? state.appointments.find((a) => a.appointmentId === payment.appointmentId)
-      : undefined
-  const shouldConfirmAppointment = linkedAppointment?.status === 'Payment Pending'
+    status === 'Paid' && payment.appointmentId ? state.appointments.find((a) => a.appointmentId === payment.appointmentId) : undefined
+  const confirms = linkedAppointment?.status === 'Payment Pending'
 
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
+  const next = logged(
+    {
+      ...state,
+      payments: state.payments.map((p) => (p.paymentId === paymentId ? updated : p)),
+      appointments: confirms
+        ? state.appointments.map((a) => (a.appointmentId === payment.appointmentId ? { ...a, status: 'Confirmed' as const } : a))
+        : state.appointments,
+      nextIds: { ...state.nextIds, transaction: nextSeq },
+    },
+    [
       {
         text: status === 'Paid' ? 'Payment collected' : 'Partial payment recorded',
         meta:
           status === 'Paid'
-            ? `${payment.patientName} · ${formatRupees(amount)}`
+            ? `${payment.patientName} · ${formatRupees(amount)} · ${method}`
             : `${payment.patientName} · ${formatRupees(paidAmount)} of ${formatRupees(payment.totalAmount)}`,
       },
-      ...(shouldConfirmAppointment
-        ? [{ text: 'Appointment confirmed', meta: `${payment.patientName} · payment received` }]
-        : []),
-    ])
-    return {
-      ...current,
-      payments: current.payments.map((p) => (p.paymentId === paymentId ? updated : p)),
-      appointments: shouldConfirmAppointment
-        ? current.appointments.map((a) =>
-            a.appointmentId === payment.appointmentId ? { ...a, status: 'Confirmed' as const } : a,
-          )
-        : current.appointments,
-      activityLog,
-      nextIds: { ...current.nextIds, transaction: nextSeq, activity: activitySeq },
-    }
-  })
+      ...(confirms ? [{ text: 'Appointment confirmed', meta: `${payment.patientName} · payment received` }] : []),
+    ],
+  )
+  return { state: next, value: updated }
+}
 
-  return updated
+/** Gives back everything collected on a bill, by the methods it came in. */
+function applyFullRefund(state: AppState, paymentId: string, reason: string, now: number): Step<Payment> {
+  const payment = requirePayment(state, paymentId)
+  if ((payment.status !== 'Paid' && payment.status !== 'Partially Paid') || !(payment.paidAmount > 0)) {
+    throw new DomainError('INVALID_TRANSITION', 'Only a bill with money collected on it can be refunded.')
+  }
+  if (!reason.trim()) throw new DomainError('VALIDATION', 'A refund reason is required.')
+  const methods = [...new Set(payment.transactions.map((t) => t.method))]
+  const updated: Payment = {
+    ...payment,
+    status: 'Refunded',
+    refund: {
+      refundId: `RFD-${payment.receiptNo.replace('RCT-', '')}`,
+      amount: payment.paidAmount,
+      reason: reason.trim(),
+      refundedAt: now,
+      methods,
+    },
+    updatedAt: now,
+  }
+  const next = logged({ ...state, payments: state.payments.map((p) => (p.paymentId === paymentId ? updated : p)) }, [
+    {
+      text: 'Payment refunded',
+      meta: `${payment.patientName} · ${payment.receiptNo} · ${formatRupees(payment.paidAmount)} · ${methods.join(' + ')}`,
+    },
+  ])
+  return { state: next, value: updated }
+}
+
+/** Closes a bill nothing was collected on. */
+function applyBillCancel(state: AppState, paymentId: string, reason: string, now: number): Step<Payment> {
+  const payment = requirePayment(state, paymentId)
+  if (payment.paidAmount > 0) {
+    throw new DomainError('INVALID_TRANSITION', 'Money has already been collected against this bill — refund it instead of cancelling.')
+  }
+  if (payment.status !== 'Pending') {
+    throw new DomainError('INVALID_TRANSITION', `Cannot cancel a payment that is ${payment.status}.`)
+  }
+  if (!reason.trim()) throw new DomainError('VALIDATION', 'A cancellation reason is required.')
+  const updated: Payment = { ...payment, status: 'Cancelled', cancelledAt: now, cancelReason: reason.trim(), updatedAt: now }
+  const next = logged({ ...state, payments: state.payments.map((p) => (p.paymentId === paymentId ? updated : p)) }, [
+    { text: 'Payment bill cancelled', meta: `${payment.patientName} · ${payment.receiptNo} · ${reason.trim()}` },
+  ])
+  return { state: next, value: updated }
+}
+
+export function createPaymentBill(input: CreatePaymentInput): Payment {
+  const { state, value } = applyNewBill(getState(), input, Date.now())
+  setState(state)
+  return value
+}
+
+export function collectPayment(input: CollectPaymentInput): Payment {
+  const { state, value } = applyCollection(getState(), input, Date.now())
+  setState(state)
+  return value
 }
 
 /** Records a collection that did not go through — the UPI payment never
@@ -1313,91 +1295,24 @@ export function recordFailedPayment({ paymentId, amount, method, reason }: Recor
   return updated
 }
 
-/** A bill that belongs to something still open — a booked appointment or a
- *  current admission — is closed through that record, never on its own. */
-function liveOwnerOf(state: AppState, payment: Payment): string | null {
-  if (payment.appointmentId) {
-    const appointment = state.appointments.find((a) => a.appointmentId === payment.appointmentId)
-    if (appointment && ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in'].includes(appointment.status)) {
-      return 'This bill belongs to an open appointment — cancel the appointment instead.'
-    }
-  }
-  if (payment.admissionId) {
-    const admission = state.admissions.find((a) => a.admissionId === payment.admissionId)
-    if (admission && ['Pending', 'Bed Reserved', 'Admitted'].includes(admission.status)) {
-      return 'This is a current inpatient’s bill — it is settled at discharge or closed with the admission.'
-    }
-  }
-  return null
-}
-
+/** Cancels a bill on its own — only one nothing was collected on, and not
+ *  one held by an open booking or a current stay (getBillLock). */
 export function cancelPayment({ paymentId, reason }: CancelPaymentInput): void {
   const state = getState()
-  const payment = requirePayment(state, paymentId)
-  const owner = liveOwnerOf(state, payment)
-  if (owner) throw new DomainError('INVALID_TRANSITION', owner)
-  if (payment.paidAmount > 0) {
-    throw new DomainError(
-      'INVALID_TRANSITION',
-      'Money has already been collected against this bill — refund it instead of cancelling.',
-    )
-  }
-  if (payment.status !== 'Pending') {
-    throw new DomainError('INVALID_TRANSITION', `Cannot cancel a payment that is ${payment.status}.`)
-  }
-  if (!reason?.trim()) throw new DomainError('VALIDATION', 'A cancellation reason is required.')
-
-  const now = Date.now()
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Payment bill cancelled', meta: `${payment.patientName} · ${payment.receiptNo} · ${reason.trim()}` },
-    ])
-    return {
-      ...current,
-      payments: current.payments.map((p) =>
-        p.paymentId === paymentId
-          ? { ...p, status: 'Cancelled' as const, cancelledAt: now, cancelReason: reason.trim(), updatedAt: now }
-          : p,
-      ),
-      activityLog,
-      nextIds: { ...current.nextIds, activity: activitySeq },
-    }
-  })
+  const lock = getBillLock(state, requirePayment(state, paymentId))
+  if (lock) throw new DomainError('INVALID_TRANSITION', lock)
+  setState(applyBillCancel(state, paymentId, reason ?? '', Date.now()).state)
 }
 
-export function refundPayment({ paymentId, amount, reason }: RefundPaymentInput): Payment {
+/** Refunds a bill in full, on its own — not one held by a booking or a
+ *  current stay (getBillLock); a booking's fee is refunded by cancelling
+ *  the booking because the doctor is unavailable. */
+export function refundPayment({ paymentId, reason }: RefundPaymentInput): Payment {
   const state = getState()
   const payment = requirePayment(state, paymentId)
-  if (payment.status !== 'Paid' && payment.status !== 'Partially Paid') {
-    throw new DomainError('INVALID_TRANSITION', 'Only a payment with money collected against it can be refunded.')
-  }
-  if (payment.admissionId && state.admissions.some((a) => a.admissionId === payment.admissionId && a.status === 'Admitted')) {
-    throw new DomainError('INVALID_TRANSITION', 'Refunds on a current inpatient’s bill are settled at discharge.')
-  }
-  if (!(amount > 0) || amount > payment.paidAmount) {
-    throw new DomainError('VALIDATION', `Enter an amount up to the ${formatRupees(payment.paidAmount)} collected.`)
-  }
-  if (!reason?.trim()) throw new DomainError('VALIDATION', 'A refund reason is required.')
-
-  const now = Date.now()
-  const updated: Payment = {
-    ...payment,
-    status: 'Refunded',
-    refund: { refundId: `RFD-${payment.receiptNo.replace('RCT-', '')}`, amount, reason: reason.trim(), refundedAt: now },
-    updatedAt: now,
-  }
-
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Payment refunded', meta: `${payment.patientName} · ${payment.receiptNo} · ${formatRupees(amount)}` },
-    ])
-    return {
-      ...current,
-      payments: current.payments.map((p) => (p.paymentId === paymentId ? updated : p)),
-      activityLog,
-      nextIds: { ...current.nextIds, activity: activitySeq },
-    }
-  })
-
-  return updated
+  const lock = getBillLock(state, payment)
+  if (lock) throw new DomainError('INVALID_TRANSITION', lock)
+  const { state: next, value } = applyFullRefund(state, paymentId, reason ?? '', Date.now())
+  setState(next)
+  return value
 }

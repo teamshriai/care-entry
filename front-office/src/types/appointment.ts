@@ -18,6 +18,33 @@ export type AppointmentStatus =
   | 'Cancelled'
   | 'No-show'
 
+/** How the consultation happens. A teleconsult follows the same lifecycle
+ *  as a visit — checking in means the patient has joined the call. */
+export type ConsultMode = 'In person' | 'Teleconsult'
+
+/** Who could not keep a booking. It decides the money: a doctor's absence
+ *  is refunded, a patient's cancellation keeps the fee. */
+export type UnavailableParty = 'Patient' | 'Doctor'
+
+/** Where a booking sits — a reschedule moves it from one to another. */
+export interface BookingPlace {
+  providerId: string
+  date: string
+  slot: string
+  mode: ConsultMode
+}
+
+/** One move of a booking, kept so its history reads back in order. */
+export interface RescheduleEntry {
+  at: number
+  from: BookingPlace
+  to: BookingPlace
+  by: UnavailableParty
+  note: string | null
+  /** The fee-difference bill, when the patient moved to a dearer doctor. */
+  differencePaymentId: string | null
+}
+
 export interface Appointment {
   appointmentId: string
   patientId: string
@@ -29,7 +56,14 @@ export interface Appointment {
   visitId: string | null
   /** Optional free-text note from the front desk — never a clinical field. */
   reason: string | null
+  mode: ConsultMode
   createdAt: number
+  /** Set together when the booking is cancelled. */
+  cancelledAt: number | null
+  cancelledBy: UnavailableParty | null
+  cancelReason: string | null
+  /** Every move, oldest first; the last `to` is where the booking is now. */
+  reschedules: RescheduleEntry[]
 }
 
 export interface AppointmentWithSlot extends Appointment {
@@ -57,6 +91,7 @@ export interface BookAppointmentInput {
   slot: string
   date?: string
   reason?: string
+  mode?: ConsultMode
 }
 
 export type SlotStatus = 'available' | 'booked' | 'past' | 'break'

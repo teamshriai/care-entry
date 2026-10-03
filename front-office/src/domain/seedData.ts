@@ -23,7 +23,7 @@ import type { AppState, TokenCounters } from '../types/store'
 import type { Patient } from '../types/patient'
 import type { Provider } from '../types/doctor'
 import type { DoctorLeave } from '../types/schedule'
-import type { Appointment, AppointmentStatus } from '../types/appointment'
+import type { Appointment, AppointmentStatus, UnavailableParty } from '../types/appointment'
 import type { Visit } from '../types/visit'
 import type { QueueToken, QueueTokenStatus } from '../types/queue'
 import type { ActivityLogEntry } from '../types/activity'
@@ -62,8 +62,9 @@ interface BookingSeed {
   arrivedAt?: number
   tokenStatus?: QueueTokenStatus
   reason?: string
-  /** Paid, then cancelled by the patient and refunded. */
-  refund?: { reason: string; at: number }
+  /** Paid, then cancelled: refunded when the doctor could not see the
+   *  patient, the fee kept when the patient cancelled. */
+  cancel?: { by: UnavailableParty; reason: string; at: number }
 }
 
 interface SeedCollection {
@@ -364,7 +365,9 @@ export function createSeedState(): AppState {
       status: cancelled ? 'Cancelled' : refund ? 'Refunded' : paid >= total ? 'Paid' : paid > 0 ? 'Partially Paid' : 'Pending',
       transactions: collections.map((c) => ({ transactionId: '', amount: c.amount, method: c.method, collectedAt: c.at })),
       failedAttempts: failed.map((f) => ({ attemptId: '', amount: f.amount, method: f.method, reason: f.reason, attemptedAt: f.at })),
-      refund: refund ? { refundId: '', amount: paid, reason: refund.reason, refundedAt: refund.at } : null,
+      refund: refund
+        ? { refundId: '', amount: paid, reason: refund.reason, refundedAt: refund.at, methods: [...new Set(collections.map((c) => c.method))] }
+        : null,
       createdAt,
       updatedAt: Math.max(createdAt, ...collections.map((c) => c.at), ...failed.map((f) => f.at), refund?.at ?? 0, cancelled?.at ?? 0),
       cancelledAt: cancelled?.at ?? null,
@@ -474,10 +477,16 @@ export function createSeedState(): AppState {
       status,
       visitId: null,
       reason: seed.reason ?? null,
+      mode: 'In person',
       createdAt: bookedAt,
+      cancelledAt: seed.cancel?.at ?? null,
+      cancelledBy: seed.cancel?.by ?? null,
+      cancelReason: seed.cancel?.reason ?? null,
+      reschedules: [],
     }
     appointments.push(appointment)
     logAt(bookedAt, 'Appointment booked', `${p.name} → ${provider.name} at ${slot}${date === today ? '' : ` on ${date}`}`)
+    if (seed.cancel) logAt(seed.cancel.at, 'Appointment cancelled', `${p.name} · ${slot} · ${seed.cancel.reason}`)
 
     const items = consultationItems(p.patientId, provider.providerId)
     pushBill({
@@ -486,7 +495,7 @@ export function createSeedState(): AppState {
       createdAt: bookedAt,
       appointmentId: appointment.appointmentId,
       collections: [{ amount: sumItems(items), method: seed.method, at: bookedAt + MINUTE }],
-      refund: seed.refund,
+      refund: seed.cancel?.by === 'Doctor' ? { reason: 'Doctor unavailable', at: seed.cancel.at } : undefined,
     })
 
     if (status === 'Checked-in' || status === 'Completed') {
@@ -526,10 +535,11 @@ export function createSeedState(): AppState {
   book({ patientId: 'SHRI-0069958', providerId: 'dr-priya-nair', day: -5, slotIndex: 2, status: 'Completed', method: 'Card' })
   book({ patientId: 'SHRI-0052719', providerId: 'dr-rahul-menon', day: -5, slotIndex: 1, status: 'Completed', method: 'UPI' })
   book({ patientId: 'SHRI-0106392', providerId: 'dr-vikram-das', day: -3, slotIndex: 2, status: 'Completed', method: 'UPI' })
-  // Booked with Dr. Meera Shah, cancelled by the patient and refunded.
+  // Booked with Dr. Meera Shah, who then could not attend — cancelled as
+  // doctor unavailable, so the fee went back to the card it came from.
   book({
     patientId: 'SHRI-0063390', providerId: 'dr-meera-shah', day: -2, slotIndex: 2, status: 'Cancelled', method: 'Card',
-    bookedAt: daysAgo(3), refund: { reason: 'Cancelled by the patient', at: daysAgo(3) + 3 * HOUR },
+    bookedAt: daysAgo(3), cancel: { by: 'Doctor', reason: 'Dr. Meera Shah unavailable', at: daysAgo(3) + 3 * HOUR },
   })
 
   // Today — Dr. Arun Kumar: one seen this morning (admission advised), one
