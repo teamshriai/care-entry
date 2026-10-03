@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Receipt, Plus, Minus, Trash2, Search, IndianRupee, CalendarPlus } from 'lucide-react'
+import { Receipt, Plus, Minus, Trash2, Search, IndianRupee } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
@@ -11,7 +11,7 @@ import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
 import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate, getPatientById } from '../domain/selectors'
-import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem, saveEstimate } from '../domain/actions'
+import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem } from '../domain/actions'
 import { billNumberFor, formatRupees } from '../utils/billing'
 import type { Tariff } from '../types/frontDesk'
 
@@ -71,16 +71,6 @@ export function EnquiryEstimatePage() {
   function handleRemove(code: string) {
     if (!estimate) return
     removeEstimateItem({ estimateId: estimate.estimateId, code })
-  }
-
-  function handleSave() {
-    if (!estimate) return
-    try {
-      const saved = saveEstimate(estimate.estimateId)
-      notify('Estimate saved', { detail: `${saved.estimateId} · ${formatRupees(saved.total)}` })
-    } catch (err) {
-      notify('Could not save estimate', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
   }
 
   // No pay-later: the estimate becomes a bill only as it is paid, in the
@@ -266,9 +256,6 @@ export function EnquiryEstimatePage() {
                   <div className="flex flex-wrap gap-2 border-t border-border-soft pt-4">
                     {hasItems && estimate ? (
                       <>
-                        <Button size="sm" onClick={handleSave}>
-                          Save Estimate
-                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => window.print()}>
                           Print Estimate
                         </Button>
@@ -285,10 +272,6 @@ export function EnquiryEstimatePage() {
                         ) : null}
                       </>
                     ) : null}
-                    <Button size="sm" variant="ghost" onClick={() => openFlow('schedule', patient ? { uhid: patient.uhid } : {})}>
-                      <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Schedule
-                    </Button>
                   </div>
                 ) : null}
               </CardBody>
