@@ -44,6 +44,13 @@ export function relativeDayLabel(dateKey: string, today: string = todayKey()): s
   return `${WEEKDAYS[date.getDay()]} ${day} ${MONTHS[month - 1]}`
 }
 
+/** "Today · Fri 02-Oct-2026", "Tomorrow · Sat 03-Oct-2026", else just
+ *  "Sun 04-Oct-2026" — a confirmation's day, never said twice. */
+export function dayWithDate(dateKey: string, today: string = todayKey()): string {
+  const label = relativeDayLabel(dateKey, today)
+  return label === 'Today' || label === 'Tomorrow' ? `${label} · ${formatDateKey(dateKey)}` : formatDateKey(dateKey)
+}
+
 export function formatDateKey(value: string | null | undefined): string {
   if (!value) return '—'
   const [year, month, day] = value.split('-').map(Number)

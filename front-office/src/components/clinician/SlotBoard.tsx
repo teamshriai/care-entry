@@ -18,11 +18,14 @@ export function SlotBoard({
   selectedSlot,
   onSelect,
   emptyMessage = 'No slots in this session.',
+  currentAppointmentId,
 }: {
   entries: SlotBoardEntry[]
   selectedSlot?: string | null
   onSelect?: (slot: string) => void
   emptyMessage?: string
+  /** A booking being moved: its own slot reads "Current", not "Booked". */
+  currentAppointmentId?: string
 }) {
   if (entries.length === 0) {
     return <p className="text-sm text-ink-muted">{emptyMessage}</p>
@@ -35,7 +38,8 @@ export function SlotBoard({
         const isSelected = selectedSlot === entry.slot
         // A booking not yet paid still holds its slot — say so, so the desk
         // knows it may free up.
-        const label = entry.status === 'booked' && entry.appointment?.status === 'Payment Pending' ? 'Held' : LABEL[entry.status]
+        const current = Boolean(currentAppointmentId) && entry.appointment?.appointmentId === currentAppointmentId
+        const label = current ? 'Current' : entry.status === 'booked' && entry.appointment?.status === 'Payment Pending' ? 'Held' : LABEL[entry.status]
         return (
           <button
             key={entry.slot}
@@ -51,7 +55,8 @@ export function SlotBoard({
               !isSelected &&
                 entry.status === 'available' &&
                 'border-stable-border bg-stable-bg text-ink hover:border-brand-500 hover:bg-brand-50 hover:shadow-sm',
-              entry.status === 'booked' && 'cursor-not-allowed border-border bg-surface-muted text-ink-faint',
+              entry.status === 'booked' && !current && 'cursor-not-allowed border-border bg-surface-muted text-ink-faint',
+              current && 'cursor-not-allowed border-dashed border-info-border bg-info-bg text-info',
               entry.status === 'past' && 'cursor-not-allowed border-border bg-surface-subtle text-ink-faint',
               entry.status === 'break' && 'cursor-not-allowed border-warning-border bg-warning-bg text-warning',
             )}

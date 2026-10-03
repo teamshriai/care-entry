@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { UserRound } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -8,6 +9,7 @@ import { PatientHeader } from '../components/patient/PatientHeader'
 import { PatientTimeline } from '../components/patient/PatientTimeline'
 import { PatientDetailsCard } from '../components/patient/PatientDetailsCard'
 import { CurrentAdmissionCard } from '../components/patient/CurrentAdmissionCard'
+import { BookingDialog } from '../components/appointment/BookingDialog'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
@@ -36,6 +38,8 @@ export function PatientProfilePage() {
   useCountPatientOpen(patient?.patientId)
   const header = useStoreValue(getPatientHeader, uhid ?? '', now)
   const timeline = useStoreValue(getPatientTimeline, uhid ?? '')
+  // The booking whose reschedule-or-cancel dialog is open.
+  const [changingBooking, setChangingBooking] = useState<string | null>(null)
 
   if (!patient) {
     return (
@@ -88,12 +92,26 @@ export function PatientProfilePage() {
             today={today}
             onCheckIn={checkIn}
             onCollect={(paymentId) => openFlow('billing', { uhid: patient.uhid, bill: paymentId })}
+            onChangeBooking={setChangingBooking}
           />
         </div>
         <div className="min-w-0">
           <PatientDetailsCard patient={patient} />
         </div>
       </div>
+
+      {changingBooking ? (
+        <BookingDialog
+          key={changingBooking}
+          appointmentId={changingBooking}
+          onClose={() => setChangingBooking(null)}
+          onReschedule={(appointmentId) => {
+            // The dialog closes before the flow opens over the profile.
+            setChangingBooking(null)
+            openFlow('reschedule', { appointment: appointmentId })
+          }}
+        />
+      ) : null}
     </div>
   )
 }

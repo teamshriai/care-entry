@@ -33,7 +33,7 @@ import {
 } from '../../domain/selectors'
 import { bookAndPayAppointment, startPaidWalkIn } from '../../domain/actions'
 import { billNumberFor, formatRupees, sumItems } from '../../utils/billing'
-import { formatDateKey, relativeDayLabel } from '../../utils/dates'
+import { dayWithDate, relativeDayLabel } from '../../utils/dates'
 import { doctorStatusLabel, modesFor, takesWalkIns } from '../../utils/appointment'
 import { initialsOf } from '../../utils/format'
 import { cn } from '../../utils/cn'
@@ -274,7 +274,7 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
           {done.token ? <p className="text-3xl font-semibold tracking-wide tabular-nums text-primary-text">{done.token}</p> : null}
           <p className="text-base font-semibold text-ink">{done.doctorName}</p>
           <p>
-            {done.date && done.slot ? `${relativeDayLabel(done.date, today)} · ${formatDateKey(done.date)} · ${done.slot}` : 'Now'}
+            {done.date && done.slot ? `${dayWithDate(done.date, today)} · ${done.slot}` : 'Now'}
             {done.waitMinutes !== undefined ? ` · ~${done.waitMinutes} min wait` : ''}
           </p>
           {isSchedule ? (
@@ -465,7 +465,7 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
                 <dd className="font-medium text-ink">
                   {isSchedule
                     ? date && slot
-                      ? `${relativeDayLabel(date, today)} · ${formatDateKey(date)} · ${slot}`
+                      ? `${dayWithDate(date, today)} · ${slot}`
                       : '—'
                     : `Now${walkIn ? ` · ~${walkIn.waitMinutes} min wait, ${walkIn.waiting} ahead` : ''}`}
                 </dd>

@@ -9,9 +9,11 @@ import {
   DoorOpen,
   IndianRupee,
   LogIn,
+  MoreHorizontal,
   PhoneCall,
   Stethoscope,
   UserCheck,
+  UserX,
   Video,
   X,
 } from 'lucide-react'
@@ -23,6 +25,7 @@ import { Alert } from '../components/ui/Alert'
 import { StatFilter } from '../components/ui/StatFilter'
 import type { StatFilterItem } from '../components/ui/StatFilter'
 import { OutpatientList } from '../components/outpatient/OutpatientList'
+import { BookingDialog } from '../components/appointment/BookingDialog'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
@@ -31,7 +34,7 @@ import { getState } from '../domain/store'
 import { getBillsForAppointment, getProviderById } from '../domain/selectors'
 import { OUTPATIENT_FILTERS, getOutpatients } from '../domain/outpatientSelectors'
 import type { OutpatientFilter, OutpatientRow } from '../domain/outpatientSelectors'
-import { callToken, checkInAppointment, completeConsultation, recallToken, startConsultation } from '../domain/actions'
+import { callToken, checkInAppointment, completeConsultation, markNoShow, recallToken, startConsultation } from '../domain/actions'
 import { todayKey } from '../domain/time'
 import { formatClock } from '../utils/format'
 import { cn } from '../utils/cn'
@@ -64,6 +67,8 @@ export function OutpatientsPage() {
   const { notify } = useToast()
   const { openFlow } = useFlow()
   const [error, setError] = useState<string | null>(null)
+  // The booking whose reschedule-or-cancel dialog is open.
+  const [dialog, setDialog] = useState<{ appointmentId: string; startWith: 'choose' | 'cancel' } | null>(null)
 
   const query = new URLSearchParams(location.search)
   const filter = readFilter(query.get('filter'))
@@ -116,10 +121,27 @@ export function OutpatientsPage() {
           ) : null
         }
         return (
-          <Button size="sm" onClick={() => run(() => checkInAppointment(appointment.appointmentId), tele ? 'Joined' : 'Checked in', name)}>
-            {tele ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />}
-            {tele ? 'Joined' : 'Check in'}
-          </Button>
+          <>
+            {row.canMarkNoShow ? (
+              <Button size="sm" variant="secondary" onClick={() => run(() => markNoShow(appointment.appointmentId), 'Marked as no-show', `${name} · fee kept`)}>
+                <UserX className="h-3.5 w-3.5" strokeWidth={1.75} />
+                No-show
+              </Button>
+            ) : null}
+            <Button size="sm" onClick={() => run(() => checkInAppointment(appointment.appointmentId), tele ? 'Joined' : 'Checked in', name)}>
+              {tele ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />}
+              {tele ? 'Joined' : 'Check in'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-label={`Reschedule or cancel ${name ?? 'this booking'}`}
+              title="Reschedule or cancel"
+              onClick={() => setDialog({ appointmentId: appointment.appointmentId, startWith: 'choose' })}
+            >
+              <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} />
+            </Button>
+          </>
         )
       }
       case 'waiting':
@@ -159,7 +181,17 @@ export function OutpatientsPage() {
         // Admission is usually advised in the doctor's room.
         return token?.status === 'Completed' || row.appointment?.status === 'Completed' ? admit : null
       case 'upcoming':
-        return null
+        return row.appointment ? (
+          <>
+            <Button size="sm" variant="secondary" onClick={() => openFlow('reschedule', { appointment: row.appointment!.appointmentId })}>
+              <CalendarClock className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Reschedule
+            </Button>
+            <Button size="sm" variant="ghost" className="text-critical" onClick={() => setDialog({ appointmentId: row.appointment!.appointmentId, startWith: 'cancel' })}>
+              Cancel
+            </Button>
+          </>
+        ) : null
     }
   }
 
@@ -244,6 +276,20 @@ export function OutpatientsPage() {
           />
         </Card>
       </div>
+
+      {dialog ? (
+        <BookingDialog
+          key={`${dialog.appointmentId}|${dialog.startWith}`}
+          appointmentId={dialog.appointmentId}
+          startWith={dialog.startWith}
+          onClose={() => setDialog(null)}
+          onReschedule={(appointmentId) => {
+            // The dialog closes before the flow opens over the page.
+            setDialog(null)
+            openFlow('reschedule', { appointment: appointmentId })
+          }}
+        />
+      ) : null}
     </div>
   )
 }

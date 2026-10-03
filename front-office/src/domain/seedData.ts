@@ -23,7 +23,7 @@ import type { AppState, TokenCounters } from '../types/store'
 import type { Patient } from '../types/patient'
 import type { Provider } from '../types/doctor'
 import type { DoctorLeave } from '../types/schedule'
-import type { Appointment, AppointmentStatus, ConsultMode, UnavailableParty } from '../types/appointment'
+import type { Appointment, AppointmentStatus, ConsultMode, RescheduleEntry, UnavailableParty } from '../types/appointment'
 import type { Visit } from '../types/visit'
 import type { QueueToken, QueueTokenStatus } from '../types/queue'
 import type { ActivityLogEntry } from '../types/activity'
@@ -32,6 +32,7 @@ import type { Payment, PaymentItem, PaymentMethod } from '../types/payment'
 import type { Admission } from '../types/admission'
 import { createAdmissionSeed } from './admissionSeedData'
 import { REGISTRATION_FEE, admissionBillItems, formatRupees, stayDays, sumItems } from '../utils/billing'
+import { NO_SHOW_GRACE_MINUTES } from '../utils/appointment'
 
 export { todayKey }
 
@@ -67,6 +68,9 @@ interface BookingSeed {
   /** Paid, then cancelled: refunded when the doctor could not see the
    *  patient, the fee kept when the patient cancelled. */
   cancel?: { by: UnavailableParty; reason: string; at: number }
+  /** Booked first with another day (or doctor) and moved here. A patient's
+   *  move to a dearer doctor paid the difference; a doctor's didn't. */
+  moved?: { fromProviderId?: string; fromDay: number; fromSlotIndex: number; by: UnavailableParty; note: string; at: number }
 }
 
 interface SeedCollection {
@@ -438,6 +442,7 @@ export function createSeedState(): AppState {
   }
 
   const appointments: Appointment[] = []
+  const differenceBills: [RescheduleEntry, Payment][] = []
   const encounters: EncounterSeed[] = []
   let appointmentSeq = 1
 
@@ -455,7 +460,8 @@ export function createSeedState(): AppState {
       const ahead = (ts: number) => ts >= now
       const offset = seed.offset ?? 0
       if (status === 'Completed') slot = todaySlot(provider.providerId, Math.min(offset, -1), (ts) => ts + 26 * MINUTE <= now)
-      else if (status === 'Checked-in' || status === 'No-show') slot = todaySlot(provider.providerId, Math.min(offset, -1), (ts) => ts < now)
+      else if (status === 'No-show') slot = todaySlot(provider.providerId, Math.min(offset, -1), (ts) => ts + NO_SHOW_GRACE_MINUTES * MINUTE <= now)
+      else if (status === 'Checked-in') slot = todaySlot(provider.providerId, Math.min(offset, -1), (ts) => ts < now)
       else slot = todaySlot(provider.providerId, Math.max(offset, 0), ahead)
       if (!slot && status === 'Completed' && seed.fallbackDay) {
         date = dateFromToday(seed.fallbackDay)
@@ -487,10 +493,41 @@ export function createSeedState(): AppState {
       reschedules: [],
     }
     appointments.push(appointment)
-    logAt(bookedAt, 'Appointment booked', `${p.name} → ${provider.name} at ${slot}${date === today ? '' : ` on ${date}`}`)
+    const moved = seed.moved
+    const from = moved ? providerOf(moved.fromProviderId ?? provider.providerId) : provider
+    if (moved) {
+      const entry: RescheduleEntry = {
+        at: moved.at,
+        from: { providerId: from.providerId, date: dateFromToday(moved.fromDay), slot: slotsOf(from.providerId)[moved.fromSlotIndex], mode: appointment.mode },
+        to: { providerId: provider.providerId, date, slot, mode: appointment.mode },
+        by: moved.by,
+        note: moved.note,
+        differencePaymentId: null,
+      }
+      appointment.reschedules.push(entry)
+      logAt(moved.at, 'Appointment rescheduled', `${p.name} · ${from.name} ${entry.from.date} ${entry.from.slot} → ${provider.name} ${date} ${slot} · ${moved.by === 'Doctor' ? 'doctor unavailable' : 'patient’s request'}`)
+      const difference = provider.consultationFee - from.consultationFee
+      if (difference > 0 && moved.by === 'Patient') {
+        const differenceBill = pushBill({
+          patientId: p.patientId,
+          items: [{ code: 'FEE-DIFF', description: `Fee difference — ${provider.name}`, amount: difference }],
+          createdAt: moved.at,
+          appointmentId: appointment.appointmentId,
+          collections: [{ amount: difference, method: seed.method, at: moved.at + MINUTE }],
+        })
+        // Bills are numbered at the end; the move names its bill then.
+        differenceBills.push([entry, differenceBill])
+      }
+    }
+    const first = appointment.reschedules[0]?.from ?? { date, slot }
+    logAt(bookedAt, 'Appointment booked', `${p.name} → ${from.name} at ${first.slot}${first.date === today ? '' : ` on ${first.date}`}`)
     if (seed.cancel) logAt(seed.cancel.at, 'Appointment cancelled', `${p.name} · ${slot} · ${seed.cancel.reason}`)
 
-    const items = consultationItems(p.patientId, provider.providerId)
+    // A moved booking was paid for its first doctor; its line now names the
+    // doctor the patient will see.
+    const items = consultationItems(p.patientId, from.providerId).map((item) =>
+      item.code === 'CONS-FEE' ? { ...item, description: `Consultation — ${provider.name}` } : item,
+    )
     pushBill({
       patientId: p.patientId,
       items,
@@ -537,6 +574,12 @@ export function createSeedState(): AppState {
   book({ patientId: 'SHRI-0069958', providerId: 'dr-priya-nair', day: -5, slotIndex: 2, status: 'Completed', method: 'Card' })
   book({ patientId: 'SHRI-0052719', providerId: 'dr-rahul-menon', day: -5, slotIndex: 1, status: 'Completed', method: 'UPI' })
   book({ patientId: 'SHRI-0106392', providerId: 'dr-vikram-das', day: -3, slotIndex: 2, status: 'Completed', method: 'UPI' })
+  // Booked with Dr. Rahul Menon, then cancelled by the patient (travelling)
+  // — the fee is kept.
+  book({
+    patientId: 'SHRI-0095218', providerId: 'dr-rahul-menon', day: -10, slotIndex: 2, status: 'Cancelled', method: 'UPI',
+    bookedAt: daysAgo(12), cancel: { by: 'Patient', reason: 'Patient travelling', at: daysAgo(11) },
+  })
   // Booked with Dr. Meera Shah, who then could not attend — cancelled as
   // doctor unavailable, so the fee went back to the card it came from.
   book({
@@ -578,7 +621,18 @@ export function createSeedState(): AppState {
   })
 
   // Ahead — Dr. Meera Shah is back tomorrow; a follow-up by teleconsult next week.
-  book({ patientId: 'SHRI-0116023', providerId: 'dr-meera-shah', day: 1, slotIndex: 3, status: 'Confirmed', method: 'Card', bookedAt: minutesAgo(95), reason: 'Bring the X-ray report' })
+  // Uma was booked with Dr. Meera Shah for today; the doctor's leave moved
+  // her to tomorrow at the same fee.
+  book({
+    patientId: 'SHRI-0116023', providerId: 'dr-meera-shah', day: 1, slotIndex: 3, status: 'Confirmed', method: 'Card', bookedAt: daysAgo(4), reason: 'Bring the X-ray report',
+    moved: { fromDay: 0, fromSlotIndex: 3, by: 'Doctor', note: 'Dr. Meera Shah on leave', at: daysAgo(2) },
+  })
+  // Saraswathi asked to see the diabetologist instead of Dr. Rahul Menon —
+  // she paid the ₹50 difference when the booking was moved.
+  book({
+    patientId: 'SHRI-0052719', providerId: 'dr-vikram-das', day: 2, slotIndex: 2, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(3), reason: 'Sugar review',
+    moved: { fromProviderId: 'dr-rahul-menon', fromDay: 2, fromSlotIndex: 4, by: 'Patient', note: 'Asked to see the diabetologist', at: daysAgo(1) },
+  })
   book({ patientId: 'SHRI-0057164', providerId: 'dr-vikram-das', day: 7, slotIndex: 1, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(100), reason: 'Follow-up', mode: 'Teleconsult' })
 
   // Visits and tokens in arrival order; token numbers run per department.
@@ -802,6 +856,7 @@ export function createSeedState(): AppState {
     attempt.attemptId = `ATT-${String(index + 1).padStart(6, '0')}`
   })
   for (const [admission, bill] of stayBills) admission.paymentId = bill.paymentId
+  for (const [entry, bill] of differenceBills) entry.differencePaymentId = bill.paymentId
 
   const registrationLog: RegistrationLogEntry[] = patients
     .filter((p) => p.createdAt >= dayStart)

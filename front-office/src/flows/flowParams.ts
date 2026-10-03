@@ -2,10 +2,10 @@
 // that say where the flow starts (which patient, doctor, bill …). The page
 // underneath keeps its own params; flows never write to the URL once open.
 
-export const FLOW_NAMES = ['schedule', 'consult', 'admit', 'discharge', 'billing'] as const
+export const FLOW_NAMES = ['schedule', 'consult', 'reschedule', 'admit', 'discharge', 'billing'] as const
 export type FlowName = (typeof FLOW_NAMES)[number]
 
-export const FLOW_PARAM_KEYS = ['uhid', 'dept', 'doctor', 'date', 'slot', 'ward', 'bed', 'admission', 'bill', 'estimate'] as const
+export const FLOW_PARAM_KEYS = ['uhid', 'dept', 'doctor', 'date', 'slot', 'ward', 'bed', 'admission', 'bill', 'estimate', 'appointment'] as const
 export type FlowParamKey = (typeof FLOW_PARAM_KEYS)[number]
 export type FlowParams = Partial<Record<FlowParamKey, string>>
 

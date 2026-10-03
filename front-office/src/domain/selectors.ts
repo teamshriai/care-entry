@@ -383,6 +383,36 @@ export function getConsultationBillItems(state: AppState, patientId: string, pro
   ]
 }
 
+export function getAppointmentById(state: AppState, appointmentId: string): Appointment | null {
+  return state.appointments.find((a) => a.appointmentId === appointmentId) ?? null
+}
+
+export interface DayBooking {
+  appointment: Appointment
+  patient: Patient | null
+  /** Everything paid on the booking — what a doctor-unavailable cancel refunds. */
+  paid: number
+}
+
+/** A doctor's open bookings on one day, by time — what has to be moved or
+ *  cancelled before that day can be leave. */
+export function getDoctorDayBookings(state: AppState, providerId: string, date: string): DayBooking[] {
+  if (!providerId || !date) return []
+  return state.appointments
+    .filter((a) => a.providerId === providerId && a.date === date && ['Scheduled', 'Payment Pending', 'Confirmed'].includes(a.status))
+    .sort((a, b) => a.slot.localeCompare(b.slot))
+    .map((appointment) => ({
+      appointment,
+      patient: getPatientById(state, appointment.patientId),
+      paid: getBillsForAppointment(state, appointment.appointmentId).reduce((sum, bill) => sum + bill.paidAmount, 0),
+    }))
+}
+
+/** Patients in a doctor's queue right now. */
+export function getDoctorQueueCount(state: AppState, providerId: string): number {
+  return state.queueTokens.filter((t) => t.providerId === providerId && ['Waiting', 'Called', 'In consultation'].includes(t.status)).length
+}
+
 export function getAppointmentsForDate(state: AppState, date: string = state.today): AppointmentRow[] {
   return state.appointments
     .filter((a) => a.date === date)
@@ -835,6 +865,19 @@ export function getBillsForAppointment(state: AppState, appointmentId: string): 
   return state.payments
     .filter((p) => p.appointmentId === appointmentId && p.status !== 'Cancelled')
     .sort((a, b) => a.createdAt - b.createdAt)
+}
+
+/** The bill line a move to a dearer doctor is charged under. */
+export const FEE_DIFFERENCE_CODE = 'FEE-DIFF'
+
+/** What has been paid towards a booking's consultation — its fee line and
+ *  any fee difference collected on a move. */
+export function consultationFeePaid(state: AppState, appointmentId: string): number {
+  return getBillsForAppointment(state, appointmentId)
+    .filter((bill) => bill.status === 'Paid' || bill.status === 'Partially Paid')
+    .flatMap((bill) => bill.items)
+    .filter((item) => item.code === 'CONS-FEE' || item.code === FEE_DIFFERENCE_CODE)
+    .reduce((sum, item) => sum + item.amount, 0)
 }
 
 const OPEN_BOOKING = ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in']

@@ -9,8 +9,17 @@
 // applies a server-sent event). Callers already treat these as fallible, so
 // no component needs to change.
 import { getState, setState } from './store'
-import { findAbhaHolder, getAvailableSlots, getBillLock, getConsultationBillItems, getDoctorStatus } from './selectors'
-import { todayKey } from './time'
+import {
+  FEE_DIFFERENCE_CODE,
+  consultationFeePaid,
+  findAbhaHolder,
+  getAvailableSlots,
+  getBillLock,
+  getBillsForAppointment,
+  getConsultationBillItems,
+  getDoctorStatus,
+} from './selectors'
+import { slotToTimestamp, todayKey } from './time'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, formatMobile, isValidMobile } from '../utils/phone'
 import {
@@ -27,11 +36,11 @@ import {
 } from '../utils/validation'
 import { formatRupees } from '../utils/billing'
 import { formatDateKey } from '../utils/dates'
-import { modesFor, takesWalkIns } from '../utils/appointment'
+import { NO_SHOW_GRACE_MINUTES, appointmentStatusLabel, modesFor, takesWalkIns } from '../utils/appointment'
 import type { AppState } from '../types/store'
 import type { Patient, RegisterPatientInput, PatientDemographicsInput, Sex } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
-import type { Appointment, BookAppointmentInput, ConsultMode } from '../types/appointment'
+import type { Appointment, BookAppointmentInput, ConsultMode, UnavailableParty } from '../types/appointment'
 import type { CheckInResult, OpenWalkInVisitInput } from '../types/queue'
 import type {
   AddEstimateItemInput,
@@ -303,6 +312,188 @@ export function startPaidWalkIn({
   const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
   setState(paid.state)
   return { ...visit.value, bill: paid.value }
+}
+
+// ------------------------------------------------- cancel, move, no-show
+// The money follows who could not keep the booking: when the doctor is
+// unavailable the patient is refunded in full; when the patient cancels or
+// does not come, the fee is kept. A move never refunds — it collects the
+// difference only when the patient chooses a dearer doctor.
+
+const OPEN_BOOKING_STATUSES = ['Scheduled', 'Payment Pending', 'Confirmed']
+
+/** Cancels one booking inside a chain of steps. */
+function applyCancelBooking(state: AppState, appointmentId: string, by: UnavailableParty, note: string, now: number): Step<Appointment> {
+  const appointment = requireAppointment(state, appointmentId)
+  if (!OPEN_BOOKING_STATUSES.includes(appointment.status)) {
+    throw new DomainError('INVALID_TRANSITION', `This booking is ${appointmentStatusLabel(appointment.status).toLowerCase()} — it can't be cancelled.`)
+  }
+  const reason = note.trim() || (by === 'Doctor' ? 'Doctor unavailable' : 'Patient cancelled')
+  let next = state
+  for (const bill of getBillsForAppointment(state, appointmentId)) {
+    if (bill.paidAmount > 0) {
+      // Doctor unavailable: everything paid for this booking goes back.
+      if (by === 'Doctor') next = applyFullRefund(next, bill.paymentId, 'Doctor unavailable', now).state
+    } else if (bill.status === 'Pending') {
+      next = applyBillCancel(next, bill.paymentId, 'Appointment cancelled', now).state
+    }
+  }
+  const cancelled: Appointment = { ...appointment, status: 'Cancelled', cancelledAt: now, cancelledBy: by, cancelReason: reason }
+  next = logged({ ...next, appointments: next.appointments.map((a) => (a.appointmentId === appointmentId ? cancelled : a)) }, [
+    {
+      text: 'Appointment cancelled',
+      meta: `${patientName(state, appointment.patientId)} · ${providerName(state, appointment.providerId)} · ${appointment.date} ${appointment.slot} · ${reason}`,
+    },
+  ])
+  return { state: next, value: cancelled }
+}
+
+/** Cancels a booking because the patient or the doctor can't keep it. */
+export function cancelAppointment({ appointmentId, by, note = '' }: { appointmentId: string; by: UnavailableParty; note?: string }): Appointment {
+  const { state, value } = applyCancelBooking(getState(), appointmentId, by, note, Date.now())
+  setState(state)
+  return value
+}
+
+/** Every open booking a doctor has on one day, cancelled as doctor
+ *  unavailable and refunded — clearing the day for leave, in one save. */
+export function cancelDoctorDayBookings({ providerId, date, note = '' }: { providerId: string; date: string; note?: string }): {
+  cancelled: number
+  refunded: number
+} {
+  const state = getState()
+  const now = Date.now()
+  const open = state.appointments.filter((a) => a.providerId === providerId && a.date === date && OPEN_BOOKING_STATUSES.includes(a.status))
+  if (open.length === 0) throw new DomainError('VALIDATION', 'There are no open bookings on that day.')
+  let next = state
+  let refunded = 0
+  for (const appointment of open) {
+    refunded += getBillsForAppointment(next, appointment.appointmentId).reduce((sum, bill) => sum + bill.paidAmount, 0)
+    next = applyCancelBooking(next, appointment.appointmentId, 'Doctor', note || 'Doctor unavailable', now).state
+  }
+  setState(next)
+  return { cancelled: open.length, refunded }
+}
+
+/** The patient did not come: the booking closes as a no-show and the fee
+ *  is kept. Only once its time is past by the grace period. */
+export function markNoShow(appointmentId: string): Appointment {
+  const state = getState()
+  const now = Date.now()
+  const appointment = requireAppointment(state, appointmentId)
+  if (appointment.status !== 'Confirmed') {
+    throw new DomainError('INVALID_TRANSITION', `This booking is ${appointmentStatusLabel(appointment.status).toLowerCase()}.`)
+  }
+  if (now < slotToTimestamp(appointment.date, appointment.slot) + NO_SHOW_GRACE_MINUTES * 60000) {
+    throw new DomainError('INVALID_TRANSITION', `A no-show can be marked ${NO_SHOW_GRACE_MINUTES} minutes after the booked time.`)
+  }
+  const updated: Appointment = { ...appointment, status: 'No-show' }
+  setState(
+    logged({ ...state, appointments: state.appointments.map((a) => (a.appointmentId === appointmentId ? updated : a)) }, [
+      { text: 'Marked as no-show', meta: `${patientName(state, appointment.patientId)} · ${providerName(state, appointment.providerId)} · ${appointment.slot} · fee kept` },
+    ]),
+  )
+  return updated
+}
+
+export interface RescheduleInput {
+  appointmentId: string
+  providerId: string
+  date: string
+  slot: string
+  mode: ConsultMode
+  by: UnavailableParty
+  note?: string
+  /** How the patient pays the difference, when they move to a dearer doctor. */
+  method?: PaymentMethod
+}
+
+/** Moves a booking to another time, or another doctor in the same
+ *  department. The booking keeps its id and records the move. */
+export function rescheduleAppointment({ appointmentId, providerId, date, slot, mode, by, note = '', method }: RescheduleInput): {
+  appointment: Appointment
+  differenceBill: Payment | null
+} {
+  const state = getState()
+  const now = Date.now()
+  const appointment = requireAppointment(state, appointmentId)
+  if (appointment.status !== 'Confirmed') {
+    throw new DomainError('INVALID_TRANSITION', `Only a confirmed booking can be moved — this one is ${appointmentStatusLabel(appointment.status).toLowerCase()}.`)
+  }
+  const provider = state.providers.find((p) => p.providerId === providerId)
+  if (!provider || provider.status !== 'Active') throw new DomainError('VALIDATION', 'That doctor is not taking bookings.')
+  if (provider.department !== appointment.department) {
+    throw new DomainError('VALIDATION', `Choose a doctor in ${appointment.department} — a move stays in the same department.`)
+  }
+  if (!modesFor(provider).includes(mode)) {
+    throw new DomainError('VALIDATION', `${provider.name} does not offer ${mode === 'Teleconsult' ? 'teleconsults' : 'in-person visits'}.`)
+  }
+  if (providerId === appointment.providerId && date === appointment.date && slot === appointment.slot) {
+    throw new DomainError('VALIDATION', 'That is the time it is already booked for — choose another.')
+  }
+  if (!getAvailableSlots(state, providerId, now, date).includes(slot)) {
+    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken (or has passed). Please choose another one.')
+  }
+
+  const difference = provider.consultationFee - consultationFeePaid(state, appointmentId)
+  // Only a patient's own move to a dearer doctor is charged; when the
+  // doctor is the reason, the hospital absorbs the difference.
+  const charge = difference > 0 && by === 'Patient' ? difference : 0
+  if (charge > 0 && !method) throw new DomainError('VALIDATION', 'Collect the fee difference to move the booking.')
+
+  let next = state
+  let differenceBill: Payment | null = null
+  if (charge > 0 && method) {
+    const billed = applyNewBill(
+      next,
+      { patientId: appointment.patientId, items: [{ code: FEE_DIFFERENCE_CODE, description: `Fee difference — ${provider.name}`, amount: charge }], appointmentId },
+      now,
+    )
+    const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: charge, method }, now)
+    next = paid.state
+    differenceBill = paid.value
+  }
+
+  const from = { providerId: appointment.providerId, date: appointment.date, slot: appointment.slot, mode: appointment.mode }
+  const to = { providerId, date, slot, mode }
+  const moved: Appointment = {
+    ...appointment,
+    providerId,
+    date,
+    slot,
+    mode,
+    reschedules: [
+      ...appointment.reschedules,
+      { at: now, from, to, by, note: note.trim() || null, differencePaymentId: differenceBill?.paymentId ?? null },
+    ],
+  }
+  // The consultation line names the doctor the patient will now see; what
+  // was paid for it stays as it was.
+  const renamed = providerId !== appointment.providerId
+  next = logged(
+    {
+      ...next,
+      appointments: next.appointments.map((a) => (a.appointmentId === appointmentId ? moved : a)),
+      payments: renamed
+        ? next.payments.map((bill) =>
+            bill.appointmentId === appointmentId && bill.status !== 'Cancelled'
+              ? {
+                  ...bill,
+                  items: bill.items.map((item) => (item.code === 'CONS-FEE' ? { ...item, description: `Consultation — ${provider.name}` } : item)),
+                }
+              : bill,
+          )
+        : next.payments,
+    },
+    [
+      {
+        text: 'Appointment rescheduled',
+        meta: `${patientName(state, appointment.patientId)} · ${providerName(state, from.providerId)} ${from.date} ${from.slot} → ${provider.name} ${date} ${slot} · ${by === 'Doctor' ? 'doctor unavailable' : 'patient’s request'}`,
+      },
+    ],
+  )
+  setState(next)
+  return { appointment: moved, differenceBill }
 }
 
 // ------------------------------------------------------- visits and tokens
@@ -702,8 +893,13 @@ export function addDoctorLeave(providerId: string, date: string, reason: string 
   const provider = state.providers.find((p) => p.providerId === providerId)
   if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
   if (!date) throw new DomainError('VALIDATION', 'Choose a date.')
+  const today = todayKey()
+  if (date < today) throw new DomainError('VALIDATION', 'Leave can only be recorded for today or a later day.')
   if (state.leaves.some((l) => l.providerId === providerId && l.date === date)) {
     throw new DomainError('DUPLICATE', 'Leave is already recorded for that date.')
+  }
+  if (date === today && state.queueTokens.some((t) => t.providerId === providerId && ['Waiting', 'Called', 'In consultation'].includes(t.status))) {
+    throw new DomainError('HAS_OPEN_APPOINTMENTS', `Patients are still waiting for ${provider.name} today — see them or send them to another doctor first.`)
   }
   const affected = state.appointments.filter(
     (a) =>

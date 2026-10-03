@@ -1,6 +1,6 @@
 import type { ElementType } from 'react'
 import { Link } from 'react-router-dom'
-import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogIn, LogOut, Stethoscope, Ticket, UserPlus, XCircle } from 'lucide-react'
+import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogIn, LogOut, MoreHorizontal, Stethoscope, Ticket, UserPlus, Video, XCircle } from 'lucide-react'
 import { Card, CardHeader } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -35,11 +35,14 @@ export function PatientTimeline({
   today,
   onCheckIn,
   onCollect,
+  onChangeBooking,
 }: {
   timeline: Timeline
   today: string
   onCheckIn: (appointmentId: string) => void
   onCollect: (paymentId: string) => void
+  /** Opens the reschedule-or-cancel choice for a confirmed booking. */
+  onChangeBooking: (appointmentId: string) => void
 }) {
   return (
     <Card className="min-w-0">
@@ -52,7 +55,7 @@ export function PatientTimeline({
         ) : (
           <ul className="divide-y divide-border-soft">
             {timeline.upcoming.map((item) => (
-              <UpcomingRow key={item.id} item={item} today={today} onCheckIn={onCheckIn} onCollect={onCollect} />
+              <UpcomingRow key={item.id} item={item} today={today} onCheckIn={onCheckIn} onCollect={onCollect} onChangeBooking={onChangeBooking} />
             ))}
           </ul>
         )}
@@ -111,11 +114,13 @@ function UpcomingRow({
   today,
   onCheckIn,
   onCollect,
+  onChangeBooking,
 }: {
   item: UpcomingItem
   today: string
   onCheckIn: (appointmentId: string) => void
   onCollect: (paymentId: string) => void
+  onChangeBooking: (appointmentId: string) => void
 }) {
   if (item.kind === 'walk-in') {
     return (
@@ -137,18 +142,23 @@ function UpcomingRow({
   const { appointment, bill } = item
   const isToday = appointment.date === today
   const unpaid = (appointment.status === 'Payment Pending' || appointment.status === 'Scheduled') && bill && bill.balance > 0
+  const tele = appointment.mode === 'Teleconsult'
   return (
-    <li className="flex items-center gap-3 px-5 py-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info-bg">
-        <Stethoscope className="h-4 w-4 text-info" strokeWidth={1.75} aria-hidden="true" />
+    <li className="flex flex-wrap items-center gap-3 px-5 py-3">
+      <span className={tele ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-bg' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info-bg'}>
+        {tele ? (
+          <Video className="h-4 w-4 text-purple" strokeWidth={1.75} aria-hidden="true" />
+        ) : (
+          <Stethoscope className="h-4 w-4 text-info" strokeWidth={1.75} aria-hidden="true" />
+        )}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-ink">
           {relativeDayLabel(appointment.date, today)} · {appointment.slot} · {appointment.provider?.name ?? 'Doctor'}
         </p>
         <p className="truncate text-xs text-ink-muted">
-          Outpatient encounter · {appointment.department}
-          {appointment.provider?.room ? ` · ${appointment.provider.room}` : ''}
+          {tele ? 'Teleconsult' : 'Outpatient encounter'} · {appointment.department}
+          {!tele && appointment.provider?.room ? ` · ${appointment.provider.room}` : ''}
         </p>
       </div>
       <Badge status={appointment.status}>{appointmentStatusLabel(appointment.status)}</Badge>
@@ -159,8 +169,19 @@ function UpcomingRow({
         </Button>
       ) : isToday && appointment.status === 'Confirmed' ? (
         <Button size="sm" onClick={() => onCheckIn(appointment.appointmentId)}>
-          <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />
-          Check in
+          {tele ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />}
+          {tele ? 'Joined' : 'Check in'}
+        </Button>
+      ) : null}
+      {appointment.status === 'Confirmed' ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-label="Reschedule or cancel this booking"
+          title="Reschedule or cancel"
+          onClick={() => onChangeBooking(appointment.appointmentId)}
+        >
+          <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} />
         </Button>
       ) : null}
     </li>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CalendarCheck, CalendarX2, Stethoscope, Trash2 } from 'lucide-react'
+import { CalendarCheck, Stethoscope } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -19,10 +19,10 @@ import {
   getDoctorRow,
   getSlotBoard,
   getAppointmentsForProvider,
-  getDoctorLeaves,
   getToday,
 } from '../domain/selectors'
-import { setDoctorStatus, addDoctorLeave, removeDoctorLeave } from '../domain/actions'
+import { setDoctorStatus } from '../domain/actions'
+import { DoctorLeaveCard } from '../components/doctor/DoctorLeaveCard'
 import { initialsOf } from '../utils/format'
 import { useFlow } from '../flows/useFlow'
 
@@ -40,10 +40,7 @@ export function DoctorProfilePage() {
   const row = useStoreValue(getDoctorRow, id, now)
   const slotEntries = useStoreValue(getSlotBoard, id, now)
   const appointments = useStoreValue(getAppointmentsForProvider, id)
-  const leaves = useStoreValue(getDoctorLeaves, id)
 
-  const [leaveDate, setLeaveDate] = useState('')
-  const [leaveReason, setLeaveReason] = useState('Leave')
   const [error, setError] = useState<string | null>(null)
 
   if (!row) {
@@ -79,13 +76,6 @@ export function DoctorProfilePage() {
       setError(message)
       notify('Action failed', { tone: 'error', detail: message })
       return false
-    }
-  }
-
-  function handleAddLeave(event: React.FormEvent) {
-    event.preventDefault()
-    if (run(() => addDoctorLeave(id, leaveDate, leaveReason), 'Leave recorded')) {
-      setLeaveDate('')
     }
   }
 
@@ -162,50 +152,7 @@ export function DoctorProfilePage() {
               </CardBody>
             </Card>
 
-            <Card>
-              <CardHeader icon={CalendarX2} iconTone="warning" title="Leave & unavailability" />
-              <CardBody className="flex flex-col gap-3">
-                <form onSubmit={handleAddLeave} className="flex flex-col gap-2">
-                  <input
-                    type="date"
-                    value={leaveDate}
-                    onChange={(event) => setLeaveDate(event.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
-                  />
-                  <input
-                    value={leaveReason}
-                    onChange={(event) => setLeaveReason(event.target.value)}
-                    placeholder="Reason"
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
-                  />
-                  <Button type="submit" size="sm" variant="secondary" disabled={!leaveDate}>
-                    Record leave
-                  </Button>
-                </form>
-                {leaves.length === 0 ? (
-                  <p className="text-xs text-ink-faint">No leave recorded.</p>
-                ) : (
-                  <div className="divide-y divide-border-soft border-t border-border-soft">
-                    {leaves.map((leave) => (
-                      <div key={leave.leaveId} className="flex items-center justify-between gap-2 py-2">
-                        <div className="min-w-0">
-                          <p className="text-sm text-ink">{leave.date}</p>
-                          <p className="truncate text-xs text-ink-muted">{leave.reason}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => run(() => removeDoctorLeave(leave.leaveId), 'Leave removed')}
-                          className="rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-muted hover:text-critical"
-                          aria-label={`Remove leave on ${leave.date}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
+            <DoctorLeaveCard providerId={id} providerName={provider.name} />
           </div>
 
           {/* Schedule + appointments */}
