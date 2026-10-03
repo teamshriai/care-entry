@@ -643,9 +643,8 @@ function applyWalkIn(state: AppState, { patientId, providerId, department }: Ope
 // consultation belong to the consultation room (the clinician side) in
 // UI_ATLAS's permission model — M-05's "Call next" is P-04-gated, not P-03.
 // They live here because the queue's state machine is part of this domain
-// and the board has to reflect them; the OP Queue screen groups them under
-// a clearly-labelled "consultation room" section rather than presenting
-// them as ordinary front-desk actions.
+// and the board has to reflect them; the Outpatients page shows them on
+// each patient's row at that stage, beside the desk's own Check in.
 
 export function callToken(tokenId: string): void {
   const state = getState()

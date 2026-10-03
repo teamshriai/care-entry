@@ -39,28 +39,54 @@ Both apps open in the **light** theme by default; the dark theme stays available
 
 ## How the front office works
 
-- **One search.** The box in the app bar finds a patient by name, mobile, UHID, ABHA or bill number
-  (`/` focuses it). An empty box offers the most recently registered and most opened patients. A
-  patient who isn't found can be registered from the same place, with what was typed already filled in.
-- **The profile is the hub.** `/patients/:uhid` shows who the patient is, what they owe, where they
-  are admitted and what has happened at the desk. Everything done for a patient starts there:
-  Schedule · Start Consultation · Admit or Discharge · Billing.
+- **One search, one box per screen.** The box in the app bar finds a patient by name, mobile, UHID,
+  ABHA (address or number) or bill number (`/` focuses it). Results show each patient's ABHA and
+  status icons. It steps aside while a task panel is open and on Guest Pass, MLC and Enquiry, which
+  have their own patient field. A patient who isn't found can be registered from **Register Patient**,
+  with what was typed already filled in.
+- **Registration takes only real values.** A name in letters; age 0–130, with 100 and over shown
+  in red and confirmed again; sex; an Indian mobile (10 digits starting 6–9); an optional ABHA,
+  checked for format and not already linked to someone else.
+- **The profile is the hub.** `/patients/:uhid` shows who the patient is, their ABHA, what they owe,
+  where they are and what has happened at the desk. Everything done for a patient starts there:
+  Schedule · Start Consultation · Admit or Discharge · Billing, and Reschedule or Cancel on a
+  booking.
+- **Icons beside every name:** ICU (red heart), Emergency (red siren), inpatient (blue bed),
+  outpatient today (teal stethoscope), teleconsult today (purple video).
 - **Tasks are flows, not pages.** Each task opens over the current page as a panel held in the URL
-  (`?flow=schedule|consult|admit|discharge|billing`, plus `uhid`, `bill` and the like). Browser Back
-  or Esc closes it, and a link with `?flow=` opens straight into it. Each flow ends with a short
-  acknowledgement and closes itself. Old addresses (`/appointments/new`, `/admissions/discharge`,
-  `/payments/pending`, …) redirect into the matching flow or place.
+  (`?flow=schedule|consult|reschedule|admit|discharge|billing`, plus `uhid`, `doctor`, `appointment`,
+  `bill` and the like). Browser Back or Esc closes it, and a link with `?flow=` opens straight into
+  it. Each flow ends with a short acknowledgement and closes itself. Old addresses
+  (`/appointments`, `/op-queue`, `/appointments/new`, `/admissions/discharge`, `/payments/pending`, …)
+  redirect to the matching place or flow.
+- **Scheduling, one step at a time:** department → that department's doctors → the chosen doctor's
+  times (in person or teleconsult, where the doctor offers both) → confirm and pay → "Appointment
+  Confirmed". Nothing is chosen for the desk. A walk-in (Start Consultation) picks a doctor seeing
+  patients now and gets a token.
+- **Outpatients** is one page for bookings, walk-ins and the queue: to check in → waiting → with the
+  doctor → done, plus bookings ahead. Each figure is also its filter; Teleconsult narrows them all.
+- **Reschedule, cancel, no-show.** A cancellation asks who can't make it. If the doctor is
+  unavailable the patient is refunded in full; if the patient cancels or doesn't come (no-show,
+  10 minutes after the booked time) the fee is kept. A move keeps the booking and its history and
+  never refunds; a patient who moves to a dearer doctor pays the difference, while a doctor's move
+  absorbs it. Doctor leave on a booked day first moves or cancels that day's bookings.
 - **Cashless, no pay-later.** Payment is UPI or card, and staff confirm what the phone or terminal
-  shows. A booking or token is saved only once it is paid. An inpatient's running bill accrues daily
-  and can be part-paid. Insured, TPA and corporate stays are settled by their payer at discharge. A
-  discharge needs the stay's bill at ₹0.
-- **Places in the sidebar:** Dashboard · Patients · Outpatients (Appointments, Queue) · Inpatients ·
-  Billing · Doctors · Services (Guest Pass, Enquiry & Estimate, MLC).
+  shows. A booking or token is saved only once it is paid. A refund is always in full, by the
+  methods the money came in. An inpatient's running bill accrues daily and can be part-paid.
+  Insured, TPA and corporate stays are settled by their payer at discharge. A discharge needs the
+  stay's bill at ₹0.
+- **Patient self-registration** can be shared from the dashboard and the Register page: QR code,
+  Open form, Copy link, or WhatsApp / SMS to the patient's mobile. The form is a preview for now —
+  answers stay on the patient's phone — so the desk registers the patient on arrival.
+- **Places in the sidebar:** Dashboard · Patients · Outpatients · Inpatients · Billing · Doctors ·
+  Services (Guest Pass, Enquiry & Estimate, MLC). The SHRI Health mark leads to
+  https://shri-ai.org/dev/. The name card at the top right switches between the desk's staff.
 
 There is no backend. The store is in memory and starts from sample data
 (`front-office/src/domain/seedData.ts`, `admissionSeedData.ts`):
-- 31 patients across every desk function: the queue, bookings, inpatients, beds awaited, discharges,
-  every bill status, guest passes, MLC, estimates and a possible duplicate.
+- 31 patients across every desk function: the queue, bookings, teleconsults, cancellations (by the
+  patient and by the doctor), moved bookings (one with a fee difference), inpatients, beds awaited,
+  discharges, every bill status, guest passes, MLC, estimates and a possible duplicate.
 - The data is generated relative to the time the app opens, so it reads like a shift in progress at
   any hour.
 - A reload starts it fresh.
