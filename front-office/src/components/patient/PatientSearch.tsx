@@ -239,9 +239,9 @@ export function PatientSearch(props: PatientSearchProps) {
       </div>
 
       {navigateMode ? (
-        <Button onClick={register} className="shrink-0" aria-label="Register a new patient">
+        <Button onClick={register} className="shrink-0" aria-label="Register Patient">
           <UserPlus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-          <span className="hidden sm:inline">Register</span>
+          <span className="hidden sm:inline">Register Patient</span>
         </Button>
       ) : null}
 
@@ -252,7 +252,7 @@ export function PatientSearch(props: PatientSearchProps) {
           </ul>
           {options.length === 0 ? (
             <p className="px-4 py-3 text-sm text-ink-muted">
-              No patient found{navigateMode ? ' — Register adds a new one, with what you typed filled in.' : '.'}
+              No patient found{navigateMode ? ' — Register Patient adds a new one, with what you typed filled in.' : '.'}
             </p>
           ) : null}
         </div>
