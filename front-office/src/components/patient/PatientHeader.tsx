@@ -1,5 +1,5 @@
 import type { ElementType, ReactNode } from 'react'
-import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut, Phone, ShieldCheck, Stethoscope } from 'lucide-react'
+import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut, Phone, ShieldCheck } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -24,8 +24,8 @@ const PAYMENT_TONE: Record<PatientHeaderSummary['payment']['status'], Tone> = {
 }
 
 export interface PatientActions {
+  /** A booking, or a walk-in now — both start in Schedule. */
   schedule: () => void
-  consult: () => void
   admit: () => void
   discharge: () => void
   billing: () => void
@@ -147,7 +147,6 @@ export function PatientHeader({
 
         <div className="flex shrink-0 flex-wrap gap-2">
           <Action icon={CalendarPlus} label="Schedule" onClick={actions.schedule} />
-          <Action icon={Stethoscope} label="Start Consultation" onClick={actions.consult} />
           {inpatient ? (
             <Action icon={LogOut} label="Discharge" onClick={actions.discharge} />
           ) : (

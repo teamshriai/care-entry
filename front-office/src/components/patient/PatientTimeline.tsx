@@ -51,7 +51,7 @@ export function PatientTimeline({
       <section aria-label="Today and upcoming" className="border-t border-border-soft">
         <h3 className="px-5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Today &amp; upcoming</h3>
         {timeline.upcoming.length === 0 ? (
-          <p className="px-5 pb-4 text-sm text-ink-muted">Nothing booked. Schedule or Start Consultation adds an encounter.</p>
+          <p className="px-5 pb-4 text-sm text-ink-muted">Nothing booked. Schedule adds a booking, or a walk-in now.</p>
         ) : (
           <ul className="divide-y divide-border-soft">
             {timeline.upcoming.map((item) => (

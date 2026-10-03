@@ -11,7 +11,6 @@ import {
   LogIn,
   MoreHorizontal,
   PhoneCall,
-  Stethoscope,
   UserCheck,
   UserX,
   Video,
@@ -212,16 +211,11 @@ export function OutpatientsPage() {
         illustration={<AppointmentIllustration className="h-8 w-8" />}
         illustrationTone="info"
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => openFlow('schedule')}>
-              <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Schedule
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => openFlow('consult')}>
-              <Stethoscope className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Start Consultation
-            </Button>
-          </div>
+          // One way in: a booking, or a walk-in now, is chosen inside Schedule.
+          <Button size="sm" onClick={() => openFlow('schedule')}>
+            <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Schedule
+          </Button>
         }
       />
 

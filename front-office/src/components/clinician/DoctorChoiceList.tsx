@@ -21,6 +21,7 @@ export function DoctorChoiceList({
   today,
   marker,
   note,
+  walkIns,
 }: {
   suggestions: DoctorSuggestion[]
   selectedId: string | null
@@ -30,6 +31,9 @@ export function DoctorChoiceList({
   marker?: (suggestion: DoctorSuggestion) => ReactNode
   /** A line under the details — the fee difference in a reschedule. */
   note?: (suggestion: DoctorSuggestion) => ReactNode
+  /** Doctors seeing patients now, who can take a walk-in — choosable even
+   *  when every slot to book is taken. */
+  walkIns?: Map<string, { waiting: number; waitMinutes: number }>
 }) {
   if (suggestions.length === 0) return <p className="text-sm text-ink-muted">No doctors in this department.</p>
   return (
@@ -38,17 +42,19 @@ export function DoctorChoiceList({
         const modes = modesFor(s.provider)
         const next = s.nextSlots[0]
         const selected = s.provider.providerId === selectedId
+        const now = walkIns?.get(s.provider.providerId)
+        const choosable = s.bookable || Boolean(now)
         return (
           <li key={s.provider.providerId}>
             <button
               type="button"
-              disabled={!s.bookable}
+              disabled={!choosable}
               aria-pressed={selected}
               onClick={() => onChoose(s.provider.providerId)}
               className={cn(
                 'flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
                 selected ? 'border-primary-600 bg-primary-50' : 'border-border hover:bg-surface-2',
-                !s.bookable && 'cursor-not-allowed opacity-60 hover:bg-transparent',
+                !choosable && 'cursor-not-allowed opacity-60 hover:bg-transparent',
               )}
             >
               <Avatar initials={initialsOf(s.provider.name)} size="sm" />
@@ -63,8 +69,13 @@ export function DoctorChoiceList({
                 <span className="block text-xs text-ink-muted">
                   {s.provider.specialty} · {formatRupees(s.provider.consultationFee)}
                 </span>
-                <span className="mt-1 block text-xs text-ink-muted">
-                  {s.bookable && next ? `Next free ${relativeDayLabel(next.date, today)} ${next.slot}` : s.reason}
+                {now ? (
+                  <span className="mt-1 block text-xs font-medium text-teal">
+                    Seeing patients now · {now.waiting} waiting · ~{now.waitMinutes} min
+                  </span>
+                ) : null}
+                <span className="mt-0.5 block text-xs text-ink-muted">
+                  {s.bookable && next ? `Next free to book ${relativeDayLabel(next.date, today)} ${next.slot}` : s.reason}
                 </span>
                 {note?.(s)}
               </span>

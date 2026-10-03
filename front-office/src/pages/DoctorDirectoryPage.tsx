@@ -53,9 +53,8 @@ export function DoctorDirectoryPage() {
     })
   }, [rows, query, department, specialty, availability])
 
-  // Scheduling picks the patient, then the time, inside the flow — the
-  // doctor is all this page settles. Walk-ins start from the patient's
-  // profile (Start Consultation), never from here.
+  // Scheduling picks the patient, then when — now as a walk-in, or a time
+  // to book — inside the flow; the doctor is all this page settles.
   function handleBook(provider: Provider) {
     openFlow('schedule', { doctor: provider.providerId })
   }

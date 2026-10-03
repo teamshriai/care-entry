@@ -340,7 +340,7 @@ export interface WalkInDoctor {
 }
 
 /** Doctors in session right now in a department, shortest wait first —
- *  who a walk-in ("Start Consultation") can be sent to. */
+ *  who a walk-in (Schedule → Now) can be sent to. */
 export function getDoctorsAvailableNow(state: AppState, department: string, now: number): WalkInDoctor[] {
   return state.providers
     .filter((p) => p.department === department && p.status === 'Active')

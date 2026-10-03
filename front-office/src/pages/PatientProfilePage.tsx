@@ -21,7 +21,7 @@ import { checkInAppointment } from '../domain/actions'
 
 /**
  * The patient's hub. Everything the front desk does for a patient starts
- * here — Schedule, Start Consultation, Admit or Discharge, Billing — and runs
+ * here — Schedule (a booking or a walk-in now), Admit or Discharge, Billing — and runs
  * over this page, which is back the moment the task is done. Deliberately
  * non-clinical: identity, contact, money, where they are admitted, and what
  * has happened at the desk.
@@ -77,7 +77,6 @@ export function PatientProfilePage() {
         summary={header}
         actions={{
           schedule: () => openFlow('schedule', { uhid: patient.uhid }),
-          consult: () => openFlow('consult', { uhid: patient.uhid }),
           admit: () => openFlow('admit', { uhid: patient.uhid }),
           discharge: () => openFlow('discharge', { uhid: patient.uhid }),
           billing: () => openFlow('billing', { uhid: patient.uhid }),

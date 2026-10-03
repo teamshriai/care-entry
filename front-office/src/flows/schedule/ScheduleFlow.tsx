@@ -11,7 +11,6 @@ import { PatientSearch } from '../../components/patient/PatientSearch'
 import { SlotBoard } from '../../components/clinician/SlotBoard'
 import { DateStrip } from '../../components/clinician/DateStrip'
 import { DoctorChoiceList } from '../../components/clinician/DoctorChoiceList'
-import { Avatar } from '../../components/ui/Avatar'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
@@ -34,8 +33,7 @@ import {
 import { bookAndPayAppointment, startPaidWalkIn } from '../../domain/actions'
 import { billNumberFor, formatRupees, sumItems } from '../../utils/billing'
 import { dayWithDate, relativeDayLabel } from '../../utils/dates'
-import { doctorStatusLabel, modesFor, takesWalkIns } from '../../utils/appointment'
-import { initialsOf } from '../../utils/format'
+import { modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
 import type { FlowProps } from '../registry'
 import type { Patient } from '../../types/patient'
@@ -43,7 +41,6 @@ import type { ConsultMode } from '../../types/appointment'
 import type { AppState } from '../../types/store'
 import type { Payment, PaymentMethod } from '../../types/payment'
 
-type Kind = 'schedule' | 'consult'
 type StepKey = 'patient' | 'department' | 'doctor' | 'time'
 
 const DEPARTMENT_ICON: Record<string, ElementType> = {
@@ -57,32 +54,30 @@ const DEPARTMENT_ICON: Record<string, ElementType> = {
 interface Done {
   doctorName: string
   room: string | null
-  /** Schedule: the booking, its day, time and mode. */
+  /** A booking: its reference, day, time and mode. */
   appointmentId?: string
   date?: string
   slot?: string
   mode?: ConsultMode
-  /** Start Consultation: the queue token. */
+  /** A walk-in: the queue token. */
   token?: string
   waitMinutes?: number
   method: PaymentMethod
   bill: Payment
 }
 
-/** Schedule: department → the department's doctors → that doctor's times →
- *  confirm and pay, one step at a time in a sheet over the page it was
- *  opened from. Nothing is chosen for the desk. */
+/**
+ * Schedule — the one way to put a patient in front of a doctor: department
+ * → the department's doctors → when: now, as a walk-in with a queue token,
+ * or a time to book (in person or teleconsult) → confirm and pay. One step
+ * at a time, in a sheet over the page it was opened from; nothing is chosen
+ * for the desk. (`?flow=consult`, the old Start Consultation, opens it too.)
+ */
 export function ScheduleFlow(props: FlowProps) {
-  return <AppointmentFlow {...props} kind="schedule" />
+  return <AppointmentFlow {...props} />
 }
 
-/** Start Consultation: a walk-in for today — department → a doctor seeing
- *  patients now → confirm and pay → queue token. */
-export function ConsultFlow(props: FlowProps) {
-  return <AppointmentFlow {...props} kind="consult" />
-}
-
-/** The doctor's first day with a free slot — where the time step opens. */
+/** The doctor's first day with a free slot — where the booking times open. */
 function firstOpenDay(state: AppState, providerId: string, now: number): string | null {
   return getDoctorDateStrip(state, providerId, now).find((day) => day.state === 'open')?.date ?? null
 }
@@ -98,37 +93,36 @@ interface Start {
 /** What the page that opened the flow already settled. A doctor page names
  *  the doctor, so the flow opens on their times; a slot is kept only when
  *  the page named one and it is still free. */
-function startFrom(params: FlowProps['params'], kind: Kind, now: number): Start {
+function startFrom(params: FlowProps['params'], now: number): Start {
   const state = getState()
   const doctor = params.doctor ? getProviderById(state, params.doctor) : null
-  const usable = doctor && doctor.status === 'Active' && (kind === 'schedule' || takesWalkIns(doctor)) ? doctor : null
+  const usable = doctor && doctor.status === 'Active' ? doctor : null
   const department = usable?.department ?? params.dept ?? null
   if (!usable) return { department, providerId: null, date: null, slot: null, mode: 'In person' }
-  const mode = modesFor(usable)[0]
-  if (kind === 'consult') return { department, providerId: usable.providerId, date: null, slot: null, mode }
   const named = Boolean(params.date && params.slot && getAvailableSlots(state, usable.providerId, now, params.date).includes(params.slot))
   return {
     department,
     providerId: usable.providerId,
     date: named ? params.date! : firstOpenDay(state, usable.providerId, now),
     slot: named ? params.slot! : null,
-    mode,
+    mode: modesFor(usable)[0],
   }
 }
 
-function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) {
+function AppointmentFlow({ params, onClose }: FlowProps) {
   const navigate = useNavigate()
   const now = useNow(15000)
   const today = useStoreValue(getToday)
-  const isSchedule = kind === 'schedule'
 
   const [patientId, setPatientId] = useState(params.uhid ?? '')
   const patient = useStoreValue(getPatientById, patientId)
-  const [start] = useState(() => startFrom(params, kind, now))
+  const [start] = useState(() => startFrom(params, now))
   const [department, setDepartment] = useState(start.department)
   const [providerId, setProviderId] = useState(start.providerId)
   const [date, setDate] = useState(start.date)
   const [slot, setSlot] = useState(start.slot)
+  // Now, as a walk-in, instead of a booked time.
+  const [walkIn, setWalkIn] = useState(false)
   const [consultMode, setConsultMode] = useState<ConsultMode>(start.mode)
   const [reason, setReason] = useState('')
   const [editing, setEditing] = useState<StepKey | null>(null)
@@ -139,20 +133,21 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
   const providers = useStoreValue(getProviders)
   const provider = useStoreValue(getProviderById, providerId ?? '')
   const suggestions = useStoreValue(getDoctorSuggestions, department ?? '', now)
-  const walkInDoctors = useStoreValue(getDoctorsAvailableNow, department ?? '', now)
+  const nowDoctors = useStoreValue(getDoctorsAvailableNow, department ?? '', now)
   const dateStrip = useStoreValue(getDoctorDateStrip, providerId ?? '', now)
   const slotEntries = useStoreValue(getSlotBoard, providerId ?? '__none__', now, date ?? today)
   const billItems = useStoreValue(getConsultationBillItems, patientId, providerId ?? '')
   const total = sumItems(billItems)
   const modes = provider ? modesFor(provider) : (['In person'] as ConsultMode[])
-  const walkIn = walkInDoctors.find((d) => d.provider.providerId === providerId)
+  const walkIns = new Map(nowDoctors.map((d) => [d.provider.providerId, { waiting: d.waiting, waitMinutes: d.waitMinutes }]))
+  const nowOffer = providerId ? walkIns.get(providerId) : undefined
 
   // Which steps are finished; a finished step reopens with a tap.
   const patientDone = Boolean(patient) && editing !== 'patient'
   const departmentDone = patientDone && Boolean(department) && editing !== 'department'
   const doctorDone = departmentDone && Boolean(provider) && editing !== 'doctor'
-  const timeDone = !isSchedule || (doctorDone && Boolean(date && slot) && editing !== 'time')
-  const ready = doctorDone && timeDone && billItems.length > 0
+  const timeDone = doctorDone && (walkIn ? Boolean(nowOffer) : Boolean(date && slot)) && editing !== 'time'
+  const ready = timeDone && billItems.length > 0
 
   function statusOf(finished: boolean, reachable: boolean): StepStatus {
     return finished ? 'done' : reachable ? 'active' : 'locked'
@@ -176,29 +171,40 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
       setProviderId(null)
       setDate(null)
       setSlot(null)
+      setWalkIn(false)
     }
     setEditing(null)
   }
 
-  // A doctor opens their times on their first open day, with no time chosen.
+  // A doctor opens their times on their first open day, with nothing chosen.
   function chooseDoctor(next: string) {
     setError(null)
     if (next !== providerId) {
       const chosen = getProviderById(getState(), next)
       setProviderId(next)
-      setDate(isSchedule ? firstOpenDay(getState(), next, now) : null)
+      setDate(firstOpenDay(getState(), next, now))
       setSlot(null)
+      setWalkIn(false)
       setConsultMode(chosen ? modesFor(chosen)[0] : 'In person')
     }
     setEditing(null)
   }
 
+  function chooseNow() {
+    setError(null)
+    setWalkIn(true)
+    setSlot(null)
+    setEditing(null)
+  }
+
   function chooseDate(next: string) {
+    setWalkIn(false)
     setDate(next)
     setSlot(null)
   }
 
   function chooseSlot(next: string) {
+    setWalkIn(false)
     setSlot(next)
     setEditing(null)
   }
@@ -209,44 +215,44 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
     if (!patient || !provider) return
     setError(null)
     try {
-      if (isSchedule) {
-        if (!date || !slot) return
-        const result = bookAndPayAppointment({
-          patientId: patient.patientId,
-          providerId: provider.providerId,
-          date,
-          slot,
-          mode: consultMode,
-          reason: reason.trim() || undefined,
-          method,
-        })
-        setDone({
-          doctorName: provider.name,
-          room: provider.room,
-          appointmentId: result.appointment.appointmentId,
-          date,
-          slot,
-          mode: consultMode,
-          method,
-          bill: result.bill,
-        })
-      } else {
+      if (walkIn) {
         const result = startPaidWalkIn({ patientId: patient.patientId, providerId: provider.providerId, method })
-        setDone({ doctorName: provider.name, room: provider.room, token: result.tokenNumber, waitMinutes: walkIn?.waitMinutes, method, bill: result.bill })
+        setDone({ doctorName: provider.name, room: provider.room, token: result.tokenNumber, waitMinutes: nowOffer?.waitMinutes, method, bill: result.bill })
+        return
       }
+      if (!date || !slot) return
+      const result = bookAndPayAppointment({
+        patientId: patient.patientId,
+        providerId: provider.providerId,
+        date,
+        slot,
+        mode: consultMode,
+        reason: reason.trim() || undefined,
+        method,
+      })
+      setDone({
+        doctorName: provider.name,
+        room: provider.room,
+        appointmentId: result.appointment.appointmentId,
+        date,
+        slot,
+        mode: consultMode,
+        method,
+        bill: result.bill,
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
-      // A slot taken a moment ago: reopen the times so another can be picked.
-      if (isSchedule && /slot/i.test(message)) {
+      // A slot taken a moment ago, or a doctor no longer seeing patients:
+      // reopen the times so another can be picked.
+      if (/slot|not seeing patients/i.test(message)) {
         setSlot(null)
+        setWalkIn(false)
         setEditing('time')
       }
     }
   }
 
-  const title = isSchedule ? 'Schedule' : 'Start Consultation'
-  const icon = isSchedule ? CalendarPlus : Stethoscope
   const subtitle = patient
     ? `${patient.name} · ${patient.uhid}${patient.age ? ` · ${patient.age} ${patient.sex.charAt(0)}` : ''}`
     : 'Choose the patient'
@@ -255,10 +261,10 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
   if (done) {
     const teleconsult = done.mode === 'Teleconsult'
     return (
-      <FlowSheet title={title} subtitle={subtitle} icon={icon} onClose={onClose}>
+      <FlowSheet title="Schedule" subtitle={subtitle} icon={CalendarPlus} onClose={onClose}>
         <AckCard
-          title={isSchedule ? 'Appointment Confirmed' : 'Token Issued'}
-          icon={isSchedule ? CalendarCheck2 : Ticket}
+          title={done.token ? 'Token Issued' : 'Appointment Confirmed'}
+          icon={done.token ? Ticket : CalendarCheck2}
           onDone={onClose}
           action={
             <Button
@@ -277,14 +283,14 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
             {done.date && done.slot ? `${dayWithDate(done.date, today)} · ${done.slot}` : 'Now'}
             {done.waitMinutes !== undefined ? ` · ~${done.waitMinutes} min wait` : ''}
           </p>
-          {isSchedule ? (
+          {done.token ? (
+            done.room ? <p>{done.room}</p> : null
+          ) : (
             <p className="inline-flex items-center gap-1.5">
               {teleconsult ? <Video className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" /> : <Building2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />}
               {teleconsult ? 'Teleconsult — the patient joins by video' : `In person${done.room ? ` · ${done.room}` : ''}`}
             </p>
-          ) : done.room ? (
-            <p>{done.room}</p>
-          ) : null}
+          )}
           <p>
             {done.appointmentId ? `${done.appointmentId.toUpperCase()} · ` : ''}
             {formatRupees(done.bill.paidAmount)} paid · {done.method} · {billNumberFor(done.bill)}
@@ -295,12 +301,15 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
   }
 
   // ------------------------------------------------------------------- steps
-  const departmentDoctors = (dep: string) =>
-    providers.filter((p) => p.department === dep && p.status === 'Active' && (isSchedule || takesWalkIns(p))).length
-  const when = date && slot ? `${relativeDayLabel(date, today)} ${slot}` : null
+  const departmentDoctors = (dep: string) => providers.filter((p) => p.department === dep && p.status === 'Active').length
+  const timeSummary = walkIn
+    ? `Now — walk-in${nowOffer ? ` · ~${nowOffer.waitMinutes} min` : ''}`
+    : date && slot
+      ? `${relativeDayLabel(date, today)} ${slot}${consultMode === 'Teleconsult' ? ' · Teleconsult' : ''}`
+      : undefined
 
   return (
-    <FlowSheet title={title} subtitle={subtitle} icon={icon} onClose={onClose}>
+    <FlowSheet title="Schedule" subtitle={subtitle} icon={CalendarPlus} onClose={onClose}>
       <div className="flex flex-col gap-3">
         {/* 1 · Patient */}
         <StepSection
@@ -357,98 +366,77 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
           summary={provider ? `${provider.name} · ${formatRupees(provider.consultationFee)}` : undefined}
           onEdit={() => edit('doctor')}
         >
-          {isSchedule ? (
-            <DoctorChoiceList suggestions={suggestions} selectedId={providerId} onChoose={chooseDoctor} today={today} />
-          ) : walkInDoctors.length === 0 ? (
-            <Alert tone="warning">No doctor in this department is seeing patients in person right now — schedule instead.</Alert>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {walkInDoctors.map((d) => (
-                <li key={d.provider.providerId}>
-                  <button
-                    type="button"
-                    aria-pressed={d.provider.providerId === providerId}
-                    onClick={() => chooseDoctor(d.provider.providerId)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors',
-                      d.provider.providerId === providerId ? 'border-primary-600 bg-primary-50' : 'border-border hover:bg-surface-2',
-                    )}
-                  >
-                    <Avatar initials={initialsOf(d.provider.name)} size="sm" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-ink">{d.provider.name}</span>
-                      <span className="block truncate text-xs text-ink-muted">
-                        {d.provider.specialty} · {formatRupees(d.provider.consultationFee)}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <Badge status={d.status}>{doctorStatusLabel(d.status)}</Badge>
-                      <span className="mt-1 block text-xs tabular-nums text-ink-muted">
-                        {d.waiting} waiting · ~{d.waitMinutes} min
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <DoctorChoiceList suggestions={suggestions} selectedId={providerId} onChoose={chooseDoctor} today={today} walkIns={walkIns} />
         </StepSection>
 
-        {/* 4 · Time — booking only */}
-        {isSchedule ? (
-          <StepSection
-            step={4}
-            title="Time"
-            status={statusOf(timeDone, doctorDone)}
-            summary={when ? `${when}${consultMode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined}
-            onEdit={() => edit('time')}
-          >
-            <div className="flex flex-col gap-3">
-              {modes.length > 1 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-ink-muted">How</span>
-                  <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="How the patient is seen">
-                    {modes.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        aria-pressed={option === consultMode}
-                        onClick={() => setConsultMode(option)}
-                        className={cn(
-                          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                          option === consultMode ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
-                        )}
-                      >
-                        {option === 'Teleconsult' ? (
-                          <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                        ) : (
-                          <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                        )}
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : modes[0] === 'Teleconsult' ? (
-                <p className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
-                  <Video className="h-3.5 w-3.5 text-purple" strokeWidth={1.75} aria-hidden="true" />
-                  Teleconsult only — the patient joins by video.
-                </p>
-              ) : null}
-              {date ? (
-                <>
-                  <DateStrip days={dateStrip} selected={date} onSelect={chooseDate} today={today} />
-                  <SlotBoard entries={slotEntries} selectedSlot={slot} onSelect={chooseSlot} emptyMessage="No session on this day." />
-                </>
-              ) : (
-                <p className="text-sm text-ink-muted">No open time with this doctor in the next two weeks — choose another doctor.</p>
-              )}
-            </div>
-          </StepSection>
-        ) : null}
+        {/* 4 · When — now as a walk-in, or a time to book */}
+        <StepSection step={4} title="When" status={statusOf(timeDone, doctorDone)} summary={timeSummary} onEdit={() => edit('time')}>
+          <div className="flex flex-col gap-3">
+            {nowOffer ? (
+              <button
+                type="button"
+                aria-pressed={walkIn}
+                onClick={chooseNow}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-xl border-2 px-3 py-3 text-left transition-colors',
+                  walkIn ? 'border-primary-600 bg-primary-50' : 'border-teal-border bg-teal-bg hover:border-primary-600',
+                )}
+              >
+                <Ticket className="h-5 w-5 shrink-0 text-teal" strokeWidth={1.75} aria-hidden="true" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-ink">Now — walk-in token</span>
+                  <span className="block text-xs text-ink-muted">
+                    {provider?.name} is seeing patients · {nowOffer.waiting} waiting · ~{nowOffer.waitMinutes} min
+                  </span>
+                </span>
+              </button>
+            ) : null}
 
-        {/* Confirm and pay — the booking is saved when the payment goes through */}
-        <StepSection step={isSchedule ? 5 : 4} title="Confirm & pay" status={ready ? 'active' : 'locked'}>
+            {nowOffer ? <p className="text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Or book a time</p> : null}
+            {modes.length > 1 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-ink-muted">How</span>
+                <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="How the patient is seen">
+                  {modes.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={!walkIn && option === consultMode}
+                      onClick={() => setConsultMode(option)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                        !walkIn && option === consultMode ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
+                      )}
+                    >
+                      {option === 'Teleconsult' ? (
+                        <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                      ) : (
+                        <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                      )}
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : modes[0] === 'Teleconsult' ? (
+              <p className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
+                <Video className="h-3.5 w-3.5 text-purple" strokeWidth={1.75} aria-hidden="true" />
+                Teleconsult only — the patient joins by video.
+              </p>
+            ) : null}
+            {date ? (
+              <>
+                <DateStrip days={dateStrip} selected={walkIn ? null : date} onSelect={chooseDate} today={today} />
+                <SlotBoard entries={slotEntries} selectedSlot={walkIn ? null : slot} onSelect={chooseSlot} emptyMessage="No session on this day." />
+              </>
+            ) : (
+              <p className="text-sm text-ink-muted">No open time to book with this doctor in the next two weeks.</p>
+            )}
+          </div>
+        </StepSection>
+
+        {/* 5 · Confirm and pay — saved when the payment goes through */}
+        <StepSection step={5} title="Confirm & pay" status={ready ? 'active' : 'locked'}>
           <div className="flex flex-col gap-4">
             {error ? <Alert tone="critical">{error}</Alert> : null}
             {patient && provider ? (
@@ -463,19 +451,19 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
                 </dd>
                 <dt className="text-ink-muted">When</dt>
                 <dd className="font-medium text-ink">
-                  {isSchedule
-                    ? date && slot
+                  {walkIn
+                    ? `Now — walk-in${nowOffer ? ` · ~${nowOffer.waitMinutes} min wait, ${nowOffer.waiting} ahead` : ''}`
+                    : date && slot
                       ? `${dayWithDate(date, today)} · ${slot}`
-                      : '—'
-                    : `Now${walkIn ? ` · ~${walkIn.waitMinutes} min wait, ${walkIn.waiting} ahead` : ''}`}
+                      : '—'}
                 </dd>
                 <dt className="text-ink-muted">Where</dt>
                 <dd className="font-medium text-ink">
-                  {isSchedule && consultMode === 'Teleconsult' ? 'Teleconsult — by video' : (provider.room ?? 'In person')}
+                  {!walkIn && consultMode === 'Teleconsult' ? 'Teleconsult — by video' : (provider.room ?? 'In person')}
                 </dd>
               </dl>
             ) : null}
-            {isSchedule ? (
+            {!walkIn ? (
               <input
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
@@ -494,7 +482,7 @@ function AppointmentFlow({ params, onClose, kind }: FlowProps & { kind: Kind }) 
               ))}
             </div>
             <PaymentPanel
-              key={`${providerId}|${date}|${slot}|${consultMode}|${total}`}
+              key={`${providerId}|${walkIn ? 'now' : `${date}|${slot}|${consultMode}`}|${total}`}
               amount={total}
               status={<Badge tone="warning">Pending</Badge>}
               onPay={pay}

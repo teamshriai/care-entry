@@ -292,7 +292,7 @@ export function bookAndPayAppointment({
   return { appointment: requireAppointment(paid.state, booked.value.appointmentId), bill: paid.value }
 }
 
-/** Start Consultation: a walk-in token for a doctor in session now, its bill
+/** A walk-in (Schedule → Now): a token for a doctor in session now, its bill
  *  and the payment, saved together — the token exists only once it is paid. */
 export function startPaidWalkIn({
   patientId,

@@ -556,7 +556,7 @@ export function createSeedState(): AppState {
   const visitEnd = (patientId: string): number | null =>
     encounters.filter((e) => e.patientId === patientId && e.closedAt).reduce<number | null>((latest, e) => Math.max(latest ?? 0, e.closedAt!), null)
 
-  /** Start Consultation: a walk-in's token, paid as it is issued. */
+  /** A walk-in's token (Schedule → Now), paid as it is issued. */
   function walkIn(patientId: string, providerId: string, arrivedAt: number, method: PaymentMethod) {
     const items = consultationItems(patientId, providerId)
     pushBill({ patientId, items, createdAt: arrivedAt, collections: [{ amount: sumItems(items), method, at: arrivedAt + MINUTE }] })

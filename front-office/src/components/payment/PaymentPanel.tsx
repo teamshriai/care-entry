@@ -18,7 +18,7 @@ function errorMessage(err: unknown): string {
 }
 
 /**
- * The one place money is taken — billing, scheduling, Start Consultation,
+ * The one place money is taken — billing, scheduling (bookings and walk-ins),
  * admission and discharge all use this panel. The hospital is cashless and
  * has no pay-later: the patient pays by UPI or card (an insured inpatient's
  * bill can be settled by the insurer), and staff confirm what the phone or
