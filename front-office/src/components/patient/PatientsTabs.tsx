@@ -10,7 +10,7 @@ import { cn } from '../../utils/cn'
 
 /**
  * The three views of the one Patients place: everyone registered, today's
- * outpatients (bookings, walk-ins, the queue) and the inpatients (beds,
+ * outpatients (bookings and the queue) and the inpatients (beds,
  * admissions, discharges). Each tab carries its live count.
  */
 export function PatientsTabs() {
@@ -21,7 +21,7 @@ export function PatientsTabs() {
 
   const tabs: { to: string; label: string; icon: LucideIcon; count: number; end?: boolean; title: string }[] = [
     { to: '/patients', label: 'All patients', icon: Users, count: all, end: true, title: 'Every registered patient' },
-    { to: '/patients/outpatients', label: 'Outpatients', icon: CalendarClock, count: outpatients, title: 'Bookings and walk-ins today' },
+    { to: '/patients/outpatients', label: 'Outpatients', icon: CalendarClock, count: outpatients, title: 'Booked for today' },
     { to: '/patients/inpatients', label: 'Inpatients', icon: BedDouble, count: inpatients, title: 'Admitted now' },
   ]
 

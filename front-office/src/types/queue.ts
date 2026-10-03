@@ -44,10 +44,3 @@ export interface CheckInResult {
   tokenId: string
   tokenNumber: string
 }
-
-/** actions.openWalkInVisit's input shape. */
-export interface OpenWalkInVisitInput {
-  patientId: string
-  providerId: string
-  department: string
-}

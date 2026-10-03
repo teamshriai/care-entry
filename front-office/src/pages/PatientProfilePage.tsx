@@ -21,7 +21,7 @@ import { checkInAppointment } from '../domain/actions'
 
 /**
  * The patient's hub. Everything the front desk does for a patient starts
- * here — Schedule (a booking or a walk-in now), Admit or Discharge, Billing — and runs
+ * here — Schedule, Admit or Discharge, Billing — and runs
  * over this page, which is back the moment the task is done. Deliberately
  * non-clinical: identity, contact, money, where they are admitted, and what
  * has happened at the desk.

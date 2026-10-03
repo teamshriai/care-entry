@@ -24,7 +24,6 @@ const PAYMENT_TONE: Record<PatientHeaderSummary['payment']['status'], Tone> = {
 }
 
 export interface PatientActions {
-  /** A booking, or a walk-in now — both start in Schedule. */
   schedule: () => void
   admit: () => void
   discharge: () => void

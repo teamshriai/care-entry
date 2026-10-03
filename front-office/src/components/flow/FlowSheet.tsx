@@ -8,7 +8,7 @@ import { useFocusTrap } from '../../hooks/useFocusTrap'
 import type { Tone } from '../../utils/tone'
 
 /**
- * The surface every flow (schedule, walk-in, billing, admit, discharge) runs
+ * The surface every flow (schedule, reschedule, billing, admit, discharge) runs
  * in: a full-height panel over the right of the current page, so the page
  * the desk started from stays where it is underneath and is back the moment
  * the flow closes. Escape and the close button both close it; clicking the

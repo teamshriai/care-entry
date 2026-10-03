@@ -419,10 +419,7 @@ export function createSeedState(): AppState {
     }
     return out
   }
-  const inSession = (providerId: string) => {
-    const slots = slotsOf(providerId)
-    return slots.length > 0 && slotToTimestamp(today, slots[0]) <= now && now <= slotToTimestamp(today, slots[slots.length - 1])
-  }
+
 
   // No slot is ever booked twice, whatever the hour the app opens at.
   const taken = new Set<string>()
@@ -556,12 +553,6 @@ export function createSeedState(): AppState {
   const visitEnd = (patientId: string): number | null =>
     encounters.filter((e) => e.patientId === patientId && e.closedAt).reduce<number | null>((latest, e) => Math.max(latest ?? 0, e.closedAt!), null)
 
-  /** A walk-in's token (Schedule → Now), paid as it is issued. */
-  function walkIn(patientId: string, providerId: string, arrivedAt: number, method: PaymentMethod) {
-    const items = consultationItems(patientId, providerId)
-    pushBill({ patientId, items, createdAt: arrivedAt, collections: [{ amount: sumItems(items), method, at: arrivedAt + MINUTE }] })
-    encounters.push({ patientId, providerId, appointment: null, arrival: arrivedAt, tokenStatus: 'Waiting', closedAt: null })
-  }
 
   // History — earlier encounters, so the timeline has a past.
   book({ patientId: 'SHRI-0091133', providerId: 'dr-arun-kumar', day: -21, slotIndex: 4, status: 'Completed', method: 'Card' })
@@ -599,12 +590,13 @@ export function createSeedState(): AppState {
   book({ patientId: 'SHRI-0120338', providerId: 'dr-rahul-menon', offset: -1, status: 'Checked-in', method: 'Card', arrivedAt: minutesAgo(16) })
   book({ patientId: 'SHRI-0129903', providerId: 'dr-rahul-menon', offset: 3, status: 'Confirmed', method: 'UPI' })
 
-  // Dr. Priya Nair — a no-show, one seen, a walk-in waiting, and a review
-  // still to come by teleconsult.
+  // Dr. Priya Nair — a no-show, one seen, a new patient booked for her next
+  // free slot, and a review still to come by teleconsult.
   book({ patientId: 'SHRI-0078812', providerId: 'dr-priya-nair', offset: -6, status: 'No-show', method: 'Card', bookedAt: daysAgo(1) })
   book({ patientId: 'SHRI-0124106', providerId: 'dr-priya-nair', offset: -3, status: 'Completed', method: 'UPI', fallbackDay: -1, slotIndex: 5 })
   book({ patientId: 'SHRI-0114479', providerId: 'dr-priya-nair', offset: 4, status: 'Confirmed', method: 'Card', bookedAt: daysAgo(1) + 2 * HOUR, reason: 'Review with reports', mode: 'Teleconsult' })
-  if (inSession('dr-priya-nair')) walkIn('SHRI-0129904', 'dr-priya-nair', minutesAgo(15), 'UPI')
+  // Registered this morning and booked straight into her next free slot.
+  book({ patientId: 'SHRI-0129904', providerId: 'dr-priya-nair', offset: 0, status: 'Confirmed', method: 'UPI', reason: 'First consultation' })
 
   // Dr. Ananya Rao — on a break, with one patient waiting and one after it.
   book({ patientId: 'SHRI-0117760', providerId: 'dr-ananya-rao', offset: -1, status: 'Checked-in', method: 'UPI', arrivedAt: minutesAgo(26) })

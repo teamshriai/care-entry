@@ -44,7 +44,7 @@ Both apps open in the **light** theme by default; the dark theme stays available
   status icons. It steps aside while a task panel is open and on Guest Pass, MLC and Enquiry, which
   have their own patient field. A patient who isn't found can be registered from **Register Patient**,
   with what was typed already filled in.
-- **Registration takes only real values.** A name in letters; age 0–130, with 100 and over shown
+- **Registration takes only real values.** A name in letters (the box takes no digits or symbols); age 0–130, with 100 and over shown
   in red and confirmed again; sex; an Indian mobile (10 digits starting 6–9); an optional ABHA,
   checked for format and not already linked to someone else.
 - **The profile is the hub.** `/patients/:uhid` shows who the patient is, their ABHA, what they owe,
@@ -58,13 +58,13 @@ Both apps open in the **light** theme by default; the dark theme stays available
   it. Each flow ends with a short acknowledgement and closes itself. Old addresses
   (`/outpatients`, `/admissions`, `/appointments`, `/op-queue`, `/admissions/discharge`, `/payments/pending`, …)
   redirect to the matching place or flow; `?flow=consult` (the old Start Consultation) opens Schedule.
-- **Schedule, one step at a time — the one way to see a doctor:** department → that department's
-  doctors → when: **now**, as a walk-in with a queue token, if the doctor is seeing patients, or a
-  time to book (in person or teleconsult, where the doctor offers both) → confirm and pay → "Token
-  Issued" or "Appointment Confirmed". Nothing is chosen for the desk.
+- **Schedule books appointments, one step at a time:** department → that department's doctors →
+  a time to book (in person or teleconsult, where the doctor offers both) → confirm and pay →
+  "Appointment Confirmed". Nothing is chosen for the desk, and there are no walk-in tokens — every
+  visit is a booking.
 - **Patients is one place with three tabs** — All patients (`/patients`), Outpatients
   (`/patients/outpatients`) and Inpatients (`/patients/inpatients`) — and each patient's profile.
-- **Outpatients** is one view for bookings, walk-ins and the queue: to check in → waiting → with the
+- **Outpatients** is one view for bookings and the queue: to check in → waiting → with the
   doctor → done, plus bookings ahead. Each figure is also its filter; Teleconsult narrows them all.
 - **Reschedule, cancel, no-show.** A cancellation asks who can't make it. If the doctor is
   unavailable the patient is refunded in full; if the patient cancels or doesn't come (no-show,
@@ -79,9 +79,6 @@ Both apps open in the **light** theme by default; the dark theme stays available
 - **The dashboard** has five figures, each opening its place — outpatients today, waiting,
   inpatients, due, registered today — then the doctors now (Schedule beside each), then today's
   outpatients and what needs attention.
-- **Patient self-registration** can be shared from the Register page: QR code,
-  Open form, Copy link, or WhatsApp / SMS to the patient's mobile. The form is a preview for now —
-  answers stay on the patient's phone — so the desk registers the patient on arrival.
 - **Places in the sidebar:** Dashboard · Patients · Billing · Doctors · Services (Guest Pass,
   Enquiry & Estimate, MLC). The SHRI Health mark leads to
   https://shri-ai.org/dev/. The name card at the top right switches between the desk's staff.

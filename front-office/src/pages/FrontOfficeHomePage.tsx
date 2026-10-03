@@ -139,7 +139,7 @@ export function FrontOfficeHomePage() {
             label="Outpatients today"
             hint={`${outpatients.counts['check-in']} to check in`}
             to="/patients/outpatients"
-            title="Show everyone booked or walked in today"
+            title="Show everyone booked for today"
           />
           <StatCard
             hue="orange"

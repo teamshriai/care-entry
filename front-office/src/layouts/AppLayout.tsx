@@ -45,7 +45,7 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* Schedule / walk-in / billing / admit / discharge open here, over the page. */}
+      {/* Schedule / reschedule / billing / admit / discharge open here, over the page. */}
       <FlowHost />
     </div>
   )

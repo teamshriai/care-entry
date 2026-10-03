@@ -10,7 +10,6 @@ import { MobileInput } from '../components/ui/MobileInput'
 import { Avatar } from '../components/ui/Avatar'
 import { AckCard } from '../components/flow/AckCard'
 import { AgeConfirm, FieldError } from '../components/patient/AgeConfirm'
-import { SelfRegistrationShare } from '../components/frontoffice/SelfRegistrationShare'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
@@ -18,7 +17,7 @@ import { registerPatient } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { cn } from '../utils/cn'
 import { nationalMobile } from '../utils/phone'
-import { abhaError, ageError, ageNeedsConfirmation, mobileError, nameError, nextAgeInput, sexError } from '../utils/validation'
+import { abhaError, ageError, ageNeedsConfirmation, mobileError, nameError, nextAgeInput, nextNameInput, sexError } from '../utils/validation'
 import type { Patient, Sex } from '../types/patient'
 
 const SEXES: Sex[] = ['Male', 'Female', 'Other']
@@ -31,7 +30,7 @@ interface RegisterPatientLocationState {
 function prefillFrom(search: string, state: RegisterPatientLocationState | null): { name: string; mobile: string } {
   const query = new URLSearchParams(search)
   return {
-    name: query.get('name')?.trim() ?? state?.prefillName ?? '',
+    name: nextNameInput(query.get('name')?.trim() ?? state?.prefillName ?? '').trim(),
     mobile: nationalMobile(query.get('mobile')).slice(0, 10),
   }
 }
@@ -159,11 +158,11 @@ export function RegisterPatientPage() {
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
               {error ? <Alert tone="critical">{error}</Alert> : null}
 
-              <Field label="Full name" required htmlFor="reg-name" error={shown('name')}>
+              <Field label="Full name" required htmlFor="reg-name" hint="Letters only — no numbers" error={shown('name')}>
                 <input
                   id="reg-name"
                   value={form.name}
-                  onChange={(event) => update('name', event.target.value)}
+                  onChange={(event) => update('name', nextNameInput(event.target.value))}
                   onBlur={touch('name')}
                   placeholder="As written on the patient's ID"
                   maxLength={60}
@@ -310,7 +309,6 @@ export function RegisterPatientPage() {
               </CardBody>
             </Card>
           )}
-          <SelfRegistrationShare subtitle="Patient would rather fill it in? Share the form to their phone" />
         </div>
       </div>
     </div>

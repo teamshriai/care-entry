@@ -44,7 +44,7 @@ function readFilter(value: string | null): OutpatientFilter {
 }
 
 const EMPTY: Record<OutpatientFilter, { title: string; description: string }> = {
-  today: { title: 'No outpatients today', description: 'Today’s bookings and walk-ins appear here.' },
+  today: { title: 'No outpatients today', description: 'Today’s bookings appear here.' },
   'check-in': { title: 'Everyone booked has arrived', description: 'Paid bookings for today appear here until the patient checks in.' },
   waiting: { title: 'Nobody is waiting', description: 'Checked-in patients appear here until the doctor calls them.' },
   'with-doctor': { title: 'Nobody is with a doctor', description: 'Called patients and those in the room appear here.' },
@@ -54,7 +54,7 @@ const EMPTY: Record<OutpatientFilter, { title: string; description: string }> = 
 
 /**
  * Patients › Outpatients — from booking to the doctor's room: today's bookings
- * and walk-ins at their stage, and the bookings ahead. Each figure is also
+ * at their stage, and the bookings ahead. Each figure is also
  * the filter for the list under it; Teleconsult narrows every figure.
  *
  * Call / In room / Complete are the doctor's room's steps — they live here
@@ -196,7 +196,7 @@ export function OutpatientsPage() {
   }
 
   const items: StatFilterItem<OutpatientFilter>[] = [
-    { key: 'today', label: 'Today', value: counts.today, context: 'Bookings and walk-ins', tone: 'info', icon: CalendarClock },
+    { key: 'today', label: 'Today', value: counts.today, context: 'Booked for today', tone: 'info', icon: CalendarClock },
     { key: 'check-in', label: 'To check in', value: counts['check-in'], context: 'Booked, not here yet', tone: 'warning', icon: LogIn },
     { key: 'waiting', label: 'Waiting', value: counts.waiting, context: 'Checked in', tone: 'purple', icon: UserCheck },
     { key: 'with-doctor', label: 'With doctor', value: counts['with-doctor'], context: 'Called or in the room', tone: 'teal', icon: DoorOpen },
@@ -208,12 +208,11 @@ export function OutpatientsPage() {
     <div>
       <PageHeader
         title="Patients"
-        subtitle={`Outpatients — bookings and walk-ins, from arrival to the doctor's room · updated ${formatClock(now)}`}
+        subtitle={`Outpatients — today's bookings, from arrival to the doctor's room · updated ${formatClock(now)}`}
         illustration={<AppointmentIllustration className="h-8 w-8" />}
         illustrationTone="info"
         tabs={<PatientsTabs />}
         actions={
-          // One way in: a booking, or a walk-in now, is chosen inside Schedule.
           <Button size="sm" onClick={() => openFlow('schedule')}>
             <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
             Schedule

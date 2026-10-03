@@ -17,7 +17,6 @@ import {
   getBillLock,
   getBillsForAppointment,
   getConsultationBillItems,
-  getDoctorStatus,
 } from './selectors'
 import { slotToTimestamp, todayKey } from './time'
 import { DomainError } from './errors'
@@ -36,12 +35,12 @@ import {
 } from '../utils/validation'
 import { formatRupees } from '../utils/billing'
 import { formatDateKey } from '../utils/dates'
-import { NO_SHOW_GRACE_MINUTES, appointmentStatusLabel, modesFor, takesWalkIns } from '../utils/appointment'
+import { NO_SHOW_GRACE_MINUTES, appointmentStatusLabel, modesFor } from '../utils/appointment'
 import type { AppState } from '../types/store'
 import type { Patient, RegisterPatientInput, PatientDemographicsInput, Sex } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
 import type { Appointment, BookAppointmentInput, ConsultMode, UnavailableParty } from '../types/appointment'
-import type { CheckInResult, OpenWalkInVisitInput } from '../types/queue'
+import type { CheckInResult } from '../types/queue'
 import type {
   AddEstimateItemInput,
   GuestPass,
@@ -290,28 +289,6 @@ export function bookAndPayAppointment({
   const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
   setState(paid.state)
   return { appointment: requireAppointment(paid.state, booked.value.appointmentId), bill: paid.value }
-}
-
-/** A walk-in (Schedule → Now): a token for a doctor in session now, its bill
- *  and the payment, saved together — the token exists only once it is paid. */
-export function startPaidWalkIn({
-  patientId,
-  providerId,
-  method,
-}: {
-  patientId: string
-  providerId: string
-  method: PaymentMethod
-}): CheckInResult & { bill: Payment } {
-  const state = getState()
-  const now = Date.now()
-  const provider = state.providers.find((p) => p.providerId === providerId)
-  if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
-  const visit = applyWalkIn(state, { patientId, providerId, department: provider.department }, now)
-  const billed = applyConsultationBill(visit.state, { patientId, providerId }, now)
-  const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
-  setState(paid.state)
-  return { ...visit.value, bill: paid.value }
 }
 
 // ------------------------------------------------- cancel, move, no-show
@@ -580,62 +557,6 @@ export function checkInAppointment(appointmentId: string): CheckInResult {
   })
 
   return { visitId, tokenId, tokenNumber }
-}
-
-/** Walk-in: the same visit and token as a check-in, with no booking. */
-function applyWalkIn(state: AppState, { patientId, providerId, department }: OpenWalkInVisitInput, now: number): Step<CheckInResult> {
-  const provider = state.providers.find((p) => p.providerId === providerId)
-  if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
-  if (!takesWalkIns(provider)) {
-    throw new DomainError('INVALID_TRANSITION', `${provider.name} sees patients by teleconsult only — book a teleconsult instead.`)
-  }
-  const status = getDoctorStatus(state, providerId, now, todayKey(new Date(now)))
-  if (!['Available', 'Running late', 'In consultation', 'On break', 'Fully booked'].includes(status)) {
-    throw new DomainError('INVALID_TRANSITION', `${provider.name} is not seeing patients right now (${status.toLowerCase()}).`)
-  }
-  if (
-    state.queueTokens.some(
-      (t) => t.patientId === patientId && t.providerId === providerId && ['Waiting', 'Called', 'In consultation'].includes(t.status),
-    )
-  ) {
-    throw new DomainError('DUPLICATE', `${patientName(state, patientId)} already has a token with ${provider.name}.`)
-  }
-  const visitId = `visit-${state.nextIds.visit}`
-  const tokenId = `tok-${state.nextIds.token}`
-  const { tokenNumber, tokenCounters } = issueTokenNumber(state, department)
-
-  const next = logged(
-    {
-      ...state,
-      visits: [
-        ...state.visits,
-        { visitId, patientId, appointmentId: null, providerId, status: 'Open' as const, arrivalTime: now, checkInTime: now, closedAt: null },
-      ],
-      queueTokens: [
-        ...state.queueTokens,
-        {
-          tokenId,
-          tokenNumber,
-          patientId,
-          visitId,
-          providerId,
-          status: 'Waiting' as const,
-          createdAt: now,
-          calledAt: null,
-          startedAt: null,
-          completedAt: null,
-          recalled: false,
-        },
-      ],
-      tokenCounters,
-      nextIds: { ...state.nextIds, visit: state.nextIds.visit + 1, token: state.nextIds.token + 1 },
-    },
-    [
-      { text: 'Walk-in token issued', meta: `${patientName(state, patientId)} · ${providerName(state, providerId)}` },
-      { text: 'Token generated', meta: `${tokenNumber} · ${patientName(state, patientId)}` },
-    ],
-  )
-  return { state: next, value: { visitId, tokenId, tokenNumber } }
 }
 
 // ------------------------------------------------------- queue progression

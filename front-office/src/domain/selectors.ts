@@ -15,7 +15,6 @@ import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
 import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
 import { abhaError, normalizeAbha } from '../utils/validation'
-import { takesWalkIns } from '../utils/appointment'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -248,9 +247,6 @@ export function getDoctorRow(state: AppState, providerId: string, now: number = 
 
 // --------------------------------------------------------------- scheduling
 
-/** Statuses in which a doctor is in session today and can take a walk-in. */
-const IN_SESSION: DoctorStatus[] = ['Available', 'Running late', 'In consultation', 'On break', 'Fully booked']
-
 const SUGGESTION_HORIZON_DAYS = 14
 
 /** The date `days` after a YYYY-MM-DD key, as a key. */
@@ -327,36 +323,6 @@ export function getDoctorDateStrip(state: AppState, providerId: string, now: num
     }
   }
   return days
-}
-
-export interface WalkInDoctor {
-  provider: Provider
-  status: DoctorStatus
-  /** Patients already waiting for this doctor. */
-  waiting: number
-  /** Rough wait for a new token, from the doctor's own pace today. */
-  waitMinutes: number
-}
-
-/** Doctors in session right now in a department, shortest wait first —
- *  who a walk-in (Schedule → Now) can be sent to. */
-export function getDoctorsAvailableNow(state: AppState, department: string, now: number): WalkInDoctor[] {
-  return state.providers
-    .filter((p) => p.department === department && p.status === 'Active')
-    .map((provider) => {
-      const status = getDoctorStatus(state, provider.providerId, now, state.today)
-      const mine = state.queueTokens.filter((t) => t.providerId === provider.providerId)
-      const waiting = mine.filter((t) => t.status === 'Waiting').length
-      const busy = mine.some((t) => t.status === 'Called' || t.status === 'In consultation')
-      return {
-        provider,
-        status,
-        waiting,
-        waitMinutes: (waiting + (busy ? 1 : 0)) * getAverageConsultationMinutes(state, provider.providerId),
-      }
-    })
-    .filter((row) => IN_SESSION.includes(row.status) && takesWalkIns(row.provider))
-    .sort((a, b) => a.waitMinutes - b.waitMinutes)
 }
 
 /** Whether a patient still owes the one-time registration fee — true until

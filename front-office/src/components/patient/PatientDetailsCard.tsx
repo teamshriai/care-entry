@@ -9,7 +9,7 @@ import { useStoreValue } from '../../hooks/useStore'
 import { findAbhaHolder, getConnectivity } from '../../domain/selectors'
 import { linkAbha, updatePatientDemographics } from '../../domain/actions'
 import { toEditableMobile } from '../../utils/phone'
-import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mobileError, nameError, nextAgeInput } from '../../utils/validation'
+import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mobileError, nameError, nextAgeInput, nextNameInput } from '../../utils/validation'
 import { cn } from '../../utils/cn'
 import { AgeConfirm, FieldError } from './AgeConfirm'
 import { formatDateKey } from '../../utils/dates'
@@ -125,7 +125,7 @@ export function PatientDetailsCard({ patient }: { patient: Patient }) {
         {draft && draftErrors ? (
           <form onSubmit={save} noValidate className="flex flex-col gap-3">
             <div>
-              <input value={draft.name} onChange={(e) => edit('name', e.target.value)} maxLength={60} className={cn(inputClass, draftErrors.name && errorClass)} placeholder="Full name" aria-label="Full name" aria-invalid={Boolean(draftErrors.name)} />
+              <input value={draft.name} onChange={(e) => edit('name', nextNameInput(e.target.value))} maxLength={60} className={cn(inputClass, draftErrors.name && errorClass)} placeholder="Full name" aria-label="Full name" aria-invalid={Boolean(draftErrors.name)} />
               <FieldError message={draftErrors.name} />
             </div>
             <div className="grid grid-cols-2 gap-3">

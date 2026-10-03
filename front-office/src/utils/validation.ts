@@ -37,6 +37,13 @@ export function ageError(value: string | number | null | undefined): string | nu
   return null
 }
 
+/** What a name box keeps as it is typed or pasted in: letters in any
+ *  script, spaces, dots, apostrophes and hyphens — never digits or other
+ *  symbols — up to 60 characters. */
+export function nextNameInput(typed: string): string {
+  return typed.replace(/[^\p{L}\p{M} .'-]/gu, '').slice(0, 60)
+}
+
 /** What the age box keeps as it is typed in: whole years only, and never
  *  above MAX_AGE — a keystroke or paste that would pass it is ignored, so
  *  the box can't hold 131 or more. */

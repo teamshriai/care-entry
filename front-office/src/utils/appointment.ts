@@ -42,11 +42,6 @@ export function modesFor(provider: Pick<Provider, 'consultationType'>): ConsultM
   }
 }
 
-/** A walk-in is seen in person, so a teleconsult-only doctor takes none. */
-export function takesWalkIns(provider: Pick<Provider, 'consultationType'>): boolean {
-  return modesFor(provider).includes('In person')
-}
-
 /** How long after the booked time a patient who hasn't come can be marked
  *  a no-show — not before, so a patient running a little late isn't. */
 export const NO_SHOW_GRACE_MINUTES = 10
