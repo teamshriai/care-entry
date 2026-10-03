@@ -1,5 +1,5 @@
-import type { AppointmentStatus } from '../types/appointment'
-import type { DoctorStatus } from '../types/doctor'
+import type { AppointmentStatus, ConsultMode } from '../types/appointment'
+import type { DoctorStatus, Provider } from '../types/doctor'
 
 /**
  * What an appointment's status reads as on screen. Kept separate from the
@@ -28,4 +28,21 @@ export function appointmentStatusLabel(status: AppointmentStatus): string {
  *  underlying DoctorStatus (and its logic in domain/selectors.ts) is unchanged. */
 export function doctorStatusLabel(status: DoctorStatus): string {
   return status === 'In consultation' ? 'With patient' : status
+}
+
+/** How a doctor sees patients — in person, by teleconsult, or either. */
+export function modesFor(provider: Pick<Provider, 'consultationType'>): ConsultMode[] {
+  switch (provider.consultationType) {
+    case 'Teleconsult only':
+      return ['Teleconsult']
+    case 'Outpatient + Teleconsult':
+      return ['In person', 'Teleconsult']
+    default:
+      return ['In person']
+  }
+}
+
+/** A walk-in is seen in person, so a teleconsult-only doctor takes none. */
+export function takesWalkIns(provider: Pick<Provider, 'consultationType'>): boolean {
+  return modesFor(provider).includes('In person')
 }

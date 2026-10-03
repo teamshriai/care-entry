@@ -5,7 +5,7 @@
 import type { AppState } from '../types/store'
 import type { Admission } from '../types/admission'
 import type { Payment } from '../types/payment'
-import type { PatientAppointmentRow } from '../types/appointment'
+import type { ConsultMode, PatientAppointmentRow } from '../types/appointment'
 import type { Provider } from '../types/doctor'
 import type { QueueToken } from '../types/queue'
 import type { Patient } from '../types/patient'
@@ -291,7 +291,7 @@ export interface PatientCareStatus {
   admitted: { ward: string; bed: string; critical: boolean } | null
   /** Seen as an outpatient today and not yet done: a booking still to come
    *  or an open token. `time` is the booked slot, `token` the queue number. */
-  outpatient: { doctor: string; time: string | null; token: string | null } | null
+  outpatient: { doctor: string; time: string | null; token: string | null; mode: ConsultMode } | null
 }
 
 /** One map for every patient with a status, so a list reads it per row
@@ -316,13 +316,18 @@ export function getPatientCareStatus(state: AppState, today: string): Record<str
   for (const token of state.queueTokens) {
     if (!OPEN_TOKEN.includes(token.status) || todayKey(new Date(token.createdAt)) !== today) continue
     const appointment = state.appointments.find((a) => a.visitId === token.visitId) ?? null
-    of(token.patientId).outpatient = { doctor: doctorName(token.providerId), time: appointment?.slot ?? null, token: token.tokenNumber }
+    of(token.patientId).outpatient = {
+      doctor: doctorName(token.providerId),
+      time: appointment?.slot ?? null,
+      token: token.tokenNumber,
+      mode: appointment?.mode ?? 'In person',
+    }
   }
   for (const appointment of state.appointments) {
     if (appointment.date !== today || !['Scheduled', 'Payment Pending', 'Confirmed'].includes(appointment.status)) continue
     const entry = of(appointment.patientId)
     if (entry.outpatient && (entry.outpatient.token || (entry.outpatient.time ?? '') <= appointment.slot)) continue
-    entry.outpatient = { doctor: doctorName(appointment.providerId), time: appointment.slot, token: null }
+    entry.outpatient = { doctor: doctorName(appointment.providerId), time: appointment.slot, token: null, mode: appointment.mode }
   }
   return status
 }

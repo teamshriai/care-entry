@@ -9,7 +9,7 @@ import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabil
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useFlow } from '../flows/useFlow'
-import { getDoctorRows, getDepartments, getSpecialties, getToday } from '../domain/selectors'
+import { getDoctorRows, getDepartments, getSpecialties } from '../domain/selectors'
 import { cn } from '../utils/cn'
 import type { DoctorRow, Provider } from '../types/doctor'
 
@@ -29,7 +29,6 @@ export function DoctorDirectoryPage() {
   const navigate = useNavigate()
   const now = useNow(30000)
   const { openFlow } = useFlow()
-  const today = useStoreValue(getToday)
 
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('All departments')
@@ -54,10 +53,11 @@ export function DoctorDirectoryPage() {
     })
   }, [rows, query, department, specialty, availability])
 
-  // Scheduling picks the patient inside the flow; walk-ins start from the
-  // patient's profile (Start Consultation), never from here.
-  function handleBook(provider: Provider, nextSlot: string | null) {
-    openFlow('schedule', nextSlot ? { doctor: provider.providerId, date: today, slot: nextSlot } : { doctor: provider.providerId })
+  // Scheduling picks the patient, then the time, inside the flow — the
+  // doctor is all this page settles. Walk-ins start from the patient's
+  // profile (Start Consultation), never from here.
+  function handleBook(provider: Provider) {
+    openFlow('schedule', { doctor: provider.providerId })
   }
 
   return (

@@ -15,6 +15,7 @@ import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
 import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
 import { abhaError, normalizeAbha } from '../utils/validation'
+import { takesWalkIns } from '../utils/appointment'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -354,7 +355,7 @@ export function getDoctorsAvailableNow(state: AppState, department: string, now:
         waitMinutes: (waiting + (busy ? 1 : 0)) * getAverageConsultationMinutes(state, provider.providerId),
       }
     })
-    .filter((row) => IN_SESSION.includes(row.status))
+    .filter((row) => IN_SESSION.includes(row.status) && takesWalkIns(row.provider))
     .sort((a, b) => a.waitMinutes - b.waitMinutes)
 }
 

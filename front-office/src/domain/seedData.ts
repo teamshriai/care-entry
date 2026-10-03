@@ -23,7 +23,7 @@ import type { AppState, TokenCounters } from '../types/store'
 import type { Patient } from '../types/patient'
 import type { Provider } from '../types/doctor'
 import type { DoctorLeave } from '../types/schedule'
-import type { Appointment, AppointmentStatus, UnavailableParty } from '../types/appointment'
+import type { Appointment, AppointmentStatus, ConsultMode, UnavailableParty } from '../types/appointment'
 import type { Visit } from '../types/visit'
 import type { QueueToken, QueueTokenStatus } from '../types/queue'
 import type { ActivityLogEntry } from '../types/activity'
@@ -62,6 +62,8 @@ interface BookingSeed {
   arrivedAt?: number
   tokenStatus?: QueueTokenStatus
   reason?: string
+  /** A teleconsult instead of the usual in-person visit. */
+  mode?: ConsultMode
   /** Paid, then cancelled: refunded when the doctor could not see the
    *  patient, the fee kept when the patient cancelled. */
   cancel?: { by: UnavailableParty; reason: string; at: number }
@@ -154,7 +156,7 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-52990',
       experienceYears: 12,
       employeeId: 'SHRI-DOC-021',
-      consultationType: 'Outpatient',
+      consultationType: 'Outpatient + Teleconsult',
       consultationFee: 900,
       room: 'Room 4, Block A',
       loginEmail: 'priya.nair@shrimedical.mock',
@@ -250,7 +252,7 @@ export function createSeedState(): AppState {
       registrationNumber: 'KMC-39088',
       experienceYears: 20,
       employeeId: 'SHRI-DOC-003',
-      consultationType: 'Outpatient',
+      consultationType: 'Outpatient + Teleconsult',
       consultationFee: 650,
       room: 'Room 1, Block A',
       loginEmail: 'vikram.das@shrimedical.mock',
@@ -477,7 +479,7 @@ export function createSeedState(): AppState {
       status,
       visitId: null,
       reason: seed.reason ?? null,
-      mode: 'In person',
+      mode: seed.mode ?? 'In person',
       createdAt: bookedAt,
       cancelledAt: seed.cancel?.at ?? null,
       cancelledBy: seed.cancel?.by ?? null,
@@ -554,10 +556,11 @@ export function createSeedState(): AppState {
   book({ patientId: 'SHRI-0120338', providerId: 'dr-rahul-menon', offset: -1, status: 'Checked-in', method: 'Card', arrivedAt: minutesAgo(16) })
   book({ patientId: 'SHRI-0129903', providerId: 'dr-rahul-menon', offset: 3, status: 'Confirmed', method: 'UPI' })
 
-  // Dr. Priya Nair — a no-show, one seen, a walk-in waiting, one to come.
+  // Dr. Priya Nair — a no-show, one seen, a walk-in waiting, and a review
+  // still to come by teleconsult.
   book({ patientId: 'SHRI-0078812', providerId: 'dr-priya-nair', offset: -6, status: 'No-show', method: 'Card', bookedAt: daysAgo(1) })
   book({ patientId: 'SHRI-0124106', providerId: 'dr-priya-nair', offset: -3, status: 'Completed', method: 'UPI', fallbackDay: -1, slotIndex: 5 })
-  book({ patientId: 'SHRI-0114479', providerId: 'dr-priya-nair', offset: 4, status: 'Confirmed', method: 'Card', bookedAt: daysAgo(1) + 2 * HOUR, reason: 'Review with reports' })
+  book({ patientId: 'SHRI-0114479', providerId: 'dr-priya-nair', offset: 4, status: 'Confirmed', method: 'Card', bookedAt: daysAgo(1) + 2 * HOUR, reason: 'Review with reports', mode: 'Teleconsult' })
   if (inSession('dr-priya-nair')) walkIn('SHRI-0129904', 'dr-priya-nair', minutesAgo(15), 'UPI')
 
   // Dr. Ananya Rao — on a break, with one patient waiting and one after it.
@@ -574,9 +577,9 @@ export function createSeedState(): AppState {
     book({ patientId, providerId: 'dr-vikram-das', slot, status: seen ? 'Completed' : 'Confirmed', method: index % 2 ? 'Card' : 'UPI' })
   })
 
-  // Ahead — Dr. Meera Shah is back tomorrow; a follow-up next week.
+  // Ahead — Dr. Meera Shah is back tomorrow; a follow-up by teleconsult next week.
   book({ patientId: 'SHRI-0116023', providerId: 'dr-meera-shah', day: 1, slotIndex: 3, status: 'Confirmed', method: 'Card', bookedAt: minutesAgo(95), reason: 'Bring the X-ray report' })
-  book({ patientId: 'SHRI-0057164', providerId: 'dr-vikram-das', day: 7, slotIndex: 1, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(100), reason: 'Follow-up' })
+  book({ patientId: 'SHRI-0057164', providerId: 'dr-vikram-das', day: 7, slotIndex: 1, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(100), reason: 'Follow-up', mode: 'Teleconsult' })
 
   // Visits and tokens in arrival order; token numbers run per department.
   const visits: Visit[] = []

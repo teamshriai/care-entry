@@ -27,6 +27,7 @@ import {
 } from '../utils/validation'
 import { formatRupees } from '../utils/billing'
 import { formatDateKey } from '../utils/dates'
+import { modesFor, takesWalkIns } from '../utils/appointment'
 import type { AppState } from '../types/store'
 import type { Patient, RegisterPatientInput, PatientDemographicsInput, Sex } from '../types/patient'
 import type { Provider, RegisterDoctorInput, DoctorChanges, ProviderStatus } from '../types/doctor'
@@ -266,8 +267,15 @@ export function bookAndPayAppointment({
   if (!state.patients.some((p) => p.patientId === patientId)) throw new DomainError('VALIDATION', 'Select a patient first.')
   const provider = state.providers.find((p) => p.providerId === providerId)
   if (!provider || provider.status !== 'Active') throw new DomainError('VALIDATION', 'That doctor is not taking bookings.')
+  if (mode && !modesFor(provider).includes(mode)) {
+    throw new DomainError('VALIDATION', `${provider.name} does not offer ${mode === 'Teleconsult' ? 'teleconsults' : 'in-person visits'}.`)
+  }
 
-  const booked = applyBooking(state, { patientId, providerId, department: provider.department, slot, date, reason, mode }, now)
+  const booked = applyBooking(
+    state,
+    { patientId, providerId, department: provider.department, slot, date, reason, mode: mode ?? modesFor(provider)[0] },
+    now,
+  )
   const billed = applyConsultationBill(booked.state, { patientId, providerId, appointmentId: booked.value.appointmentId }, now)
   // Fully paid → the collection confirms the booking it belongs to.
   const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
@@ -387,6 +395,9 @@ export function checkInAppointment(appointmentId: string): CheckInResult {
 function applyWalkIn(state: AppState, { patientId, providerId, department }: OpenWalkInVisitInput, now: number): Step<CheckInResult> {
   const provider = state.providers.find((p) => p.providerId === providerId)
   if (!provider) throw new DomainError('NOT_FOUND', 'That doctor no longer exists.')
+  if (!takesWalkIns(provider)) {
+    throw new DomainError('INVALID_TRANSITION', `${provider.name} sees patients by teleconsult only — book a teleconsult instead.`)
+  }
   const status = getDoctorStatus(state, providerId, now, todayKey(new Date(now)))
   if (!['Available', 'Running late', 'In consultation', 'On break', 'Fully booked'].includes(status)) {
     throw new DomainError('INVALID_TRANSITION', `${provider.name} is not seeing patients right now (${status.toLowerCase()}).`)

@@ -29,7 +29,7 @@ export function DoctorAvailabilityTable({
 }: {
   rows: DoctorRow[]
   /** Shows a Schedule button per doctor — omit for an information-only list. */
-  onBook?: (provider: Provider, nextSlot: string | null) => void
+  onBook?: (provider: Provider) => void
   onOpenProfile?: (provider: Provider) => void
   compact?: boolean
 }) {
@@ -108,7 +108,7 @@ export function DoctorAvailabilityTable({
                       size="sm"
                       variant={canBook ? 'primary' : 'secondary'}
                       disabled={!canBook}
-                      onClick={() => onBook(row.provider, row.nextSlot)}
+                      onClick={() => onBook(row.provider)}
                     >
                       Schedule
                     </Button>

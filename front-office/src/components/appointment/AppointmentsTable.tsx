@@ -7,6 +7,7 @@ import { formatClock } from '../../utils/format'
 import { appointmentStatusLabel } from '../../utils/appointment'
 import type { AppointmentRow } from '../../types/appointment'
 import { PatientStatusIcons } from '../patient/PatientStatusIcons'
+import { ModeBadge } from './ModeBadge'
 import { usePatientCareStatus } from '../../hooks/useCareStatus'
 
 // Arrival column shows the real check-in timestamp from the linked Visit —
@@ -89,6 +90,7 @@ export function AppointmentsTable({
                 <p className="max-w-[11rem] truncate text-ink-muted" title={appointment.provider?.name}>
                   {appointment.provider?.name ?? '—'}
                 </p>
+                {appointment.mode === 'Teleconsult' ? <ModeBadge mode="Teleconsult" /> : null}
               </td>
               {compact ? null : (
                 <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{appointment.department}</td>

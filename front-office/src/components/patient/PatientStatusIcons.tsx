@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { BedDouble, HeartPulse, Siren, Stethoscope } from 'lucide-react'
+import { BedDouble, HeartPulse, Siren, Stethoscope, Video } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import { TONE_STYLES } from '../../utils/tone'
 import type { Tone } from '../../utils/tone'
@@ -24,10 +24,11 @@ function marksFor(status: PatientCareStatus): Mark[] {
   }
   if (outpatient) {
     const when = outpatient.token ? `Token ${outpatient.token}` : outpatient.time
+    const teleconsult = outpatient.mode === 'Teleconsult'
     marks.push({
-      icon: Stethoscope,
-      tone: 'teal',
-      label: ['Outpatient (OPD)', outpatient.doctor, when].filter(Boolean).join(' · '),
+      icon: teleconsult ? Video : Stethoscope,
+      tone: teleconsult ? 'purple' : 'teal',
+      label: [teleconsult ? 'Teleconsult' : 'Outpatient (OPD)', outpatient.doctor, when].filter(Boolean).join(' · '),
       detail: outpatient.token ?? outpatient.time ?? 'OPD',
     })
   }
@@ -36,7 +37,8 @@ function marksFor(status: PatientCareStatus): Mark[] {
 
 /**
  * Where the patient is in care, beside their name: ICU (red heart), Emergency
- * (red siren), inpatient (blue bed) and outpatient today (teal stethoscope).
+ * (red siren), inpatient (blue bed), outpatient today (teal stethoscope) and
+ * teleconsult today (purple video).
  * Each icon names itself in a tooltip and to screen readers; `showDetail`
  * adds the bed or the time beside the icon.
  */
