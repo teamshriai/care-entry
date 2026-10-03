@@ -12,7 +12,6 @@ import type { Appointment, AppointmentRow, PatientAppointmentRow, SlotBoardEntry
 import type { QueueTokenRow, QueueView } from '../types/queue'
 import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
 import type { Connectivity } from '../types/connectivity'
-import type { ActivityLogEntry } from '../types/activity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
 import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
 import { abhaError, normalizeAbha } from '../utils/validation'
@@ -847,11 +846,6 @@ export function getPatientFlags(state: AppState): Record<string, PatientFlags> {
 }
 
 // -------------------------------------------------------------- payments
-
-/** The desk's latest actions, newest first — the dashboard's recent activity. */
-export function getRecentActivity(state: AppState, limit: number = 10): ActivityLogEntry[] {
-  return [...state.activityLog].sort((a, b) => b.time - a.time).slice(0, limit)
-}
 
 export function getPayments(state: AppState): Payment[] {
   return [...state.payments].sort((a, b) => b.createdAt - a.createdAt)

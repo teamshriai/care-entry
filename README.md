@@ -77,9 +77,9 @@ Both apps open in the **light** theme by default; the dark theme stays available
   Insured, TPA and corporate stays are settled by their payer at discharge. A discharge needs the
   stay's bill at ₹0.
 - **The dashboard** has five figures, each opening its place — outpatients today, waiting,
-  inpatients, due, registered today — then today's outpatients, what needs attention, the
-  self-registration form to share, recent activity and the doctors now.
-- **Patient self-registration** can be shared from the dashboard and the Register page: QR code,
+  inpatients, due, registered today — then the doctors now (Schedule beside each), then today's
+  outpatients and what needs attention.
+- **Patient self-registration** can be shared from the Register page: QR code,
   Open form, Copy link, or WhatsApp / SMS to the patient's mobile. The form is a preview for now —
   answers stay on the patient's phone — so the desk registers the patient on arrival.
 - **Places in the sidebar:** Dashboard · Patients · Billing · Doctors · Services (Guest Pass,

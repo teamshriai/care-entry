@@ -1,6 +1,5 @@
 import type { ElementType } from 'react'
 import {
-  Activity,
   AlertTriangle,
   BedDouble,
   CalendarClock,
@@ -9,13 +8,10 @@ import {
   IndianRupee,
   Info,
   LogIn,
-  LogOut,
   Stethoscope,
-  Ticket,
   Undo2,
   UserCheck,
   UserPlus,
-  XCircle,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -26,12 +22,11 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { StatCard } from '../components/frontoffice/StatCard'
 import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
-import { SelfRegistrationShare } from '../components/frontoffice/SelfRegistrationShare'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
-import { getAppointmentsForDate, getBillingOverview, getDoctorRows, getNeedsAttention, getQueueView, getRecentActivity } from '../domain/selectors'
+import { getAppointmentsForDate, getBillingOverview, getDoctorRows, getNeedsAttention, getQueueView } from '../domain/selectors'
 import { getOutpatients } from '../domain/outpatientSelectors'
 import { getPatientRows } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
@@ -40,7 +35,7 @@ import { getInpatientRows, getWardSummaries } from '../domain/admissionSelectors
 import { checkInAppointment, returnGuestPass } from '../domain/actions'
 import { formatRupees } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
-import { formatClock, formatHeaderDateTime } from '../utils/format'
+import { formatHeaderDateTime } from '../utils/format'
 import { cn } from '../utils/cn'
 import { TONE_STYLES } from '../utils/tone'
 
@@ -53,34 +48,10 @@ const ATTENTION_ICON: Record<NeedsAttentionItem['tone'], ElementType> = {
 
 const ATTENTION_ROWS = 6
 
-/** An icon for an activity-log line, from what it says happened. */
-function activityIcon(text: string): ElementType {
-  const t = text.toLowerCase()
-  if (t.includes('refund')) return Undo2
-  if (t.includes('cancel') || t.includes('no-show')) return XCircle
-  if (t.includes('payment') || t.includes('bill')) return IndianRupee
-  if (t.includes('discharg')) return LogOut
-  if (t.includes('admi') || t.includes('bed')) return BedDouble
-  if (t.includes('token') || t.includes('queue') || t.includes('checked in')) return Ticket
-  if (t.includes('appointment') || t.includes('resched')) return CalendarClock
-  if (t.includes('registered') || t.includes('patient')) return UserPlus
-  return Activity
-}
-
-/** "now", "12 min ago", "3 h ago", else the date and time. */
-function timeAgo(time: number, now: number): string {
-  const minutes = Math.max(0, Math.round((now - time) / 60000))
-  if (minutes < 1) return 'now'
-  if (minutes < 60) return `${minutes} min ago`
-  if (minutes < 12 * 60) return `${Math.floor(minutes / 60)} h ago`
-  return `${new Date(time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${formatClock(time)}`
-}
-
 /**
- * The front desk at a glance: the day's common tasks one tap away, figures
- * that each open the place that holds them, today's outpatients and what
- * needs attention with their one action each, the self-registration form to
- * share, the latest activity, and the doctors — with Book beside each.
+ * The front desk at a glance: five figures that each open the place that
+ * holds them, the doctors now (with Schedule beside each), then today's
+ * outpatients and what needs attention, with their one action each.
  */
 export function FrontOfficeHomePage() {
   const navigate = useNavigate()
@@ -99,7 +70,6 @@ export function FrontOfficeHomePage() {
   const needsAttention = useStoreValue(getNeedsAttention, now)
   const outpatients = useStoreValue(getOutpatients, now, 'today', false, '')
   const patientRows = useStoreValue(getPatientRows)
-  const activity = useStoreValue(getRecentActivity, 10)
   const today = todayKey(new Date(now))
   const registeredToday = patientRows.filter((row) => todayKey(new Date(row.patient.createdAt)) === today).length
 
@@ -209,6 +179,29 @@ export function FrontOfficeHomePage() {
           />
         </section>
 
+        {/* Doctors now — Book opens Schedule with the doctor chosen */}
+        <section className="min-w-0" aria-label="Doctors now">
+          <Card accentTone="indigo">
+            <CardHeader
+              icon={Stethoscope}
+              iconTone="indigo"
+              title="Doctors now"
+              subtitle="From today's schedule, leave and break · Schedule books with that doctor"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => navigate('/doctors')}>
+                  View all
+                </Button>
+              }
+            />
+            <DoctorAvailabilityTable
+              rows={doctorRows}
+              compact
+              onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
+              onBook={(provider) => openFlow('schedule', { doctor: provider.providerId })}
+            />
+          </Card>
+        </section>
+
         <div className="grid grid-cols-1 items-start gap-6 min-[1400px]:grid-cols-2">
           {/* Today's outpatients — one action per row */}
           <section className="min-w-0" aria-label="Today's outpatients">
@@ -284,67 +277,6 @@ export function FrontOfficeHomePage() {
             </Card>
           </section>
         </div>
-
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <section className="min-w-0" aria-label="Patient self-registration">
-            <SelfRegistrationShare />
-          </section>
-
-          {/* What the desk did last */}
-          <section className="min-w-0" aria-label="Recent activity">
-            <Card accentTone="brand">
-              <CardHeader icon={Activity} iconTone="brand" title="Recent activity" subtitle="The desk's latest actions, newest first" />
-              {activity.length === 0 ? (
-                <EmptyState title="Nothing yet" description="Registrations, bookings and payments appear here as they happen." />
-              ) : (
-                <ul className="divide-y divide-border-soft">
-                  {activity.map((entry) => {
-                    const Icon = activityIcon(entry.text)
-                    return (
-                      <li key={entry.id} className="flex items-start gap-3 px-5 py-2.5">
-                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2">
-                          <Icon className="h-3.5 w-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden="true" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-ink">{entry.text}</p>
-                          {entry.meta ? (
-                            <p className="truncate text-xs text-ink-muted" title={entry.meta}>
-                              {entry.meta}
-                            </p>
-                          ) : null}
-                        </div>
-                        <span className="shrink-0 text-2xs tabular-nums text-ink-subtle">{timeAgo(entry.time, now)}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </Card>
-          </section>
-        </div>
-
-        {/* Doctors now — Book opens Schedule with the doctor chosen */}
-        <section className="min-w-0" aria-label="Doctors now">
-          <Card accentTone="indigo">
-            <CardHeader
-              icon={Stethoscope}
-              iconTone="indigo"
-              title="Doctors now"
-              subtitle="From today's schedule, leave and break · Schedule books with that doctor"
-              action={
-                <Button size="sm" variant="ghost" onClick={() => navigate('/doctors')}>
-                  View all
-                </Button>
-              }
-            />
-            <DoctorAvailabilityTable
-              rows={doctorRows}
-              compact
-              onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
-              onBook={(provider) => openFlow('schedule', { doctor: provider.providerId })}
-            />
-          </Card>
-        </section>
       </div>
     </div>
   )
