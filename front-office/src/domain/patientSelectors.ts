@@ -282,3 +282,47 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
   history.sort((a, b) => b.at - a.at)
   return { upcoming, history }
 }
+
+// --------------------------------------------------------------- care status
+
+/** Where a patient is in care right now — the icons beside every name. */
+export interface PatientCareStatus {
+  /** In a bed; ICU and Emergency count as critical. */
+  admitted: { ward: string; bed: string; critical: boolean } | null
+  /** Seen as an outpatient today and not yet done: a booking still to come
+   *  or an open token. `time` is the booked slot, `token` the queue number. */
+  outpatient: { doctor: string; time: string | null; token: string | null } | null
+}
+
+/** One map for every patient with a status, so a list reads it per row
+ *  without searching the records again. `today` comes from the caller's
+ *  clock — `state.today` is the day the app started. */
+export function getPatientCareStatus(state: AppState, today: string): Record<string, PatientCareStatus> {
+  const status: Record<string, PatientCareStatus> = {}
+  const of = (patientId: string) => (status[patientId] ??= { admitted: null, outpatient: null })
+  const doctorName = (providerId: string) => getProviderById(state, providerId)?.name ?? 'Doctor'
+
+  for (const admission of state.admissions) {
+    if (admission.status !== 'Admitted' || !admission.wardLabel || !admission.bedNumber) continue
+    of(admission.patientId).admitted = {
+      ward: admission.wardLabel,
+      bed: admission.bedNumber,
+      critical: admission.wardLabel === 'ICU' || admission.wardLabel === 'Emergency',
+    }
+  }
+
+  // An open token says the patient is here; a booking not yet checked in
+  // says they are expected. A checked-in booking is read through its token.
+  for (const token of state.queueTokens) {
+    if (!OPEN_TOKEN.includes(token.status) || todayKey(new Date(token.createdAt)) !== today) continue
+    const appointment = state.appointments.find((a) => a.visitId === token.visitId) ?? null
+    of(token.patientId).outpatient = { doctor: doctorName(token.providerId), time: appointment?.slot ?? null, token: token.tokenNumber }
+  }
+  for (const appointment of state.appointments) {
+    if (appointment.date !== today || !['Scheduled', 'Payment Pending', 'Confirmed'].includes(appointment.status)) continue
+    const entry = of(appointment.patientId)
+    if (entry.outpatient && (entry.outpatient.token || (entry.outpatient.time ?? '') <= appointment.slot)) continue
+    entry.outpatient = { doctor: doctorName(appointment.providerId), time: appointment.slot, token: null }
+  }
+  return status
+}

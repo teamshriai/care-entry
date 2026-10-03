@@ -22,6 +22,8 @@ import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { cn } from '../utils/cn'
 import type { Admission, Bed, Ward } from '../types/admission'
+import { PatientStatusIcons } from '../components/patient/PatientStatusIcons'
+import { usePatientCareStatus } from '../hooks/useCareStatus'
 
 type InpatientFilter = 'admitted' | 'awaiting' | 'beds' | 'discharged'
 
@@ -115,7 +117,7 @@ export function InpatientsPage() {
               <Table head={['Patient', 'Ward · bed', 'Day', 'Doctor', 'Bill', '']}>
                 {rows.map(({ admission: a, billing, billStatus }) => (
                   <tr key={a.admissionId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    <PatientCell name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
+                    <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
                     <td className="whitespace-nowrap px-5 py-3">
                       <WardLabel ward={a.wardLabel} bed={a.bedNumber} />
                     </td>
@@ -151,7 +153,7 @@ export function InpatientsPage() {
               <Table head={['Patient', 'Requested', 'Doctor', 'Type', 'Reason', '']}>
                 {awaiting.map((a) => (
                   <tr key={a.admissionId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    <PatientCell name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
+                    <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
                     <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{at(a.createdAt)}</td>
                     <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{a.doctorName}</td>
                     <td className="whitespace-nowrap px-5 py-3">
@@ -222,7 +224,7 @@ export function InpatientsPage() {
               <Table head={['Patient', 'Ward · bed', 'Discharged', 'Type', 'Final bill']}>
                 {discharged.map(({ admission: a, bill }) => (
                   <tr key={a.admissionId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    <PatientCell name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
+                    <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
                     <td className="whitespace-nowrap px-5 py-3">
                       <WardLabel ward={a.wardLabel} bed={a.bedNumber} />
                     </td>
@@ -268,16 +270,20 @@ function Table({ head, children }: { head: string[]; children: ReactNode }) {
   )
 }
 
-function PatientCell({ name, detail, onOpen }: { name: string; detail: string; onOpen: () => void }) {
+function PatientCell({ patientId, name, detail, onOpen }: { patientId: string; name: string; detail: string; onOpen: () => void }) {
+  const care = usePatientCareStatus()
   return (
     <td className="px-5 py-3">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="rounded-sm text-left font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
-      >
-        {name}
-      </button>
+      <span className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="rounded-sm text-left font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
+        >
+          {name}
+        </button>
+        <PatientStatusIcons status={care[patientId]} />
+      </span>
       <span className="block whitespace-nowrap text-xs text-ink-subtle">{detail}</span>
     </td>
   )

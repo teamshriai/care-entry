@@ -4,6 +4,8 @@ import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { useToast } from '../../hooks/useToast'
+import { usePatientCareStatus } from '../../hooks/useCareStatus'
+import { PatientStatusIcons } from './PatientStatusIcons'
 import { formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
 import { cn } from '../../utils/cn'
@@ -44,6 +46,7 @@ export function PatientHeader({
   actions: PatientActions
 }) {
   const { notify } = useToast()
+  const care = usePatientCareStatus()
   const { risk, payment, inpatient, admission } = summary
 
   function copyAbha() {
@@ -69,6 +72,7 @@ export function PatientHeader({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h1 className="truncate text-xl font-semibold tracking-tight text-ink sm:text-2xl">{patient.name}</h1>
+              <PatientStatusIcons status={care[patient.patientId]} />
               <span title={risk.reason}>
                 <Badge tone={RISK_TONE[risk.level]}>{RISK_LABEL[risk.level]}</Badge>
               </span>

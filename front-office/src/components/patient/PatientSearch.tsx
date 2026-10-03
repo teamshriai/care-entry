@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BedDouble, IndianRupee, ReceiptText, Search, ShieldCheck, UserPlus } from 'lucide-react'
+import { IndianRupee, ReceiptText, Search, ShieldCheck, UserPlus } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { useStoreValue } from '../../hooks/useStore'
@@ -10,6 +10,9 @@ import { useFlow } from '../../flows/useFlow'
 import { findBillByNumber, getPatientFlags, getPatientSearchSuggestions, searchPatients } from '../../domain/selectors'
 import { getAdmittedPatients } from '../../domain/admissionSelectors'
 import type { PatientFlags } from '../../domain/selectors'
+import type { PatientCareStatus } from '../../domain/patientSelectors'
+import { usePatientCareStatus } from '../../hooks/useCareStatus'
+import { PatientStatusIcons } from './PatientStatusIcons'
 import { billNumberFor, formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
 import { cn } from '../../utils/cn'
@@ -59,6 +62,7 @@ export function PatientSearch(props: PatientSearchProps) {
   const matches = useStoreValue(searchPatients, query)
   const suggestions = useStoreValue(getPatientSearchSuggestions)
   const flags = useStoreValue(getPatientFlags)
+  const care = usePatientCareStatus()
   const bill = useStoreValue(findBillByNumber, query)
   const admitted = useStoreValue(getAdmittedPatients)
 
@@ -190,7 +194,14 @@ export function PatientSearch(props: PatientSearchProps) {
             index === activeIndex ? 'bg-primary-50' : 'hover:bg-surface-2',
           )}
         >
-          {option.kind === 'bill' ? <BillRow bill={option.bill} /> : <PatientRow patient={option.patient} flags={flags[option.patient.patientId]} matchedOn={option.matchedOn} />}
+          {option.kind === 'bill' ? <BillRow bill={option.bill} /> : (
+            <PatientRow
+              patient={option.patient}
+              flags={flags[option.patient.patientId]}
+              care={care[option.patient.patientId]}
+              matchedOn={option.matchedOn}
+            />
+          )}
         </div>
       </li>
     )
@@ -250,7 +261,17 @@ export function PatientSearch(props: PatientSearchProps) {
   )
 }
 
-function PatientRow({ patient, flags, matchedOn }: { patient: Patient; flags?: PatientFlags; matchedOn?: PatientSearchMatch['matchedOn'] }) {
+function PatientRow({
+  patient,
+  flags,
+  care,
+  matchedOn,
+}: {
+  patient: Patient
+  flags?: PatientFlags
+  care?: PatientCareStatus
+  matchedOn?: PatientSearchMatch['matchedOn']
+}) {
   return (
     <>
       <Avatar initials={initialsOf(patient.name)} size="sm" />
@@ -277,13 +298,7 @@ function PatientRow({ patient, flags, matchedOn }: { patient: Patient; flags?: P
         ) : null}
       </span>
       <span className="flex shrink-0 items-center gap-2">
-        {flags?.bed ? (
-          <span className="flex items-center gap-1 text-xs font-medium text-info" title={`Inpatient · ${flags.bed}`}>
-            <BedDouble className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-            <span className="sr-only">Inpatient, bed</span>
-            {flags.bed}
-          </span>
-        ) : null}
+        <PatientStatusIcons status={care} showDetail />
         {flags && flags.due > 0 ? (
           <span
             className={cn('flex items-center gap-0.5 text-xs font-semibold tabular-nums', flags.failed ? 'text-critical' : 'text-warning')}

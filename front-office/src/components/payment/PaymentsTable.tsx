@@ -9,6 +9,8 @@ import { todayKey } from '../../domain/time'
 import { cn } from '../../utils/cn'
 import { billNumberFor, formatRupees } from '../../utils/billing'
 import type { Payment } from '../../types/payment'
+import { PatientStatusIcons } from '../patient/PatientStatusIcons'
+import { usePatientCareStatus } from '../../hooks/useCareStatus'
 
 /** The bill list — the Billing page passes in whichever bills its filter
  *  selects, plus the row action. */
@@ -25,6 +27,7 @@ export function PaymentsTable({
   renderActions?: (payment: Payment) => ReactNode
   showBalance?: boolean
 }) {
+  const care = usePatientCareStatus()
   if (payments.length === 0) {
     return <EmptyState icon={Receipt} title={emptyTitle} description={emptyDescription} />
   }
@@ -53,8 +56,11 @@ export function PaymentsTable({
                 </Link>
               </td>
               <td className="px-5 py-3">
-                <p className="max-w-[12rem] truncate text-ink" title={payment.patientName}>
-                  {payment.patientName}
+                <p className="flex max-w-[14rem] items-center gap-1.5 text-ink">
+                  <span className="truncate" title={payment.patientName}>
+                    {payment.patientName}
+                  </span>
+                  <PatientStatusIcons status={care[payment.patientId]} />
                 </p>
                 <p className="text-2xs text-ink-faint">{payment.patientId}</p>
               </td>

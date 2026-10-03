@@ -15,6 +15,8 @@ import type { PatientListRow } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
 import { formatRupees } from '../utils/billing'
 import { initialsOf } from '../utils/format'
+import { PatientStatusIcons } from '../components/patient/PatientStatusIcons'
+import { usePatientCareStatus } from '../hooks/useCareStatus'
 
 type PatientFilter = 'all' | 'today' | 'inpatients' | 'duplicates'
 
@@ -43,6 +45,7 @@ export function PatientsPage() {
   const now = useNow(60000)
   const filter = readFilter(location.search)
   const rows = useStoreValue(getPatientRows)
+  const care = usePatientCareStatus()
 
   const today = todayKey(new Date(now))
   const isToday = (row: PatientListRow) => todayKey(new Date(row.patient.createdAt)) === today
@@ -114,16 +117,19 @@ export function PatientsPage() {
                           <div className="flex items-center gap-2.5">
                             <Avatar initials={initialsOf(patient.name)} size="sm" />
                             <div className="min-w-0">
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  open()
-                                }}
-                                className="rounded-sm text-left font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
-                              >
-                                {patient.name}
-                              </button>
+                              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    open()
+                                  }}
+                                  className="rounded-sm text-left font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
+                                >
+                                  {patient.name}
+                                </button>
+                                <PatientStatusIcons status={care[patient.patientId]} showDetail />
+                              </span>
                               {patient.nameNative ? <span className="block text-xs text-ink-subtle">{patient.nameNative}</span> : null}
                             </div>
                           </div>
@@ -139,7 +145,6 @@ export function PatientsPage() {
                         <td className="px-5 py-3">
                           <div className="flex flex-wrap gap-1.5">
                             {isToday(row) ? <Badge tone="stable">Registered today</Badge> : null}
-                            {row.bed ? <Badge tone="info">In bed {row.bed}</Badge> : null}
                             {row.due > 0 ? (
                               <Badge tone={row.failed ? 'critical' : 'warning'}>
                                 {row.failed ? 'Failed' : 'Due'} · {formatRupees(row.due)}

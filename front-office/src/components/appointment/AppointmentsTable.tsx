@@ -6,6 +6,8 @@ import { cn } from '../../utils/cn'
 import { formatClock } from '../../utils/format'
 import { appointmentStatusLabel } from '../../utils/appointment'
 import type { AppointmentRow } from '../../types/appointment'
+import { PatientStatusIcons } from '../patient/PatientStatusIcons'
+import { usePatientCareStatus } from '../../hooks/useCareStatus'
 
 // Arrival column shows the real check-in timestamp from the linked Visit —
 // blank until the patient actually arrives, never a placeholder time.
@@ -34,6 +36,7 @@ export function AppointmentsTable({
   maxRows?: number
   emptyAction?: ReactNode
 }) {
+  const care = usePatientCareStatus()
   if (appointments.length === 0) {
     return (
       <EmptyState
@@ -72,8 +75,11 @@ export function AppointmentsTable({
             >
               <td className="whitespace-nowrap px-5 py-3 font-medium tabular-nums text-ink">{appointment.slot}</td>
               <td className="px-5 py-3">
-                <p className="max-w-[12rem] truncate text-ink" title={appointment.patient?.name}>
-                  {appointment.patient?.name ?? '—'}
+                <p className="flex max-w-[14rem] items-center gap-1.5 text-ink">
+                  <span className="truncate" title={appointment.patient?.name}>
+                    {appointment.patient?.name ?? '—'}
+                  </span>
+                  <PatientStatusIcons status={care[appointment.patientId]} />
                 </p>
                 {compact ? null : (
                   <p className="text-2xs text-ink-faint">{appointment.patient?.uhid}</p>
