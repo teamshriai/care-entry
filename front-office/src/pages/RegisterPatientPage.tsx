@@ -10,6 +10,7 @@ import { MobileInput } from '../components/ui/MobileInput'
 import { Avatar } from '../components/ui/Avatar'
 import { AckCard } from '../components/flow/AckCard'
 import { AgeConfirm, FieldError } from '../components/patient/AgeConfirm'
+import { CreateAbhaLink } from '../components/patient/CreateAbhaLink'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
@@ -240,16 +241,20 @@ export function RegisterPatientPage() {
                     : 'Optional'
                 }
               >
-                <input
-                  id="reg-abha"
-                  value={form.abhaId}
-                  onChange={(event) => update('abhaId', event.target.value)}
-                  onBlur={touch('abhaId')}
-                  placeholder="name@abdm or 14-digit number"
-                  autoComplete="off"
-                  aria-invalid={Boolean(form.abhaId.trim() && (shown('abhaId') || abhaHolder))}
-                  className={cn(inputClass, form.abhaId.trim() && (shown('abhaId') || abhaHolder) && errorClass)}
-                />
+                <div className="flex gap-2">
+                  <input
+                    id="reg-abha"
+                    value={form.abhaId}
+                    onChange={(event) => update('abhaId', event.target.value)}
+                    onBlur={touch('abhaId')}
+                    placeholder="name@abdm or 14-digit number"
+                    autoComplete="off"
+                    aria-invalid={Boolean(form.abhaId.trim() && (shown('abhaId') || abhaHolder))}
+                    className={cn(inputClass, form.abhaId.trim() && (shown('abhaId') || abhaHolder) && errorClass)}
+                  />
+                  {/* No ABHA yet? The patient can create one with ABDM. */}
+                  {form.abhaId.trim() ? null : <CreateAbhaLink />}
+                </div>
               </Field>
 
               <div className="flex flex-col items-stretch gap-2 border-t border-border-soft pt-4 sm:flex-row sm:items-center sm:justify-end">

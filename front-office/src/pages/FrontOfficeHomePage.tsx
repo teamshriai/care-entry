@@ -222,12 +222,19 @@ export function FrontOfficeHomePage() {
                 appointments={todaysList}
                 compact
                 maxRows={5}
+                // Not here yet → Check in; checked in → Waiting (a second click
+                // undoes a mistaken check-in); called or in the room → With
+                // doctor; then how the visit ended.
                 renderStatus={(appointment) =>
                   appointment.status === 'Confirmed' || (appointment.status === 'Checked-in' && appointment.token?.status === 'Waiting') ? (
-                    <CheckInToggle appointment={appointment} patientName={appointment.patient?.name} />
+                    <CheckInToggle appointment={appointment} patientName={appointment.patient?.name} pressedLabel="Waiting" />
+                  ) : appointment.status === 'Checked-in' && (appointment.token?.status === 'Called' || appointment.token?.status === 'In consultation') ? (
+                    <Badge tone="teal" className="px-2">
+                      With doctor
+                    </Badge>
                   ) : (
-                    <Badge status={appointment.status} className="px-2">
-                      {appointmentStatusLabel(appointment.status)}
+                    <Badge status={appointment.token?.status === 'No-show' ? 'No-show' : appointment.status} className="px-2">
+                      {appointment.token?.status === 'No-show' ? 'No-show' : appointmentStatusLabel(appointment.status)}
                     </Badge>
                   )
                 }

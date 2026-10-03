@@ -15,7 +15,16 @@ function tokenStatusOf(state: AppState, visitId: string): string | null {
  * once checked in it stays as a pressed "Checked in" that a second click
  * undoes — for a mistaken check-in — until the doctor calls the patient.
  */
-export function CheckInToggle({ appointment, patientName }: { appointment: Appointment; patientName?: string }) {
+export function CheckInToggle({
+  appointment,
+  patientName,
+  pressedLabel,
+}: {
+  appointment: Appointment
+  patientName?: string
+  /** What the checked-in state reads as — "Waiting" where the list shows status. */
+  pressedLabel?: string
+}) {
   const { notify } = useToast()
   const tokenStatus = useStoreValue(tokenStatusOf, appointment.visitId ?? '')
   const tele = appointment.mode === 'Teleconsult'
@@ -52,7 +61,7 @@ export function CheckInToggle({ appointment, patientName }: { appointment: Appoi
         size="sm"
         variant="secondary"
         aria-pressed
-        title="Checked in by mistake? Click again to undo"
+        title="Checked in · checked in by mistake? Click again to undo"
         onClick={() =>
           run(() => {
             undoCheckIn(appointment.appointmentId)
@@ -61,7 +70,7 @@ export function CheckInToggle({ appointment, patientName }: { appointment: Appoi
         }
       >
         <Check className="h-3.5 w-3.5" strokeWidth={2} />
-        {tele ? 'Joined' : 'Checked in'}
+        {pressedLabel ?? (tele ? 'Joined' : 'Checked in')}
       </Button>
     )
   }

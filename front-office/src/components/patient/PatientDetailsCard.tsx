@@ -12,6 +12,7 @@ import { toEditableMobile } from '../../utils/phone'
 import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mobileError, nameError, nextAgeInput, nextNameInput } from '../../utils/validation'
 import { cn } from '../../utils/cn'
 import { AgeConfirm, FieldError } from './AgeConfirm'
+import { CreateAbhaLink } from './CreateAbhaLink'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import type { Patient, Sex } from '../../types/patient'
@@ -201,6 +202,12 @@ export function PatientDetailsCard({ patient }: { patient: Patient }) {
                 Link ABHA
               </Button>
             </div>
+            {abha.trim() ? null : (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                No ABHA yet?
+                <CreateAbhaLink />
+              </div>
+            )}
             <FieldError message={abhaTouched ? abhaProblem : null} />
           </form>
         ) : null}
