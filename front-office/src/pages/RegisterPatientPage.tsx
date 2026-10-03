@@ -17,7 +17,7 @@ import { registerPatient } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { cn } from '../utils/cn'
 import { nationalMobile } from '../utils/phone'
-import { abhaError, ageError, ageNeedsConfirmation, mobileError, nameError, sexError } from '../utils/validation'
+import { abhaError, ageError, ageNeedsConfirmation, mobileError, nameError, nextAgeInput, sexError } from '../utils/validation'
 import type { Patient, Sex } from '../types/patient'
 
 const SEXES: Sex[] = ['Male', 'Female', 'Other']
@@ -177,11 +177,11 @@ export function RegisterPatientPage() {
                   <input
                     id="reg-age"
                     value={form.age}
-                    onChange={(event) => update('age', event.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                    onChange={(event) => update('age', nextAgeInput(event.target.value, form.age))}
                     onBlur={touch('age')}
                     inputMode="numeric"
                     maxLength={3}
-                    placeholder="Years"
+                    placeholder="0–130"
                     aria-invalid={Boolean(shown('age'))}
                     className={cn(inputClass, (shown('age') || needsAgeConfirm) && errorClass, needsAgeConfirm && 'font-semibold text-critical')}
                   />

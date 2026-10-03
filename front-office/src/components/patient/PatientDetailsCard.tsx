@@ -9,7 +9,7 @@ import { useStoreValue } from '../../hooks/useStore'
 import { findAbhaHolder, getConnectivity } from '../../domain/selectors'
 import { linkAbha, updatePatientDemographics } from '../../domain/actions'
 import { toEditableMobile } from '../../utils/phone'
-import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mobileError, nameError } from '../../utils/validation'
+import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mobileError, nameError, nextAgeInput } from '../../utils/validation'
 import { cn } from '../../utils/cn'
 import { AgeConfirm, FieldError } from './AgeConfirm'
 import { formatDateKey } from '../../utils/dates'
@@ -132,10 +132,10 @@ export function PatientDetailsCard({ patient }: { patient: Patient }) {
               <div>
                 <input
                   value={draft.age}
-                  onChange={(e) => edit('age', e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+                  onChange={(e) => edit('age', nextAgeInput(e.target.value, draft.age))}
                   className={cn(inputClass, (draftErrors.age || needsAgeConfirm) && errorClass)}
-                  placeholder="Age"
-                  aria-label="Age"
+                  placeholder="Age 0–130"
+                  aria-label="Age in years, 0 to 130"
                   aria-invalid={Boolean(draftErrors.age)}
                   inputMode="numeric"
                   maxLength={3}

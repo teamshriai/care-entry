@@ -37,6 +37,14 @@ export function ageError(value: string | number | null | undefined): string | nu
   return null
 }
 
+/** What the age box keeps as it is typed in: whole years only, and never
+ *  above MAX_AGE — a keystroke or paste that would pass it is ignored, so
+ *  the box can't hold 131 or more. */
+export function nextAgeInput(typed: string, previous: string): string {
+  const digits = typed.replace(/[^0-9]/g, '').replace(/^0+(?=\d)/, '').slice(0, 3)
+  return digits !== '' && Number(digits) > MAX_AGE ? previous : digits
+}
+
 /** 100–130 is possible but rare — worth asking the patient again. */
 export function ageNeedsConfirmation(value: string | number | null | undefined): boolean {
   if (ageError(value)) return false

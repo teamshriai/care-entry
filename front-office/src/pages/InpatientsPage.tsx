@@ -49,7 +49,9 @@ function payerOf(admission: Admission): string {
 /**
  * Inpatients: who is in a bed, who is waiting for one, which beds are free
  * and who went home today — each figure is also the filter for the list
- * under it. Discharge sits on the patient's row; a free bed admits into it.
+ * under it. Discharge sits on the patient's row, and a requested admission
+ * is given its bed on its own row. A new admission starts from the
+ * patient's profile, never here.
  */
 export function InpatientsPage() {
   const location = useLocation()
@@ -98,12 +100,6 @@ export function InpatientsPage() {
         subtitle="Who is in a bed, who is waiting for one, and which beds are free."
         illustration={<AdmissionIllustration className="h-8 w-8" />}
         illustrationTone="purple"
-        actions={
-          <Button size="sm" onClick={() => openFlow('admit')}>
-            <BedDouble className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Admit
-          </Button>
-        }
       />
 
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
@@ -165,7 +161,7 @@ export function InpatientsPage() {
                     <td className="whitespace-nowrap px-5 py-3 text-right">
                       <Button size="sm" onClick={() => openFlow('admit', { uhid: a.patientId })}>
                         <BedDouble className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        Admit
+                        Allot bed
                       </Button>
                     </td>
                   </tr>
@@ -208,7 +204,6 @@ export function InpatientsPage() {
                     bed={bed}
                     occupant={rows.find((r) => r.admission.admissionId === bed.currentAdmissionId)?.admission ?? null}
                     onOpen={openProfile}
-                    onAdmit={() => openFlow('admit', { ward: bed.ward, bed: bed.bedId })}
                   />
                 ))}
               </ul>
@@ -298,25 +293,15 @@ function WardLabel({ ward, bed }: { ward: string | null; bed: string | null }) {
   )
 }
 
-/** One bed: who is in it (opens their profile), or — when free — a tap to admit into it. */
-function BedTile({
-  bed,
-  occupant,
-  onOpen,
-  onAdmit,
-}: {
-  bed: Bed
-  occupant: Admission | null
-  onOpen: (patientId: string) => void
-  onAdmit: () => void
-}) {
+/** One bed: who is in it (opens their profile), or whether it is free. */
+function BedTile({ bed, occupant, onOpen }: { bed: Bed; occupant: Admission | null; onOpen: (patientId: string) => void }) {
   const free = bed.status === 'Available'
   const body = (
     <>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold text-ink">{bed.bedNumber}</span>
         <span className="block truncate text-xs text-ink-subtle">
-          {occupant ? occupant.patientName : free ? 'Admit here' : bed.status}
+          {occupant ? occupant.patientName : free ? 'Free' : bed.status}
         </span>
       </span>
       <Badge tone={free ? 'stable' : bed.status === 'Occupied' ? 'info' : 'neutral'} className="text-2xs">
@@ -331,12 +316,8 @@ function BedTile({
         <button type="button" onClick={() => onOpen(occupant.patientId)} title={`${occupant.patientName} · open profile`} className={cn(tileClass, 'border-info-border bg-info-bg hover:border-primary-600')}>
           {body}
         </button>
-      ) : free ? (
-        <button type="button" onClick={onAdmit} title={`Admit a patient to ${bed.bedNumber}`} className={cn(tileClass, 'border-stable-border bg-stable-bg hover:border-primary-600')}>
-          {body}
-        </button>
       ) : (
-        <div className={cn(tileClass, 'border-border-soft bg-surface-2')}>{body}</div>
+        <div className={cn(tileClass, free ? 'border-stable-border bg-stable-bg' : 'border-border-soft bg-surface-2')}>{body}</div>
       )}
     </li>
   )

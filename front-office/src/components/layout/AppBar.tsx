@@ -1,7 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { Menu } from 'lucide-react'
-import { currentFrontOfficeUser } from '../../data/currentUser'
-import { Avatar } from '../ui/Avatar'
+import { UserMenu } from './UserMenu'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { NotificationsMenu } from './NotificationsMenu'
 import { ThemeToggle } from './ThemeToggle'
@@ -50,13 +49,7 @@ export function AppBar({ onMenuClick }: { onMenuClick: () => void }) {
           <LanguageSwitcher />
         </div>
         <NotificationsMenu />
-        <div className="ml-0.5 flex items-center gap-2.5 border-l border-border-soft pl-2 sm:ml-1 sm:pl-3">
-          <Avatar initials={currentFrontOfficeUser.initials} size="sm" />
-          <div className="hidden text-right sm:block xl:hidden 2xl:block">
-            <p className="text-sm font-medium leading-tight text-ink">{currentFrontOfficeUser.name}</p>
-            <p className="text-xs leading-tight text-ink-subtle">{currentFrontOfficeUser.role}</p>
-          </div>
-        </div>
+        <UserMenu />
       </div>
 
       {/* IndoStates — an external link, opened in a new tab so the portal stays open. The
