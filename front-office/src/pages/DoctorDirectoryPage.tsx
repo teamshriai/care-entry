@@ -75,7 +75,7 @@ export function DoctorDirectoryPage() {
       />
 
       <div className="px-6 py-6 lg:px-8">
-        <Card>
+        <Card accentTone="indigo">
           <div className="flex flex-col gap-3 border-b border-border-soft p-4 xl:flex-row xl:items-center">
             <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
               <Search className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={1.75} />

@@ -46,7 +46,7 @@ export function PatientProfilePage() {
       <div>
         <PageHeader title="Patient not found" />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-xl">
+          <Card accentTone="teal" className="max-w-xl">
             <CardBody>
               <EmptyState
                 icon={UserRound}

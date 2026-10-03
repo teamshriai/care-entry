@@ -45,7 +45,7 @@ export function PatientTimeline({
   onChangeBooking: (appointmentId: string) => void
 }) {
   return (
-    <Card className="min-w-0">
+    <Card accentTone="info" className="min-w-0">
       <CardHeader icon={CalendarClock} iconTone="info" title="Timeline" subtitle="Encounters, bills and admissions — newest first" />
 
       <section aria-label="Today and upcoming" className="border-t border-border-soft">

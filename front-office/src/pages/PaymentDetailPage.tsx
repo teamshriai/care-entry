@@ -51,7 +51,7 @@ export function PaymentDetailPage() {
       <div>
         <PageHeader title="Bill not found" />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-xl">
+          <Card accentTone="stable" className="max-w-xl">
             <CardBody>
               <EmptyState
                 icon={ReceiptIcon}
@@ -137,7 +137,7 @@ export function PaymentDetailPage() {
         {error ? <Alert tone="critical">{error}</Alert> : null}
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_340px]">
-          <Card className="min-w-0">
+          <Card accentTone="stable" className="min-w-0">
             <CardHeader title="Bill items" subtitle={linkedTo ?? undefined} action={<BillStatusBadge payment={payment} />} />
             <div className="divide-y divide-border-soft">
               {payment.items.map((item) => (
@@ -211,7 +211,7 @@ export function PaymentDetailPage() {
           </Card>
 
           <div className="min-w-0">
-            <Card>
+            <Card accentTone="stable">
               <CardHeader title="Summary" />
               <CardBody className="flex flex-col gap-3">
                 <dl className="space-y-2 text-sm">

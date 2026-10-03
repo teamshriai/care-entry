@@ -1,7 +1,6 @@
 import type { ElementType, ReactNode } from 'react'
-import { IconBadge } from './IconBadge'
 import { cn } from '../../utils/cn'
-import { TONE_STYLES, TONE_VAR } from '../../utils/tone'
+import { STAT_HUE, TONE_HUE } from '../../utils/statHue'
 import type { Tone } from '../../utils/tone'
 
 export interface StatFilterItem<K extends string> {
@@ -36,7 +35,8 @@ export function StatFilter<K extends string>({
     <div role="group" aria-label={label} className={cn('grid gap-3', columns)}>
       {items.map((item) => {
         const active = item.key === selected
-        const accent = TONE_VAR[item.tone]
+        const hue = STAT_HUE[TONE_HUE[item.tone]]
+        const Icon = item.icon
         return (
           <button
             key={item.key}
@@ -44,27 +44,22 @@ export function StatFilter<K extends string>({
             aria-pressed={active}
             onClick={() => onSelect(item.key)}
             className={cn(
-              'flex flex-col rounded-xl border bg-surface-1 px-4 py-3 text-left transition-all duration-150',
+              // A phone stacks the icon over the figure so nothing is cut short.
+              'flex min-w-0 flex-col items-start gap-2 rounded-2xl p-3 text-left transition-all duration-150 sm:flex-row sm:items-center sm:gap-3',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2',
-              active ? 'shadow-card-md' : 'border-border hover:bg-surface-2',
+              hue.card,
+              // The chosen figure carries a ring in its own colour.
+              active ? cn('shadow-card-md ring-2 ring-offset-2 ring-offset-bg', hue.ring) : 'hover:-translate-y-0.5 hover:shadow-card-md',
             )}
-            style={
-              active && accent
-                ? {
-                    borderColor: `var(--color-${accent})`,
-                    boxShadow: `0 0 0 3px color-mix(in oklab, var(--color-${accent}) 18%, transparent)`,
-                  }
-                : undefined
-            }
           >
-            <span className="flex items-center gap-2">
-              <IconBadge icon={item.icon} tone={item.tone} size="xs" />
-              <span className="truncate text-xs font-semibold text-ink-muted">{item.label}</span>
+            <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white', hue.icon)}>
+              <Icon className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
             </span>
-            <span className={cn('mt-2 text-2xl font-semibold leading-none tabular-nums', TONE_STYLES[item.tone].text)}>
-              {item.value}
+            <span className="min-w-0">
+              <span className={cn('block text-2xl font-bold leading-none tabular-nums', hue.ink)}>{item.value}</span>
+              <span className="mt-1 block text-sm font-semibold leading-tight text-ink">{item.label}</span>
+              {item.context ? <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-ink-muted">{item.context}</span> : null}
             </span>
-            <span className="mt-1.5 truncate text-2xs text-ink-subtle">{item.context ?? ' '}</span>
           </button>
         )
       })}

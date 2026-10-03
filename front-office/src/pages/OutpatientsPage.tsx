@@ -198,7 +198,7 @@ export function OutpatientsPage() {
   const items: StatFilterItem<OutpatientFilter>[] = [
     { key: 'today', label: 'Today', value: counts.today, context: 'Bookings and walk-ins', tone: 'info', icon: CalendarClock },
     { key: 'check-in', label: 'To check in', value: counts['check-in'], context: 'Booked, not here yet', tone: 'warning', icon: LogIn },
-    { key: 'waiting', label: 'Waiting', value: counts.waiting, context: 'Checked in', tone: 'info', icon: UserCheck },
+    { key: 'waiting', label: 'Waiting', value: counts.waiting, context: 'Checked in', tone: 'purple', icon: UserCheck },
     { key: 'with-doctor', label: 'With doctor', value: counts['with-doctor'], context: 'Called or in the room', tone: 'teal', icon: DoorOpen },
     { key: 'done', label: 'Done today', value: counts.done, context: 'Seen or closed', tone: 'stable', icon: CheckCircle2 },
     { key: 'upcoming', label: 'Upcoming', value: counts.upcoming, context: 'Booked for later days', tone: 'indigo', icon: CalendarDays },
@@ -261,7 +261,7 @@ export function OutpatientsPage() {
 
         {error ? <Alert tone="warning">{error}</Alert> : null}
 
-        <Card>
+        <Card accentTone="info">
           <OutpatientList
             rows={rows}
             today={today}

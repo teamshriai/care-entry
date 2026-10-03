@@ -47,7 +47,7 @@ export function PaymentReceiptPage() {
       <div>
         <PageHeader title="Receipt not found" />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-xl">
+          <Card accentTone="stable" className="max-w-xl">
             <CardBody>
               <EmptyState
                 title="No such receipt"
@@ -77,7 +77,7 @@ export function PaymentReceiptPage() {
       />
 
       <div className="px-6 py-6 lg:px-8">
-        <Card className="mx-auto max-w-xl">
+        <Card accentTone="stable" className="mx-auto max-w-xl">
           <CardBody className="flex flex-col gap-4">
             <div className="border-b border-border-soft pb-4 text-center">
               <p className="text-lg font-semibold tracking-tight text-ink">{facility.name}</p>

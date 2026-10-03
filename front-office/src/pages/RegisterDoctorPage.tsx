@@ -143,7 +143,7 @@ export function RegisterDoctorPage() {
       <div>
         <PageHeader title="Register Doctor" subtitle="Profile created — the doctor is now in the directory." />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-2xl">
+          <Card accentTone="indigo" className="max-w-2xl">
             <CardBody className="flex flex-col gap-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stable-bg">
@@ -207,7 +207,7 @@ export function RegisterDoctorPage() {
           <div className="flex min-w-0 flex-col gap-6">
             {error ? <Alert tone="critical">{error}</Alert> : null}
 
-            <Card>
+            <Card accentTone="indigo">
               <CardHeader icon={UserRoundPlus} iconTone="indigo" title="Basic information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Doctor name" required className="sm:col-span-2">
@@ -255,7 +255,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="indigo">
               <CardHeader icon={Stethoscope} iconTone="indigo" title="Professional information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Department" required>
@@ -306,7 +306,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="indigo">
               <CardHeader icon={Building2} iconTone="indigo" title="Hospital information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Doctor / employee ID" hint="Left blank, one is allocated automatically">
@@ -348,7 +348,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="stable">
               <CardHeader
                 icon={CalendarCheck}
                 iconTone="stable"
@@ -406,7 +406,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="stable">
               <CardHeader icon={ShieldCheck} iconTone="stable" title="Account" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Login email / username" hint="Defaults to the contact email">
@@ -443,7 +443,7 @@ export function RegisterDoctorPage() {
 
           {/* Summary / submit */}
           <div className="min-w-0">
-            <Card className="2xl:sticky 2xl:top-6">
+            <Card accentTone="indigo" className="2xl:sticky 2xl:top-6">
               <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center gap-2.5">
                   <Avatar initials={form.name ? initialsOf(form.name) : 'DR'} />

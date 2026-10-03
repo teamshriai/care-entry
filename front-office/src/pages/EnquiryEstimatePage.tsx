@@ -102,7 +102,7 @@ export function EnquiryEstimatePage() {
 
       <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
         {/* Patient gate — every estimate belongs to one patient */}
-        <Card>
+        <Card accentTone="cyan">
           <CardBody className="flex flex-col gap-2 lg:max-w-xl">
             <p className="text-xs font-medium text-ink-muted">Patient</p>
             <PatientPickField
@@ -119,7 +119,7 @@ export function EnquiryEstimatePage() {
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* Available services */}
-          <Card className="min-w-0">
+          <Card accentTone="stable" className="min-w-0">
             <CardHeader icon={Receipt} iconTone="stable" title="Available Services" subtitle="Displayed rates for enquiries at the counter" />
             <div className="flex flex-col gap-3 border-b border-border-soft p-4 lg:flex-row lg:items-center">
               <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
@@ -189,7 +189,7 @@ export function EnquiryEstimatePage() {
 
           {/* Estimate for the selected patient */}
           <div className="min-w-0">
-            <Card className="2xl:sticky 2xl:top-6">
+            <Card accentTone="cyan" className="2xl:sticky 2xl:top-6">
               <CardHeader
                 title={patient ? `Estimate for ${patient.name}` : 'Estimate'}
                 subtitle={estimate ? estimate.estimateId : undefined}

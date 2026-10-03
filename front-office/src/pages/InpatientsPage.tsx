@@ -86,12 +86,12 @@ export function InpatientsPage() {
       label: 'Inpatients',
       value: rows.length,
       context: `${rows.filter((r) => isCritical(r.admission.wardLabel)).length} in ICU / Emergency`,
-      tone: 'info',
+      tone: 'purple',
       icon: BedDouble,
     },
     { key: 'awaiting', label: 'Awaiting bed', value: awaiting.length, context: 'Admission requested', tone: 'warning', icon: Hourglass },
     { key: 'beds', label: 'Beds free', value: bedsFree, context: `of ${bedsTotal} beds`, tone: 'stable', icon: BedSingle },
-    { key: 'discharged', label: 'Discharged today', value: discharged.length, context: 'Beds released', tone: 'neutral', icon: LogOut },
+    { key: 'discharged', label: 'Discharged today', value: discharged.length, context: 'Beds released', tone: 'teal', icon: LogOut },
   ]
 
   return (
@@ -108,7 +108,7 @@ export function InpatientsPage() {
         <StatFilter label="Show" items={items} selected={filter} onSelect={selectFilter} />
 
         {filter === 'admitted' ? (
-          <Card>
+          <Card accentTone="purple">
             {rows.length === 0 ? (
               <EmptyState icon={BedDouble} title="Nobody is admitted" description="Patients appear here the moment they are admitted." />
             ) : (
@@ -144,7 +144,7 @@ export function InpatientsPage() {
         ) : null}
 
         {filter === 'awaiting' ? (
-          <Card>
+          <Card accentTone="purple">
             {awaiting.length === 0 ? (
               <EmptyState icon={Hourglass} title="Nobody is waiting for a bed" description="Admission requests appear here until a bed is given." />
             ) : (
@@ -174,7 +174,7 @@ export function InpatientsPage() {
         ) : null}
 
         {filter === 'beds' ? (
-          <Card>
+          <Card accentTone="purple">
             <div className="flex flex-wrap gap-2 border-b border-border-soft px-5 py-4" role="group" aria-label="Ward">
               {wards.map((w) => {
                 const active = w.ward === activeWard?.ward
@@ -214,7 +214,7 @@ export function InpatientsPage() {
         ) : null}
 
         {filter === 'discharged' ? (
-          <Card>
+          <Card accentTone="purple">
             {discharged.length === 0 ? (
               <EmptyState icon={LogOut} title="No discharges yet today" description="Patients appear here as they are discharged." />
             ) : (

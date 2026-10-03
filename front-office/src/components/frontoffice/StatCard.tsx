@@ -1,14 +1,9 @@
 import type { ElementType } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../utils/cn'
+import { STAT_HUE } from '../../utils/statHue'
+import type { StatHue } from '../../utils/statHue'
 
-const HUE = {
-  blue: { card: 'bg-stat-blue-bg', icon: 'bg-stat-blue', ink: 'text-stat-blue-ink' },
-  orange: { card: 'bg-stat-orange-bg', icon: 'bg-stat-orange', ink: 'text-stat-orange-ink' },
-  purple: { card: 'bg-stat-purple-bg', icon: 'bg-stat-purple', ink: 'text-stat-purple-ink' },
-  red: { card: 'bg-stat-red-bg', icon: 'bg-stat-red', ink: 'text-stat-red-ink' },
-  teal: { card: 'bg-stat-teal-bg', icon: 'bg-stat-teal', ink: 'text-stat-teal-ink' },
-} as const
 
 /**
  * One dashboard figure, in the clinician portal's compact style: a tinted
@@ -26,7 +21,7 @@ export function StatCard({
   title,
 }: {
   icon: ElementType
-  hue: keyof typeof HUE
+  hue: StatHue
   value: number | string
   label: string
   hint: string
@@ -35,7 +30,7 @@ export function StatCard({
   title: string
 }) {
   const navigate = useNavigate()
-  const style = HUE[hue]
+  const style = STAT_HUE[hue]
   return (
     <button
       type="button"

@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
 import { cn } from '../../utils/cn'
 import { IconBadge } from './IconBadge'
@@ -6,12 +7,15 @@ import type { Tone } from '../../utils/tone'
 
 type CardEmphasis = 'default' | 'critical' | 'quiet'
 
+/** A card's colour, so its header can pick up the same hue. */
+const CardAccent = createContext<string | undefined>(undefined)
+
 export function Card({
   className = '',
   emphasis = 'default',
-  /** Optional hue for the card's edge — a subtle tint of the destination's
-   *  colour mixed into the standard card border. The card surface itself stays
-   *  plain (design system §10.5); the header icon tile carries the colour. */
+  /** The card's colour: a solid bar along its top edge, a tint of it in the
+   *  header, and its edge mixed into the border. The body stays plain so
+   *  lists and forms read cleanly; print drops the colour. */
   accentTone,
   children,
   style,
@@ -23,21 +27,26 @@ export function Card({
     quiet: 'border border-border-soft bg-surface-2',
   }
   const accentVar = accentTone ? TONE_VAR[accentTone] : undefined
+  const edge = accentVar ? `color-mix(in oklab, var(--color-${accentVar}) 32%, var(--color-border))` : undefined
 
   return (
     <div
-      className={cn('rounded-xl', emphasisStyles[emphasis], className)}
+      className={cn('rounded-xl', emphasisStyles[emphasis], accentVar && 'card-accent', className)}
       style={
         accentVar
           ? {
-              borderColor: `color-mix(in oklab, var(--color-${accentVar}) 32%, var(--color-border))`,
+              borderLeftColor: edge,
+              borderRightColor: edge,
+              borderBottomColor: edge,
+              borderTopColor: `var(--color-${accentVar})`,
+              borderTopWidth: 3,
               ...style,
             }
           : style
       }
       {...props}
     >
-      {children}
+      <CardAccent.Provider value={accentVar}>{children}</CardAccent.Provider>
     </div>
   )
 }
@@ -59,8 +68,12 @@ export function CardHeader({
   action?: ReactNode
   className?: string
 }) {
+  const accentVar = useContext(CardAccent)
   return (
-    <div className={cn('flex min-h-11 items-start justify-between gap-4 px-4 pt-4 pb-3 sm:px-5', className)}>
+    <div
+      className={cn('flex min-h-11 items-start justify-between gap-4 px-4 pt-4 pb-3 sm:px-5', accentVar && 'card-accent-head rounded-t-[inherit]', className)}
+      style={accentVar ? { background: `color-mix(in oklab, var(--color-${accentVar}) 9%, var(--color-surface-1))` } : undefined}
+    >
       <div className="flex items-center gap-3">
         {Icon ? <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size="xs" /> : null}
         <div>

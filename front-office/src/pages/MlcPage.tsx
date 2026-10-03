@@ -79,7 +79,7 @@ export function MlcPage() {
       />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[380px_minmax(0,1fr)]">
-        <Card className="min-w-0">
+        <Card accentTone="warning" className="min-w-0">
           <CardHeader icon={FileWarning} iconTone="warning" title="Register an MLC" />
           <CardBody>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -179,7 +179,7 @@ export function MlcPage() {
           </CardBody>
         </Card>
 
-        <Card className="min-w-0">
+        <Card accentTone="warning" className="min-w-0">
           <CardHeader
             title="MLC register"
             subtitle="Every case and its police intimation status, newest first"

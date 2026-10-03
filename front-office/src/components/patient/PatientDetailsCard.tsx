@@ -105,7 +105,7 @@ export function PatientDetailsCard({ patient }: { patient: Patient }) {
   }
 
   return (
-    <Card>
+    <Card accentTone="teal">
       <CardHeader
         icon={UserCog}
         iconTone="teal"

@@ -48,7 +48,7 @@ export function DoctorProfilePage() {
       <div>
         <PageHeader title="Doctor not found" />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-xl">
+          <Card accentTone="indigo" className="max-w-xl">
             <CardBody>
               <EmptyState
                 icon={Stethoscope}
@@ -101,7 +101,7 @@ export function DoctorProfilePage() {
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[340px_minmax(0,1fr)]">
           {/* Profile */}
           <div className="flex min-w-0 flex-col gap-6">
-            <Card>
+            <Card accentTone="indigo">
               <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
                   <Avatar initials={initialsOf(provider.name)} size="lg" />
@@ -157,7 +157,7 @@ export function DoctorProfilePage() {
 
           {/* Schedule + appointments */}
           <div className="flex min-w-0 flex-col gap-6">
-            <Card>
+            <Card accentTone="info">
               <CardHeader
                 icon={CalendarCheck}
                 iconTone="info"
@@ -188,7 +188,7 @@ export function DoctorProfilePage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="info">
               <CardHeader
                 icon={Stethoscope}
                 iconTone="info"

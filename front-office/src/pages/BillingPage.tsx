@@ -70,7 +70,7 @@ export function BillingPage() {
       <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
         <StatFilter label="Show bills" items={items} selected={filter} onSelect={selectFilter} />
 
-        <Card>
+        <Card accentTone="stable">
           <PaymentsTable
             payments={bills}
             showBalance

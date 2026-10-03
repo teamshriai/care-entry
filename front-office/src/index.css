@@ -114,6 +114,18 @@
   --color-stat-teal-bg: #c9eee2;
   --color-stat-teal: #0b8a68;
   --color-stat-teal-ink: #08694f;
+  --color-stat-green-bg: #d3f0d9;
+  --color-stat-green: #2f9e44;
+  --color-stat-green-ink: #1b6e30;
+  --color-stat-indigo-bg: #dcdcfc;
+  --color-stat-indigo: #4f46e5;
+  --color-stat-indigo-ink: #3730a3;
+  --color-stat-pink-bg: #fbd3e6;
+  --color-stat-pink: #d6336c;
+  --color-stat-pink-ink: #a61e4d;
+  --color-stat-slate-bg: #dfe5ec;
+  --color-stat-slate: #64748b;
+  --color-stat-slate-ink: #334155;
 
   /* Operational Summary bars — vivid solid fills. */
   --color-bar-blue: #2563eb;
@@ -325,6 +337,18 @@
   --color-stat-teal-bg: #133f35;
   --color-stat-teal: #0b8a68;
   --color-stat-teal-ink: #8ce9c8;
+  --color-stat-green-bg: #173f22;
+  --color-stat-green: #2f9e44;
+  --color-stat-green-ink: #8ce99a;
+  --color-stat-indigo-bg: #262a5e;
+  --color-stat-indigo: #5c56e8;
+  --color-stat-indigo-ink: #b4b8ff;
+  --color-stat-pink-bg: #4d1d33;
+  --color-stat-pink: #d6336c;
+  --color-stat-pink-ink: #ffa8cc;
+  --color-stat-slate-bg: #2b3442;
+  --color-stat-slate: #64748b;
+  --color-stat-slate-ink: #cbd5e1;
 
   --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
   --shadow-card-md: 0 2px 8px 0 rgba(0, 0, 0, 0.45), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
@@ -552,5 +576,16 @@ html[data-high-contrast='true'][data-theme='dark'] {
   aside,
   [data-print='hide'] {
     display: none !important;
+  }
+}
+
+/* A coloured card prints plain: no top bar, no tinted header. */
+@media print {
+  .card-accent {
+    border-color: var(--color-border) !important;
+    border-top-width: 1px !important;
+  }
+  .card-accent-head {
+    background: transparent !important;
   }
 }

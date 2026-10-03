@@ -69,7 +69,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
   }
 
   return (
-    <Card>
+    <Card accentTone="warning">
       <CardHeader icon={CalendarX2} iconTone="warning" title="Leave & unavailability" />
       <CardBody className="flex flex-col gap-3">
         {error ? <Alert tone="warning">{error}</Alert> : null}

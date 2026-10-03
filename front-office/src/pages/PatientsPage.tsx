@@ -65,7 +65,7 @@ export function PatientsPage() {
 
   const items: StatFilterItem<PatientFilter>[] = [
     { key: 'all', label: 'All patients', value: rows.length, context: 'Newest first', tone: 'info', icon: Users },
-    { key: 'today', label: 'Registered today', value: lists.today.length, context: 'New records', tone: 'stable', icon: UserPlus },
+    { key: 'today', label: 'Registered today', value: lists.today.length, context: 'New records', tone: 'teal', icon: UserPlus },
     { key: 'duplicates', label: 'Possible duplicates', value: lists.duplicates.length, context: 'Same mobile number', tone: 'warning', icon: Copy },
   ]
 
@@ -82,7 +82,7 @@ export function PatientsPage() {
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
         <StatFilter label="Show patients" items={items} selected={filter} onSelect={selectFilter} columns="grid-cols-2 sm:grid-cols-3" />
 
-        <Card>
+        <Card accentTone="teal">
           {shown.length === 0 ? (
             <EmptyState
               illustration={<PatientIllustration className="h-12 w-12" />}

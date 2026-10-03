@@ -81,7 +81,7 @@ export function GuestPassPage() {
       />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[360px_minmax(0,1fr)]">
-        <Card className="min-w-0">
+        <Card accentTone="brand" className="min-w-0">
           <CardHeader icon={IdCard} iconTone="brand" title="Issue a pass" />
           <CardBody>
             <form onSubmit={handleIssue} className="flex flex-col gap-4">
@@ -134,7 +134,7 @@ export function GuestPassPage() {
         </Card>
 
         <div className="flex min-w-0 flex-col gap-6">
-          <Card>
+          <Card accentTone="brand">
             <CardHeader
               title="Active passes"
               subtitle="Outstanding passes, oldest first"
@@ -173,7 +173,7 @@ export function GuestPassPage() {
             )}
           </Card>
 
-          <Card>
+          <Card accentTone="brand">
             <CardHeader title="Returned today" action={<span className="text-xs tabular-nums text-ink-faint">{returned.length}</span>} />
             {returned.length === 0 ? (
               <EmptyState title="Nothing returned yet" description="Returned passes are listed here for the shift." />

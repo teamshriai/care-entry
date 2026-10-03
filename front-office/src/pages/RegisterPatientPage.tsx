@@ -115,7 +115,7 @@ export function RegisterPatientPage() {
     // history, so Back never lands on it again.
     return (
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6 py-10">
-        <Card className="w-full max-w-md">
+        <Card accentTone="teal" className="w-full max-w-md">
           <AckCard
             title="Patient Registered"
             icon={UserRoundCheck}
@@ -153,7 +153,7 @@ export function RegisterPatientPage() {
       <PageHeader title="Register Patient" subtitle="Create a new patient record and allocate a UHID." />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
-        <Card className="min-w-0">
+        <Card accentTone="teal" className="min-w-0">
           <CardHeader icon={UserPlus} iconTone="teal" title="Patient details" />
           <CardBody>
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
@@ -272,7 +272,7 @@ export function RegisterPatientPage() {
 
         <div className="flex min-w-0 flex-col gap-6">
           {duplicates.length > 0 ? (
-            <Card className="border-warning-border bg-warning-bg/40">
+            <Card accentTone="warning" className="border-warning-border bg-warning-bg/40">
               <CardHeader
                 title="Possible existing patient found"
                 subtitle="Matched on mobile number, name or ABHA. Confirm before creating a second record."
@@ -300,7 +300,7 @@ export function RegisterPatientPage() {
               </div>
             </Card>
           ) : (
-            <Card>
+            <Card accentTone="teal">
               <CardBody>
                 <p className="text-sm font-medium text-ink">Duplicate check</p>
                 <p className="mt-1 text-sm text-ink-muted">
