@@ -34,7 +34,8 @@ import { getState } from '../domain/store'
 import { getBillsForAppointment, getProviderById } from '../domain/selectors'
 import { OUTPATIENT_FILTERS, getOutpatients } from '../domain/outpatientSelectors'
 import type { OutpatientFilter, OutpatientRow } from '../domain/outpatientSelectors'
-import { callToken, checkInAppointment, completeConsultation, markNoShow, recallToken, startConsultation } from '../domain/actions'
+import { callToken, completeConsultation, markNoShow, recallToken, startConsultation } from '../domain/actions'
+import { CheckInToggle } from '../components/appointment/CheckInToggle'
 import { todayKey } from '../domain/time'
 import { formatClock } from '../utils/format'
 import { cn } from '../utils/cn'
@@ -128,10 +129,7 @@ export function OutpatientsPage() {
                 No-show
               </Button>
             ) : null}
-            <Button size="sm" onClick={() => run(() => checkInAppointment(appointment.appointmentId), tele ? 'Joined' : 'Checked in', name)}>
-              {tele ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />}
-              {tele ? 'Joined' : 'Check in'}
-            </Button>
+            <CheckInToggle appointment={appointment} patientName={name} />
             <Button
               size="sm"
               variant="ghost"
@@ -146,10 +144,14 @@ export function OutpatientsPage() {
       }
       case 'waiting':
         return token ? (
-          <Button size="sm" onClick={() => run(() => callToken(token.tokenId), 'Patient called', `${token.tokenNumber} · ${name}`)}>
-            <PhoneCall className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Call
-          </Button>
+          <>
+            {/* A mistaken check-in can be taken back until the patient is called. */}
+            {row.appointment ? <CheckInToggle appointment={row.appointment} patientName={name} /> : null}
+            <Button size="sm" onClick={() => run(() => callToken(token.tokenId), 'Patient called', `${token.tokenNumber} · ${name}`)}>
+              <PhoneCall className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Call
+            </Button>
+          </>
         ) : null
       case 'called':
         return token ? (

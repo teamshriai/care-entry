@@ -559,6 +559,39 @@ export function checkInAppointment(appointmentId: string): CheckInResult {
   return { visitId, tokenId, tokenNumber }
 }
 
+/** Takes back a check-in pressed by mistake: the booking is to check in
+ *  again and its visit and token are withdrawn, in one save. Only while the
+ *  patient is still waiting — once called, the visit has begun. The token's
+ *  number is not given out again, so numbers stay unique for the day. */
+export function undoCheckIn(appointmentId: string): Appointment {
+  const state = getState()
+  const appointment = requireAppointment(state, appointmentId)
+  if (appointment.status !== 'Checked-in' || !appointment.visitId) {
+    throw new DomainError('INVALID_TRANSITION', 'This booking is not checked in.')
+  }
+  if (appointment.date !== todayKey()) {
+    throw new DomainError('INVALID_TRANSITION', 'Only today’s check-in can be taken back.')
+  }
+  const token = state.queueTokens.find((t) => t.visitId === appointment.visitId)
+  if (token && token.status !== 'Waiting') {
+    throw new DomainError('INVALID_TRANSITION', `The patient has already been ${token.status === 'Called' ? 'called' : 'seen'} — the check-in can't be undone.`)
+  }
+  const visitId = appointment.visitId
+  const reverted: Appointment = { ...appointment, status: 'Confirmed', visitId: null }
+  setState(
+    logged(
+      {
+        ...state,
+        appointments: state.appointments.map((a) => (a.appointmentId === appointmentId ? reverted : a)),
+        visits: state.visits.filter((v) => v.visitId !== visitId),
+        queueTokens: state.queueTokens.filter((t) => t.visitId !== visitId),
+      },
+      [{ text: 'Check-in undone', meta: `${patientName(state, appointment.patientId)}${token ? ` · ${token.tokenNumber} withdrawn` : ''}` }],
+    ),
+  )
+  return reverted
+}
+
 // ------------------------------------------------------- queue progression
 // NOTE ON OWNERSHIP: calling a patient in, starting and completing a
 // consultation belong to the consultation room (the clinician side) in

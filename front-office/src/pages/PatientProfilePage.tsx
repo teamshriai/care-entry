@@ -12,12 +12,10 @@ import { CurrentAdmissionCard } from '../components/patient/CurrentAdmissionCard
 import { BookingDialog } from '../components/appointment/BookingDialog'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
-import { useToast } from '../hooks/useToast'
 import { useCountPatientOpen } from '../hooks/useCountPatientOpen'
 import { useFlow } from '../flows/useFlow'
 import { getPatientById, getToday } from '../domain/selectors'
 import { getPatientHeader, getPatientTimeline } from '../domain/patientSelectors'
-import { checkInAppointment } from '../domain/actions'
 
 /**
  * The patient's hub. Everything the front desk does for a patient starts
@@ -29,7 +27,6 @@ import { checkInAppointment } from '../domain/actions'
 export function PatientProfilePage() {
   const { uhid } = useParams<{ uhid: string }>()
   const navigate = useNavigate()
-  const { notify } = useToast()
   const { openFlow } = useFlow()
   const now = useNow(60000)
   const today = useStoreValue(getToday)
@@ -61,14 +58,6 @@ export function PatientProfilePage() {
     )
   }
 
-  function checkIn(appointmentId: string) {
-    try {
-      const result = checkInAppointment(appointmentId)
-      notify('Checked in', { detail: `Token ${result.tokenNumber} · ${patient!.name}` })
-    } catch (err) {
-      notify('Could not check in', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
-  }
 
   return (
     <div>
@@ -89,7 +78,6 @@ export function PatientProfilePage() {
           <PatientTimeline
             timeline={timeline}
             today={today}
-            onCheckIn={checkIn}
             onCollect={(paymentId) => openFlow('billing', { uhid: patient.uhid, bill: paymentId })}
             onChangeBooking={setChangingBooking}
           />

@@ -1,9 +1,10 @@
 import type { ElementType } from 'react'
 import { Link } from 'react-router-dom'
-import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogIn, LogOut, MoreHorizontal, Stethoscope, Ticket, UserPlus, Video, XCircle } from 'lucide-react'
+import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogOut, MoreHorizontal, Stethoscope, Ticket, UserPlus, Video, XCircle } from 'lucide-react'
 import { Card, CardHeader } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
+import { CheckInToggle } from '../appointment/CheckInToggle'
 import { EmptyState } from '../ui/EmptyState'
 import { BILL_STATUS_TONE } from '../../utils/billing'
 import { appointmentStatusLabel } from '../../utils/appointment'
@@ -33,13 +34,11 @@ const KIND_ICON: Record<TimelineKind, ElementType> = {
 export function PatientTimeline({
   timeline,
   today,
-  onCheckIn,
   onCollect,
   onChangeBooking,
 }: {
   timeline: Timeline
   today: string
-  onCheckIn: (appointmentId: string) => void
   onCollect: (paymentId: string) => void
   /** Opens the reschedule-or-cancel choice for a confirmed booking. */
   onChangeBooking: (appointmentId: string) => void
@@ -55,7 +54,7 @@ export function PatientTimeline({
         ) : (
           <ul className="divide-y divide-border-soft">
             {timeline.upcoming.map((item) => (
-              <UpcomingRow key={item.id} item={item} today={today} onCheckIn={onCheckIn} onCollect={onCollect} onChangeBooking={onChangeBooking} />
+              <UpcomingRow key={item.id} item={item} today={today} onCollect={onCollect} onChangeBooking={onChangeBooking} />
             ))}
           </ul>
         )}
@@ -112,13 +111,11 @@ export function PatientTimeline({
 function UpcomingRow({
   item,
   today,
-  onCheckIn,
   onCollect,
   onChangeBooking,
 }: {
   item: UpcomingItem
   today: string
-  onCheckIn: (appointmentId: string) => void
   onCollect: (paymentId: string) => void
   onChangeBooking: (appointmentId: string) => void
 }) {
@@ -167,11 +164,8 @@ function UpcomingRow({
           <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
           Collect
         </Button>
-      ) : isToday && appointment.status === 'Confirmed' ? (
-        <Button size="sm" onClick={() => onCheckIn(appointment.appointmentId)}>
-          {tele ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />}
-          {tele ? 'Joined' : 'Check in'}
-        </Button>
+      ) : isToday ? (
+        <CheckInToggle appointment={appointment} />
       ) : null}
       {appointment.status === 'Confirmed' ? (
         <Button

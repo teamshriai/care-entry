@@ -7,7 +7,6 @@ import {
   CircleDot,
   IndianRupee,
   Info,
-  LogIn,
   Stethoscope,
   Undo2,
   UserCheck,
@@ -32,7 +31,8 @@ import { getPatientRows } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
 import type { NeedsAttentionItem } from '../domain/selectors'
 import { getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
-import { checkInAppointment, returnGuestPass } from '../domain/actions'
+import { returnGuestPass } from '../domain/actions'
+import { CheckInToggle } from '../components/appointment/CheckInToggle'
 import { formatRupees } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
 import { formatHeaderDateTime } from '../utils/format'
@@ -223,16 +223,8 @@ export function FrontOfficeHomePage() {
                 compact
                 maxRows={5}
                 renderStatus={(appointment) =>
-                  appointment.status === 'Confirmed' ? (
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        act(() => checkInAppointment(appointment.appointmentId), 'Checked in', appointment.patient?.name ?? undefined)
-                      }
-                    >
-                      <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Check in
-                    </Button>
+                  appointment.status === 'Confirmed' || (appointment.status === 'Checked-in' && appointment.token?.status === 'Waiting') ? (
+                    <CheckInToggle appointment={appointment} patientName={appointment.patient?.name} />
                   ) : (
                     <Badge status={appointment.status} className="px-2">
                       {appointmentStatusLabel(appointment.status)}

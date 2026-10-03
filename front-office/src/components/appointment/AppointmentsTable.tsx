@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
 import { AppointmentIllustration } from '../ui/illustrations/AppointmentIllustration'
@@ -77,9 +78,17 @@ export function AppointmentsTable({
               <td className="whitespace-nowrap px-5 py-3 font-medium tabular-nums text-ink">{appointment.slot}</td>
               <td className="px-5 py-3">
                 <p className="flex max-w-[14rem] items-center gap-1.5 text-ink">
-                  <span className="truncate" title={appointment.patient?.name}>
-                    {appointment.patient?.name ?? '—'}
-                  </span>
+                  {appointment.patient ? (
+                    <Link
+                      to={`/patients/${appointment.patient.uhid}`}
+                      title={`Open ${appointment.patient.name}'s profile`}
+                      className="truncate rounded-sm font-medium text-ink underline-offset-2 hover:text-primary-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
+                    >
+                      {appointment.patient.name}
+                    </Link>
+                  ) : (
+                    <span className="truncate">—</span>
+                  )}
                   <PatientStatusIcons status={care[appointment.patientId]} />
                 </p>
                 {compact ? null : (
