@@ -195,7 +195,7 @@ export function DoctorProfilePage() {
                 title="Today's appointments"
                 subtitle="Operational schedule only — no clinical record is shown here"
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate(`/outpatients?provider=${id}`)}>
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/patients/outpatients?provider=${id}`)}>
                     Outpatients · {appointments.length}
                   </Button>
                 }

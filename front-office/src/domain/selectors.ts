@@ -632,7 +632,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Patient awaiting doctor',
         detail: `${token.patient?.name ?? 'A patient'} has been awaiting the doctor for ${token.waitingMinutes} minutes (${token.tokenNumber}).`,
-        action: { kind: 'open', label: 'Outpatients', to: '/outpatients?filter=waiting' },
+        action: { kind: 'open', label: 'Outpatients', to: '/patients/outpatients?filter=waiting' },
       })
     }
   }
@@ -644,7 +644,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Doctor running late',
         detail: `${row.provider.name} is about ${row.delayMinutes} minutes behind schedule.`,
-        action: { kind: 'open', label: 'Their patients', to: `/outpatients?provider=${row.provider.providerId}` },
+        action: { kind: 'open', label: 'Their patients', to: `/patients/outpatients?provider=${row.provider.providerId}` },
       })
     }
     if (row.status === 'On leave') {

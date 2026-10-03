@@ -24,6 +24,7 @@ import { cn } from '../utils/cn'
 import type { Admission, Bed, Ward } from '../types/admission'
 import { PatientStatusIcons } from '../components/patient/PatientStatusIcons'
 import { usePatientCareStatus } from '../hooks/useCareStatus'
+import { PatientsTabs } from '../components/patient/PatientsTabs'
 
 type InpatientFilter = 'admitted' | 'awaiting' | 'beds' | 'discharged'
 
@@ -47,7 +48,7 @@ function payerOf(admission: Admission): string {
 }
 
 /**
- * Inpatients: who is in a bed, who is waiting for one, which beds are free
+ * Patients › Inpatients: who is in a bed, who is waiting for one, which beds are free
  * and who went home today — each figure is also the filter for the list
  * under it. Discharge sits on the patient's row, and a requested admission
  * is given its bed on its own row. A new admission starts from the
@@ -96,10 +97,11 @@ export function InpatientsPage() {
   return (
     <div>
       <PageHeader
-        title="Inpatients"
-        subtitle="Who is in a bed, who is waiting for one, and which beds are free."
+        title="Patients"
+        subtitle="Inpatients — who is in a bed, who is waiting for one, which beds are free, and who went home today."
         illustration={<AdmissionIllustration className="h-8 w-8" />}
         illustrationTone="purple"
+        tabs={<PatientsTabs />}
       />
 
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">

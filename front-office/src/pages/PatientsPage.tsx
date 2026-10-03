@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BedDouble, Copy, UserPlus, Users } from 'lucide-react'
+import { Copy, UserPlus, Users } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { PatientIllustration } from '../components/ui/illustrations/PatientIllustration'
 import { Card } from '../components/ui/Card'
@@ -15,12 +15,13 @@ import type { PatientListRow } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
 import { formatRupees } from '../utils/billing'
 import { initialsOf } from '../utils/format'
+import { PatientsTabs } from '../components/patient/PatientsTabs'
 import { PatientStatusIcons } from '../components/patient/PatientStatusIcons'
 import { usePatientCareStatus } from '../hooks/useCareStatus'
 
-type PatientFilter = 'all' | 'today' | 'inpatients' | 'duplicates'
+type PatientFilter = 'all' | 'today' | 'duplicates'
 
-const FILTERS: PatientFilter[] = ['all', 'today', 'inpatients', 'duplicates']
+const FILTERS: PatientFilter[] = ['all', 'today', 'duplicates']
 
 function readFilter(search: string): PatientFilter {
   const value = new URLSearchParams(search).get('filter')
@@ -30,7 +31,6 @@ function readFilter(search: string): PatientFilter {
 const EMPTY: Record<PatientFilter, { title: string; description: string }> = {
   all: { title: 'No patients yet', description: 'Registered patients appear here.' },
   today: { title: 'Nobody registered yet today', description: 'Patients registered today appear here.' },
-  inpatients: { title: 'Nobody is admitted', description: 'Patients in a bed appear here.' },
   duplicates: { title: 'No possible duplicates', description: 'Records that share a mobile number appear here.' },
 }
 
@@ -52,7 +52,6 @@ export function PatientsPage() {
   const lists: Record<PatientFilter, PatientListRow[]> = {
     all: rows,
     today: rows.filter(isToday),
-    inpatients: rows.filter((row) => row.bed),
     duplicates: rows.filter((row) => row.duplicate),
   }
   const shown = lists[filter]
@@ -67,7 +66,6 @@ export function PatientsPage() {
   const items: StatFilterItem<PatientFilter>[] = [
     { key: 'all', label: 'All patients', value: rows.length, context: 'Newest first', tone: 'info', icon: Users },
     { key: 'today', label: 'Registered today', value: lists.today.length, context: 'New records', tone: 'stable', icon: UserPlus },
-    { key: 'inpatients', label: 'Inpatients', value: lists.inpatients.length, context: 'In a bed now', tone: 'info', icon: BedDouble },
     { key: 'duplicates', label: 'Possible duplicates', value: lists.duplicates.length, context: 'Same mobile number', tone: 'warning', icon: Copy },
   ]
 
@@ -78,10 +76,11 @@ export function PatientsPage() {
         subtitle="Every registered patient, newest first. Open one to schedule, bill, admit or discharge."
         illustration={<PatientIllustration className="h-8 w-8" />}
         illustrationTone="teal"
+        tabs={<PatientsTabs />}
       />
 
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-        <StatFilter label="Show patients" items={items} selected={filter} onSelect={selectFilter} />
+        <StatFilter label="Show patients" items={items} selected={filter} onSelect={selectFilter} columns="grid-cols-2 sm:grid-cols-3" />
 
         <Card>
           {shown.length === 0 ? (

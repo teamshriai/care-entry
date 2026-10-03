@@ -56,13 +56,15 @@ Both apps open in the **light** theme by default; the dark theme stays available
   (`?flow=schedule|reschedule|admit|discharge|billing`, plus `uhid`, `doctor`, `appointment`,
   `bill` and the like). Browser Back or Esc closes it, and a link with `?flow=` opens straight into
   it. Each flow ends with a short acknowledgement and closes itself. Old addresses
-  (`/appointments`, `/op-queue`, `/appointments/new`, `/admissions/discharge`, `/payments/pending`, …)
+  (`/outpatients`, `/admissions`, `/appointments`, `/op-queue`, `/admissions/discharge`, `/payments/pending`, …)
   redirect to the matching place or flow; `?flow=consult` (the old Start Consultation) opens Schedule.
 - **Schedule, one step at a time — the one way to see a doctor:** department → that department's
   doctors → when: **now**, as a walk-in with a queue token, if the doctor is seeing patients, or a
   time to book (in person or teleconsult, where the doctor offers both) → confirm and pay → "Token
   Issued" or "Appointment Confirmed". Nothing is chosen for the desk.
-- **Outpatients** is one page for bookings, walk-ins and the queue: to check in → waiting → with the
+- **Patients is one place with three tabs** — All patients (`/patients`), Outpatients
+  (`/patients/outpatients`) and Inpatients (`/patients/inpatients`) — and each patient's profile.
+- **Outpatients** is one view for bookings, walk-ins and the queue: to check in → waiting → with the
   doctor → done, plus bookings ahead. Each figure is also its filter; Teleconsult narrows them all.
 - **Reschedule, cancel, no-show.** A cancellation asks who can't make it. If the doctor is
   unavailable the patient is refunded in full; if the patient cancels or doesn't come (no-show,
@@ -80,8 +82,8 @@ Both apps open in the **light** theme by default; the dark theme stays available
 - **Patient self-registration** can be shared from the dashboard and the Register page: QR code,
   Open form, Copy link, or WhatsApp / SMS to the patient's mobile. The form is a preview for now —
   answers stay on the patient's phone — so the desk registers the patient on arrival.
-- **Places in the sidebar:** Dashboard · Patients · Outpatients · Inpatients · Billing · Doctors ·
-  Services (Guest Pass, Enquiry & Estimate, MLC). The SHRI Health mark leads to
+- **Places in the sidebar:** Dashboard · Patients · Billing · Doctors · Services (Guest Pass,
+  Enquiry & Estimate, MLC). The SHRI Health mark leads to
   https://shri-ai.org/dev/. The name card at the top right switches between the desk's staff.
 
 There is no backend. The store is in memory and starts from sample data

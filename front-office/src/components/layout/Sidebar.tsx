@@ -3,8 +3,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   LayoutGrid,
   Users,
-  CalendarClock,
-  BedDouble,
   IndianRupee,
   Stethoscope,
   IdCard,
@@ -40,9 +38,9 @@ const NAV_GROUPS: NavGroup[] = [
   {
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
+      // One place for patients — everyone, outpatients and inpatients are
+      // its tabs, and a patient's profile lives under it too.
       { to: '/patients', label: 'Patients', icon: Users, tone: 'teal' },
-      { to: '/outpatients', label: 'Outpatients', icon: CalendarClock, tone: 'info' },
-      { to: '/admissions', label: 'Inpatients', icon: BedDouble, tone: 'purple' },
       { to: '/billing', label: 'Billing', icon: IndianRupee, tone: 'stable' },
       { to: '/doctors', label: 'Doctors', icon: Stethoscope, tone: 'indigo' },
     ],

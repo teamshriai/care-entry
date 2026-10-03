@@ -45,7 +45,7 @@ function KeepQueryRedirect({ to }: { to: string }) {
 }
 
 /** Old links to /appointments/new (with a doctor or slot in router state)
- *  open the schedule flow over Outpatients, carrying that starting point. */
+ *  open the schedule flow over Patients › Outpatients, carrying that starting point. */
 function ScheduleRedirect() {
   const location = useLocation()
   const state = (location.state ?? {}) as { providerId?: string; slot?: string; date?: string }
@@ -55,17 +55,17 @@ function ScheduleRedirect() {
     params.set('date', state.date ?? todayKey())
     params.set('slot', state.slot)
   }
-  return <Navigate to={`/outpatients?${params.toString()}`} replace />
+  return <Navigate to={`/patients/outpatients?${params.toString()}`} replace />
 }
 
 /** Old links to /admissions/discharge (with an admission in router state)
- *  open the discharge flow over Inpatients. */
+ *  open the discharge flow over Patients › Inpatients. */
 function DischargeRedirect() {
   const location = useLocation()
   const admissionId = (location.state as { admissionId?: string } | null)?.admissionId
   const params = new URLSearchParams({ flow: 'discharge' })
   if (admissionId) params.set('admission', admissionId)
-  return <Navigate to={`/admissions?${params.toString()}`} replace />
+  return <Navigate to={`/patients/inpatients?${params.toString()}`} replace />
 }
 
 /** An admission has no page of its own any more — it lives on the patient's
@@ -73,7 +73,7 @@ function DischargeRedirect() {
 function AdmissionRedirect() {
   const { admissionId } = useParams<{ admissionId: string }>()
   const admission = useStoreValue(getAdmissionById, admissionId ?? '')
-  return <Navigate to={admission ? `/patients/${admission.patientId}` : '/admissions'} replace />
+  return <Navigate to={admission ? `/patients/${admission.patientId}` : '/patients/inpatients'} replace />
 }
 
 // No auth route — no authentication or backend infrastructure is built here
@@ -88,7 +88,10 @@ function App() {
             <Route path="/" element={<FrontOfficeHomePage />} />
 
             {/* Patients — one list; finding a patient is the search in the app bar */}
+            {/* Patients — one place, three views: everyone, outpatients, inpatients */}
             <Route path="/patients" element={<PatientsPage />} />
+            <Route path="/patients/outpatients" element={<OutpatientsPage />} />
+            <Route path="/patients/inpatients" element={<InpatientsPage />} />
             <Route path="/patients/search" element={<Navigate to="/patients" replace />} />
             <Route path="/patients/:uhid" element={<PatientProfilePage />} />
             <Route
@@ -104,16 +107,15 @@ function App() {
             <Route path="/doctors" element={<DoctorDirectoryPage />} />
             <Route path="/doctors/register" element={<RegisterDoctorPage />} />
             {/* Legacy path — doctor availability lives in the schedule flow. */}
-            <Route path="/doctors/availability" element={<KeepQueryRedirect to="/outpatients?flow=schedule" />} />
+            <Route path="/doctors/availability" element={<KeepQueryRedirect to="/patients/outpatients?flow=schedule" />} />
             <Route path="/doctors/:providerId" element={<DoctorProfilePage />} />
 
-            {/* Outpatients — bookings, walk-ins and the queue on one page;
-                scheduling is a flow over the current page. The old
-                Appointments and Queue addresses lead here. */}
-            <Route path="/outpatients" element={<OutpatientsPage />} />
+            {/* Old Outpatients, Appointments and Queue addresses lead to
+                Patients › Outpatients; scheduling is a flow over the page. */}
+            <Route path="/outpatients" element={<KeepQueryRedirect to="/patients/outpatients" />} />
             <Route path="/appointments/new" element={<ScheduleRedirect />} />
-            <Route path="/appointments" element={<KeepQueryRedirect to="/outpatients" />} />
-            <Route path="/op-queue" element={<KeepQueryRedirect to="/outpatients?filter=waiting" />} />
+            <Route path="/appointments" element={<KeepQueryRedirect to="/patients/outpatients" />} />
+            <Route path="/op-queue" element={<KeepQueryRedirect to="/patients/outpatients?filter=waiting" />} />
 
             {/* Services */}
             <Route path="/services/guest-pass" element={<GuestPassPage />} />
@@ -124,11 +126,12 @@ function App() {
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/billing/bills" element={<Navigate to="/billing?filter=all" replace />} />
 
-            {/* Inpatients — admit and discharge are flows over the board */}
-            <Route path="/admissions" element={<InpatientsPage />} />
-            <Route path="/admissions/new" element={<Navigate to="/admissions?flow=admit" replace />} />
-            <Route path="/admissions/list" element={<Navigate to="/admissions" replace />} />
-            <Route path="/admissions/beds" element={<Navigate to="/admissions?filter=beds" replace />} />
+            {/* Old Inpatients addresses lead to Patients › Inpatients; admit and
+                discharge are flows over the page. */}
+            <Route path="/admissions" element={<KeepQueryRedirect to="/patients/inpatients" />} />
+            <Route path="/admissions/new" element={<Navigate to="/patients?flow=admit" replace />} />
+            <Route path="/admissions/list" element={<Navigate to="/patients/inpatients" replace />} />
+            <Route path="/admissions/beds" element={<Navigate to="/patients/inpatients?filter=beds" replace />} />
             <Route path="/admissions/discharge" element={<DischargeRedirect />} />
             <Route path="/admissions/:admissionId" element={<AdmissionRedirect />} />
 

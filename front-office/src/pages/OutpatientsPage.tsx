@@ -25,6 +25,7 @@ import { StatFilter } from '../components/ui/StatFilter'
 import type { StatFilterItem } from '../components/ui/StatFilter'
 import { OutpatientList } from '../components/outpatient/OutpatientList'
 import { BookingDialog } from '../components/appointment/BookingDialog'
+import { PatientsTabs } from '../components/patient/PatientsTabs'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
@@ -52,7 +53,7 @@ const EMPTY: Record<OutpatientFilter, { title: string; description: string }> = 
 }
 
 /**
- * Outpatients — one page from booking to the doctor's room: today's bookings
+ * Patients › Outpatients — from booking to the doctor's room: today's bookings
  * and walk-ins at their stage, and the bookings ahead. Each figure is also
  * the filter for the list under it; Teleconsult narrows every figure.
  *
@@ -206,10 +207,11 @@ export function OutpatientsPage() {
   return (
     <div>
       <PageHeader
-        title="Outpatients"
-        subtitle={`Updated ${formatClock(now)} · bookings and walk-ins, from arrival to the doctor's room`}
+        title="Patients"
+        subtitle={`Outpatients — bookings and walk-ins, from arrival to the doctor's room · updated ${formatClock(now)}`}
         illustration={<AppointmentIllustration className="h-8 w-8" />}
         illustrationTone="info"
+        tabs={<PatientsTabs />}
         actions={
           // One way in: a booking, or a walk-in now, is chosen inside Schedule.
           <Button size="sm" onClick={() => openFlow('schedule')}>

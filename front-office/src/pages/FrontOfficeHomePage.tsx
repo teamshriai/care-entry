@@ -168,7 +168,7 @@ export function FrontOfficeHomePage() {
             value={outpatients.counts.today}
             label="Outpatients today"
             hint={`${outpatients.counts['check-in']} to check in`}
-            to="/outpatients"
+            to="/patients/outpatients"
             title="Show everyone booked or walked in today"
           />
           <StatCard
@@ -177,7 +177,7 @@ export function FrontOfficeHomePage() {
             value={queue.waiting.length}
             label="Waiting"
             hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
-            to="/outpatients?filter=waiting"
+            to="/patients/outpatients?filter=waiting"
             title="Show who is waiting for a doctor"
           />
           <StatCard
@@ -186,7 +186,7 @@ export function FrontOfficeHomePage() {
             value={inpatients.length}
             label="Inpatients"
             hint={`${critical} in ICU/ER · ${bedsFree} beds free`}
-            to="/admissions"
+            to="/patients/inpatients"
             title="Show who is admitted, and the beds"
           />
           <StatCard
@@ -219,7 +219,7 @@ export function FrontOfficeHomePage() {
                 title="Today's outpatients"
                 subtitle={`${booked.length} booked · ${toCheckIn.length} to check in`}
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/outpatients')}>
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/patients/outpatients')}>
                     View all
                   </Button>
                 }
