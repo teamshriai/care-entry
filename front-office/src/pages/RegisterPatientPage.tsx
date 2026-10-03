@@ -10,6 +10,7 @@ import { MobileInput } from '../components/ui/MobileInput'
 import { Avatar } from '../components/ui/Avatar'
 import { AckCard } from '../components/flow/AckCard'
 import { AgeConfirm, FieldError } from '../components/patient/AgeConfirm'
+import { SelfRegistrationShare } from '../components/frontoffice/SelfRegistrationShare'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
@@ -269,7 +270,7 @@ export function RegisterPatientPage() {
           </CardBody>
         </Card>
 
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col gap-6">
           {duplicates.length > 0 ? (
             <Card className="border-warning-border bg-warning-bg/40">
               <CardHeader
@@ -299,7 +300,7 @@ export function RegisterPatientPage() {
               </div>
             </Card>
           ) : (
-            <Card className="h-full">
+            <Card>
               <CardBody>
                 <p className="text-sm font-medium text-ink">Duplicate check</p>
                 <p className="mt-1 text-sm text-ink-muted">
@@ -309,6 +310,7 @@ export function RegisterPatientPage() {
               </CardBody>
             </Card>
           )}
+          <SelfRegistrationShare subtitle="Patient would rather fill it in? Share the form to their phone" />
         </div>
       </div>
     </div>

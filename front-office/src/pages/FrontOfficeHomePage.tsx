@@ -1,9 +1,12 @@
 import type { ElementType } from 'react'
 import {
+  Activity,
   AlertTriangle,
   BedDouble,
   BedSingle,
   CalendarClock,
+  CalendarDays,
+  CalendarPlus,
   CircleAlert,
   CircleDot,
   IndianRupee,
@@ -11,8 +14,12 @@ import {
   LogIn,
   LogOut,
   Stethoscope,
+  Ticket,
   Undo2,
   UserCheck,
+  UserPlus,
+  Video,
+  XCircle,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -23,17 +30,21 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { QuickActionTile } from '../components/frontoffice/QuickActionTile'
 import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
+import { SelfRegistrationShare } from '../components/frontoffice/SelfRegistrationShare'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
-import { getAppointmentsForDate, getBillingOverview, getDoctorRows, getNeedsAttention, getQueueView } from '../domain/selectors'
+import { getAppointmentsForDate, getBillingOverview, getDoctorRows, getNeedsAttention, getQueueView, getRecentActivity } from '../domain/selectors'
+import { getOutpatients } from '../domain/outpatientSelectors'
+import { getPatientRows } from '../domain/patientSelectors'
+import { todayKey } from '../domain/time'
 import type { NeedsAttentionItem } from '../domain/selectors'
 import { getDischargedOn, getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
 import { checkInAppointment, returnGuestPass } from '../domain/actions'
 import { formatRupees } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
-import { formatHeaderDateTime } from '../utils/format'
+import { formatClock, formatHeaderDateTime } from '../utils/format'
 import { cn } from '../utils/cn'
 import { TONE_STYLES } from '../utils/tone'
 
@@ -46,12 +57,34 @@ const ATTENTION_ICON: Record<NeedsAttentionItem['tone'], ElementType> = {
 
 const ATTENTION_ROWS = 6
 
+/** An icon for an activity-log line, from what it says happened. */
+function activityIcon(text: string): ElementType {
+  const t = text.toLowerCase()
+  if (t.includes('refund')) return Undo2
+  if (t.includes('cancel') || t.includes('no-show')) return XCircle
+  if (t.includes('payment') || t.includes('bill')) return IndianRupee
+  if (t.includes('discharg')) return LogOut
+  if (t.includes('admi') || t.includes('bed')) return BedDouble
+  if (t.includes('token') || t.includes('queue') || t.includes('checked in')) return Ticket
+  if (t.includes('appointment') || t.includes('resched')) return CalendarClock
+  if (t.includes('registered') || t.includes('patient')) return UserPlus
+  return Activity
+}
+
+/** "now", "12 min ago", "3 h ago", else the date and time. */
+function timeAgo(time: number, now: number): string {
+  const minutes = Math.max(0, Math.round((now - time) / 60000))
+  if (minutes < 1) return 'now'
+  if (minutes < 60) return `${minutes} min ago`
+  if (minutes < 12 * 60) return `${Math.floor(minutes / 60)} h ago`
+  return `${new Date(time).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${formatClock(time)}`
+}
+
 /**
- * The front desk at a glance: each figure opens the place that holds it,
- * today's appointments and what needs attention each carry their one
- * action, and the doctors' status is there to read. Starting things —
- * registering, scheduling, admitting — happens from the search and the
- * patient's profile, not from launch tiles here.
+ * The front desk at a glance: the day's common tasks one tap away, figures
+ * that each open the place that holds them, today's outpatients and what
+ * needs attention with their one action each, the self-registration form to
+ * share, the latest activity, and the doctors — with Book beside each.
  */
 export function FrontOfficeHomePage() {
   const navigate = useNavigate()
@@ -69,6 +102,12 @@ export function FrontOfficeHomePage() {
   const discharged = useStoreValue(getDischargedOn, now)
   const doctorRows = useStoreValue(getDoctorRows, now)
   const needsAttention = useStoreValue(getNeedsAttention, now)
+  const outpatients = useStoreValue(getOutpatients, now, 'today', false, '')
+  const teleconsults = useStoreValue(getOutpatients, now, 'today', true, '')
+  const patientRows = useStoreValue(getPatientRows)
+  const activity = useStoreValue(getRecentActivity, 10)
+  const today = todayKey(new Date(now))
+  const registeredToday = patientRows.filter((row) => todayKey(new Date(row.patient.createdAt)) === today).length
 
   const booked = appointments.filter((a) => a.status !== 'Cancelled')
   const toCheckIn = appointments.filter((a) => a.status === 'Confirmed')
@@ -128,38 +167,123 @@ export function FrontOfficeHomePage() {
       <PageHeader title="SHRI Health Care Entry" subtitle={`${formatHeaderDateTime(new Date(now))} · every figure is derived from today's records`} />
 
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+        {/* The day's common tasks — each starts with its own patient search. */}
+        <section aria-label="Quick actions" className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/register/new')}>
+            <UserPlus className="h-4 w-4" strokeWidth={1.75} />
+            Register Patient
+          </Button>
+          <Button variant="secondary" onClick={() => openFlow('schedule')}>
+            <CalendarPlus className="h-4 w-4 text-info" strokeWidth={1.75} />
+            Schedule
+          </Button>
+          <Button variant="secondary" onClick={() => openFlow('consult')}>
+            <Stethoscope className="h-4 w-4 text-teal" strokeWidth={1.75} />
+            Start Consultation
+          </Button>
+          <Button variant="secondary" onClick={() => openFlow('admit')}>
+            <BedDouble className="h-4 w-4 text-purple" strokeWidth={1.75} />
+            Admit
+          </Button>
+          <Button variant="secondary" onClick={() => openFlow('billing')}>
+            <IndianRupee className="h-4 w-4 text-stable" strokeWidth={1.75} />
+            Collect
+          </Button>
+        </section>
+
         {/* Each figure opens the place that holds it. */}
-        <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <QuickActionTile icon={CalendarClock} iconTone="info" label="Outpatients today" count={booked.length} hint={`${toCheckIn.length} to check in`} to="/outpatients" />
+        <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <QuickActionTile
+            variant="primary"
+            primaryColor="blue"
+            icon={CalendarClock}
+            label="Outpatients today"
+            count={outpatients.counts.today}
+            hint={`${outpatients.counts['check-in']} to check in`}
+            to="/outpatients"
+          />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="amber"
             icon={UserCheck}
-            iconTone={longestWait >= 15 ? 'warning' : 'info'}
             label="Waiting"
             count={queue.waiting.length}
             hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
             to="/outpatients?filter=waiting"
           />
           <QuickActionTile
+            variant="primary"
+            primaryColor="coral"
             icon={IndianRupee}
-            iconTone={billing.failedCount ? 'critical' : 'warning'}
             label="Due"
             count={formatRupees(billing.dueAmount)}
             hint={`${billing.dueCount} bills${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
             to="/billing?filter=due"
           />
-          <QuickActionTile icon={BedDouble} iconTone="info" label="Inpatients" count={inpatients.length} hint={`${critical} in ICU / Emergency`} to="/admissions" />
-          <QuickActionTile icon={BedSingle} iconTone="stable" label="Beds free" count={bedsFree} hint={`of ${bedsTotal} beds`} to="/admissions?filter=beds" />
-          <QuickActionTile icon={LogOut} iconTone="neutral" label="Discharged today" count={discharged.length} hint="Beds released" to="/admissions?filter=discharged" />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="purple"
+            icon={BedDouble}
+            label="Inpatients"
+            count={inpatients.length}
+            hint={`${critical} in ICU / Emergency`}
+            to="/admissions"
+          />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="emerald"
+            icon={BedSingle}
+            label="Beds free"
+            count={bedsFree}
+            hint={`of ${bedsTotal} beds`}
+            to="/admissions?filter=beds"
+          />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="turquoise"
+            icon={LogOut}
+            label="Discharged today"
+            count={discharged.length}
+            hint="Beds released"
+            to="/admissions?filter=discharged"
+          />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="magenta"
+            icon={UserPlus}
+            label="Registered today"
+            count={registeredToday}
+            hint="New patient records"
+            to="/patients?filter=today"
+          />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="indigo"
+            icon={Video}
+            label="Teleconsults today"
+            count={teleconsults.counts.today}
+            hint={`${teleconsults.counts['check-in']} still to join`}
+            to="/outpatients?teleconsult=1"
+          />
+          <QuickActionTile
+            variant="primary"
+            primaryColor="sky"
+            icon={CalendarDays}
+            label="Upcoming"
+            count={outpatients.counts.upcoming}
+            hint="Booked for later days"
+            to="/outpatients?filter=upcoming"
+          />
         </section>
 
         <div className="grid grid-cols-1 items-start gap-6 min-[1400px]:grid-cols-2">
-          {/* Today's appointments — one action per row */}
-          <section className="min-w-0" aria-label="Today's appointments">
+          {/* Today's outpatients — one action per row */}
+          <section className="min-w-0" aria-label="Today's outpatients">
             <Card accentTone="info">
               <CardHeader
                 icon={CalendarClock}
                 iconTone="info"
-                title="Today's appointments"
+                title="Today's outpatients"
                 subtitle={`${booked.length} booked · ${toCheckIn.length} to check in`}
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate('/outpatients')}>
@@ -228,21 +352,64 @@ export function FrontOfficeHomePage() {
           </section>
         </div>
 
-        {/* Doctors now — to read, not to act on */}
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+          <section className="min-w-0" aria-label="Patient self-registration">
+            <SelfRegistrationShare />
+          </section>
+
+          {/* What the desk did last */}
+          <section className="min-w-0" aria-label="Recent activity">
+            <Card accentTone="brand">
+              <CardHeader icon={Activity} iconTone="brand" title="Recent activity" subtitle="The desk's latest actions, newest first" />
+              {activity.length === 0 ? (
+                <EmptyState title="Nothing yet" description="Registrations, bookings and payments appear here as they happen." />
+              ) : (
+                <ul className="divide-y divide-border-soft">
+                  {activity.map((entry) => {
+                    const Icon = activityIcon(entry.text)
+                    return (
+                      <li key={entry.id} className="flex items-start gap-3 px-5 py-2.5">
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-2">
+                          <Icon className="h-3.5 w-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-ink">{entry.text}</p>
+                          {entry.meta ? (
+                            <p className="truncate text-xs text-ink-muted" title={entry.meta}>
+                              {entry.meta}
+                            </p>
+                          ) : null}
+                        </div>
+                        <span className="shrink-0 text-2xs tabular-nums text-ink-subtle">{timeAgo(entry.time, now)}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </Card>
+          </section>
+        </div>
+
+        {/* Doctors now — Book opens Schedule with the doctor chosen */}
         <section className="min-w-0" aria-label="Doctors now">
           <Card accentTone="indigo">
             <CardHeader
               icon={Stethoscope}
               iconTone="indigo"
               title="Doctors now"
-              subtitle="From today's schedule, leave and break"
+              subtitle="From today's schedule, leave and break · Schedule books with that doctor"
               action={
                 <Button size="sm" variant="ghost" onClick={() => navigate('/doctors')}>
                   View all
                 </Button>
               }
             />
-            <DoctorAvailabilityTable rows={doctorRows} compact onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)} />
+            <DoctorAvailabilityTable
+              rows={doctorRows}
+              compact
+              onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
+              onBook={(provider) => openFlow('schedule', { doctor: provider.providerId })}
+            />
           </Card>
         </section>
       </div>

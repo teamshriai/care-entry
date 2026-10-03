@@ -15,6 +15,8 @@ const PRIMARY_TILE = {
   purple: 'bg-action-purple text-white',
   turquoise: 'bg-action-turquoise text-white',
   magenta: 'bg-action-magenta text-white',
+  indigo: 'bg-action-indigo text-white',
+  sky: 'bg-action-sky text-white',
 } as const
 
 export function QuickActionTile({
@@ -35,7 +37,7 @@ export function QuickActionTile({
    *  app's existing tone palette (see utils/tone.ts). */
   iconTone?: Tone
   /** Solid tile hue for a primary tile's fill (--color-action-*, bright solid fills). */
-  primaryColor?: 'blue' | 'emerald' | 'coral' | 'amber' | 'purple' | 'turquoise' | 'magenta'
+  primaryColor?: keyof typeof PRIMARY_TILE
   label: string
   /** Optional figure shown opposite the icon (e.g. today's discharges, ₹ due). */
   count?: number | string
@@ -86,7 +88,8 @@ export function QuickActionTile({
       </div>
       <span className={cn(dense ? 'text-xs font-medium' : 'text-sm font-semibold', isPrimary ? 'text-current' : 'text-ink')}>
         {label}
-        {hint ? <span className="mt-0.5 block text-2xs font-normal text-ink-subtle">{hint}</span> : null}
+        {/* On a solid tile the hint stays full white (thinner, not fainter) so it keeps its contrast. */}
+        {hint ? <span className={cn('mt-0.5 block text-2xs font-normal', isPrimary ? 'text-white' : 'text-ink-subtle')}>{hint}</span> : null}
       </span>
     </button>
   )

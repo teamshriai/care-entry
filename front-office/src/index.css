@@ -105,6 +105,8 @@
   --color-action-purple: #5b21b6;
   --color-action-turquoise: #0f766e;
   --color-action-magenta: #a21caf;
+  --color-action-indigo: #3730a3;
+  --color-action-sky: #0369a1;
 
   /* Operational Summary bars — vivid solid fills. */
   --color-bar-blue: #2563eb;
