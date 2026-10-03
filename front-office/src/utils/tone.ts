@@ -95,7 +95,7 @@ export const TONE_STYLES: Record<Tone, ToneStyle> = {
 }
 
 /** The raw CSS custom property behind each accent tone (see index.css) —
- *  shared by IconBadge, Card, StatFilter and QuickActionTile so they can mix
+ *  shared by IconBadge, Card and StatFilter so they can mix
  *  tints/gradients/glows with `color-mix()` from one place.
  *  `neutral` has no accent by design. */
 export const TONE_VAR: Partial<Record<Tone, string>> = {

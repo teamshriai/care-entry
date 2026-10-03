@@ -3,10 +3,7 @@ import {
   Activity,
   AlertTriangle,
   BedDouble,
-  BedSingle,
   CalendarClock,
-  CalendarDays,
-  CalendarPlus,
   CircleAlert,
   CircleDot,
   IndianRupee,
@@ -18,7 +15,6 @@ import {
   Undo2,
   UserCheck,
   UserPlus,
-  Video,
   XCircle,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -27,7 +23,7 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Card, CardHeader } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
-import { QuickActionTile } from '../components/frontoffice/QuickActionTile'
+import { StatCard } from '../components/frontoffice/StatCard'
 import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
 import { SelfRegistrationShare } from '../components/frontoffice/SelfRegistrationShare'
@@ -40,7 +36,7 @@ import { getOutpatients } from '../domain/outpatientSelectors'
 import { getPatientRows } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
 import type { NeedsAttentionItem } from '../domain/selectors'
-import { getDischargedOn, getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
+import { getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
 import { checkInAppointment, returnGuestPass } from '../domain/actions'
 import { formatRupees } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
@@ -99,11 +95,9 @@ export function FrontOfficeHomePage() {
   const billing = useStoreValue(getBillingOverview)
   const inpatients = useStoreValue(getInpatientRows, now)
   const wards = useStoreValue(getWardSummaries)
-  const discharged = useStoreValue(getDischargedOn, now)
   const doctorRows = useStoreValue(getDoctorRows, now)
   const needsAttention = useStoreValue(getNeedsAttention, now)
   const outpatients = useStoreValue(getOutpatients, now, 'today', false, '')
-  const teleconsults = useStoreValue(getOutpatients, now, 'today', true, '')
   const patientRows = useStoreValue(getPatientRows)
   const activity = useStoreValue(getRecentActivity, 10)
   const today = todayKey(new Date(now))
@@ -113,7 +107,6 @@ export function FrontOfficeHomePage() {
   const toCheckIn = appointments.filter((a) => a.status === 'Confirmed')
   const longestWait = Math.max(0, ...queue.waiting.map((t) => t.waitingMinutes ?? 0))
   const bedsFree = wards.reduce((sum, w) => sum + w.available, 0)
-  const bedsTotal = wards.reduce((sum, w) => sum + w.total, 0)
   const critical = inpatients.filter((r) => r.admission.wardLabel === 'ICU' || r.admission.wardLabel === 'Emergency').length
   // Display order only: what is still to happen first (stable sort keeps time order).
   const isClosed = (status: string) => status === 'Completed' || status === 'Cancelled' || status === 'No-show'
@@ -167,112 +160,52 @@ export function FrontOfficeHomePage() {
       <PageHeader title="SHRI Health Care Entry" subtitle={`${formatHeaderDateTime(new Date(now))} · every figure is derived from today's records`} />
 
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-        {/* The day's common tasks — each starts with its own patient search. */}
-        <section aria-label="Quick actions" className="flex flex-wrap gap-2">
-          <Button onClick={() => navigate('/register/new')}>
-            <UserPlus className="h-4 w-4" strokeWidth={1.75} />
-            Register Patient
-          </Button>
-          <Button variant="secondary" onClick={() => openFlow('schedule')}>
-            <CalendarPlus className="h-4 w-4 text-info" strokeWidth={1.75} />
-            Schedule
-          </Button>
-          <Button variant="secondary" onClick={() => openFlow('consult')}>
-            <Stethoscope className="h-4 w-4 text-teal" strokeWidth={1.75} />
-            Start Consultation
-          </Button>
-          <Button variant="secondary" onClick={() => openFlow('admit')}>
-            <BedDouble className="h-4 w-4 text-purple" strokeWidth={1.75} />
-            Admit
-          </Button>
-          <Button variant="secondary" onClick={() => openFlow('billing')}>
-            <IndianRupee className="h-4 w-4 text-stable" strokeWidth={1.75} />
-            Collect
-          </Button>
-        </section>
-
-        {/* Each figure opens the place that holds it. */}
-        <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <QuickActionTile
-            variant="primary"
-            primaryColor="blue"
+        {/* Five figures, one purpose each — each card opens the place that holds it. */}
+        <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <StatCard
+            hue="blue"
             icon={CalendarClock}
+            value={outpatients.counts.today}
             label="Outpatients today"
-            count={outpatients.counts.today}
             hint={`${outpatients.counts['check-in']} to check in`}
             to="/outpatients"
+            title="Show everyone booked or walked in today"
           />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="amber"
+          <StatCard
+            hue="orange"
             icon={UserCheck}
+            value={queue.waiting.length}
             label="Waiting"
-            count={queue.waiting.length}
             hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
             to="/outpatients?filter=waiting"
+            title="Show who is waiting for a doctor"
           />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="coral"
+          <StatCard
+            hue="purple"
+            icon={BedDouble}
+            value={inpatients.length}
+            label="Inpatients"
+            hint={`${critical} in ICU/ER · ${bedsFree} beds free`}
+            to="/admissions"
+            title="Show who is admitted, and the beds"
+          />
+          <StatCard
+            hue="red"
             icon={IndianRupee}
+            value={formatRupees(billing.dueAmount)}
             label="Due"
-            count={formatRupees(billing.dueAmount)}
             hint={`${billing.dueCount} bills${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
             to="/billing?filter=due"
+            title="Show the bills still to collect"
           />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="purple"
-            icon={BedDouble}
-            label="Inpatients"
-            count={inpatients.length}
-            hint={`${critical} in ICU / Emergency`}
-            to="/admissions"
-          />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="emerald"
-            icon={BedSingle}
-            label="Beds free"
-            count={bedsFree}
-            hint={`of ${bedsTotal} beds`}
-            to="/admissions?filter=beds"
-          />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="turquoise"
-            icon={LogOut}
-            label="Discharged today"
-            count={discharged.length}
-            hint="Beds released"
-            to="/admissions?filter=discharged"
-          />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="magenta"
+          <StatCard
+            hue="teal"
             icon={UserPlus}
+            value={registeredToday}
             label="Registered today"
-            count={registeredToday}
             hint="New patient records"
             to="/patients?filter=today"
-          />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="indigo"
-            icon={Video}
-            label="Teleconsults today"
-            count={teleconsults.counts.today}
-            hint={`${teleconsults.counts['check-in']} still to join`}
-            to="/outpatients?teleconsult=1"
-          />
-          <QuickActionTile
-            variant="primary"
-            primaryColor="sky"
-            icon={CalendarDays}
-            label="Upcoming"
-            count={outpatients.counts.upcoming}
-            hint="Booked for later days"
-            to="/outpatients?filter=upcoming"
+            title="Show the patients registered today"
           />
         </section>
 
