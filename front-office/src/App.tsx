@@ -10,8 +10,7 @@ import { PatientProfilePage } from './pages/PatientProfilePage'
 import { DoctorDirectoryPage } from './pages/DoctorDirectoryPage'
 import { RegisterDoctorPage } from './pages/RegisterDoctorPage'
 import { DoctorProfilePage } from './pages/DoctorProfilePage'
-import { TodaysAppointmentsPage } from './pages/TodaysAppointmentsPage'
-import { OpQueuePage } from './pages/OpQueuePage'
+import { OutpatientsPage } from './pages/OutpatientsPage'
 import { GuestPassPage } from './pages/GuestPassPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
@@ -34,8 +33,19 @@ function FreshOnQuery({ children }: { children: ReactNode }) {
   return <div key={search}>{children}</div>
 }
 
+/** An old address that now lives elsewhere: goes there, keeping whatever
+ *  the old link carried in its query (an open flow, a filter). */
+function KeepQueryRedirect({ to }: { to: string }) {
+  const { search } = useLocation()
+  const [path, fixed = ''] = to.split('?')
+  const query = new URLSearchParams(fixed)
+  for (const [key, value] of new URLSearchParams(search)) if (!query.has(key)) query.set(key, value)
+  const rest = query.toString()
+  return <Navigate to={rest ? `${path}?${rest}` : path} replace />
+}
+
 /** Old links to /appointments/new (with a doctor or slot in router state)
- *  open the schedule flow over Appointments, carrying that starting point. */
+ *  open the schedule flow over Outpatients, carrying that starting point. */
 function ScheduleRedirect() {
   const location = useLocation()
   const state = (location.state ?? {}) as { providerId?: string; slot?: string; date?: string }
@@ -45,7 +55,7 @@ function ScheduleRedirect() {
     params.set('date', state.date ?? todayKey())
     params.set('slot', state.slot)
   }
-  return <Navigate to={`/appointments?${params.toString()}`} replace />
+  return <Navigate to={`/outpatients?${params.toString()}`} replace />
 }
 
 /** Old links to /admissions/discharge (with an admission in router state)
@@ -94,16 +104,16 @@ function App() {
             <Route path="/doctors" element={<DoctorDirectoryPage />} />
             <Route path="/doctors/register" element={<RegisterDoctorPage />} />
             {/* Legacy path — doctor availability lives in the schedule flow. */}
-            <Route path="/doctors/availability" element={<Navigate to="/appointments?flow=schedule" replace />} />
+            <Route path="/doctors/availability" element={<KeepQueryRedirect to="/outpatients?flow=schedule" />} />
             <Route path="/doctors/:providerId" element={<DoctorProfilePage />} />
 
-            {/* Appointments — scheduling is a flow over the current page;
-                the old booking route opens it over Appointments. */}
+            {/* Outpatients — bookings, walk-ins and the queue on one page;
+                scheduling is a flow over the current page. The old
+                Appointments and Queue addresses lead here. */}
+            <Route path="/outpatients" element={<OutpatientsPage />} />
             <Route path="/appointments/new" element={<ScheduleRedirect />} />
-            <Route path="/appointments" element={<TodaysAppointmentsPage />} />
-
-            {/* Visits & queue */}
-            <Route path="/op-queue" element={<OpQueuePage />} />
+            <Route path="/appointments" element={<KeepQueryRedirect to="/outpatients" />} />
+            <Route path="/op-queue" element={<KeepQueryRedirect to="/outpatients?filter=waiting" />} />
 
             {/* Services */}
             <Route path="/services/guest-pass" element={<GuestPassPage />} />

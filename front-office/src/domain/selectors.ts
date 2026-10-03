@@ -431,15 +431,18 @@ export function getAverageConsultationMinutes(state: AppState, providerId: strin
 }
 
 export function getQueueView(state: AppState, now: number = Date.now()): QueueView {
+  // A queue is one day's: yesterday's tokens are history, not a queue.
+  const today = todayKey(new Date(now))
+  const tokens = state.queueTokens.filter((t) => todayKey(new Date(t.createdAt)) === today)
   const waitingByProvider = new Map<string, typeof state.queueTokens>()
-  for (const token of state.queueTokens) {
+  for (const token of tokens) {
     if (token.status !== 'Waiting') continue
     if (!waitingByProvider.has(token.providerId)) waitingByProvider.set(token.providerId, [])
     waitingByProvider.get(token.providerId)!.push(token)
   }
   for (const list of waitingByProvider.values()) list.sort((a, b) => a.createdAt - b.createdAt)
 
-  const rows: QueueTokenRow[] = state.queueTokens.map((token) => {
+  const rows: QueueTokenRow[] = tokens.map((token) => {
     const visit = state.visits.find((v) => v.visitId === token.visitId) ?? null
     const appointment = visit?.appointmentId
       ? state.appointments.find((a) => a.appointmentId === visit.appointmentId) ?? null
@@ -450,7 +453,7 @@ export function getQueueView(state: AppState, now: number = Date.now()): QueueVi
     if (token.status === 'Waiting') {
       const queueForDoctor = waitingByProvider.get(token.providerId) ?? []
       position = queueForDoctor.findIndex((t) => t.tokenId === token.tokenId) + 1
-      const doctorBusy = state.queueTokens.some(
+      const doctorBusy = tokens.some(
         (t) => t.providerId === token.providerId && (t.status === 'Called' || t.status === 'In consultation'),
       )
       const ahead = position - 1 + (doctorBusy ? 1 : 0)
@@ -598,7 +601,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Patient awaiting doctor',
         detail: `${token.patient?.name ?? 'A patient'} has been awaiting the doctor for ${token.waitingMinutes} minutes (${token.tokenNumber}).`,
-        action: { kind: 'open', label: 'Queue', to: '/op-queue' },
+        action: { kind: 'open', label: 'Outpatients', to: '/outpatients?filter=waiting' },
       })
     }
   }
@@ -610,7 +613,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Doctor running late',
         detail: `${row.provider.name} is about ${row.delayMinutes} minutes behind schedule.`,
-        action: { kind: 'open', label: 'Queue', to: '/op-queue' },
+        action: { kind: 'open', label: 'Their patients', to: `/outpatients?provider=${row.provider.providerId}` },
       })
     }
     if (row.status === 'On leave') {

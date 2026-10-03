@@ -23,14 +23,17 @@ export function StatFilter<K extends string>({
   selected,
   onSelect,
   label,
+  columns = 'grid-cols-2 lg:grid-cols-4',
 }: {
   items: StatFilterItem<K>[]
   selected: K
   onSelect: (key: K) => void
   label: string
+  /** The grid's column classes — four across by default. */
+  columns?: string
 }) {
   return (
-    <div role="group" aria-label={label} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div role="group" aria-label={label} className={cn('grid gap-3', columns)}>
       {items.map((item) => {
         const active = item.key === selected
         const accent = TONE_VAR[item.tone]

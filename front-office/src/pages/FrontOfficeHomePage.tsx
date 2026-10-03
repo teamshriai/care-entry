@@ -130,14 +130,14 @@ export function FrontOfficeHomePage() {
       <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
         {/* Each figure opens the place that holds it. */}
         <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <QuickActionTile icon={CalendarClock} iconTone="info" label="Appointments today" count={booked.length} hint={`${toCheckIn.length} to check in`} to="/appointments" />
+          <QuickActionTile icon={CalendarClock} iconTone="info" label="Outpatients today" count={booked.length} hint={`${toCheckIn.length} to check in`} to="/outpatients" />
           <QuickActionTile
             icon={UserCheck}
             iconTone={longestWait >= 15 ? 'warning' : 'info'}
             label="Waiting"
             count={queue.waiting.length}
             hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
-            to="/op-queue"
+            to="/outpatients?filter=waiting"
           />
           <QuickActionTile
             icon={IndianRupee}
@@ -162,7 +162,7 @@ export function FrontOfficeHomePage() {
                 title="Today's appointments"
                 subtitle={`${booked.length} booked · ${toCheckIn.length} to check in`}
                 action={
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/appointments')}>
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/outpatients')}>
                     View all
                   </Button>
                 }

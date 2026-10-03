@@ -247,16 +247,13 @@ export function DoctorProfilePage() {
                 iconTone="info"
                 title="Today's appointments"
                 subtitle="Operational schedule only — no clinical record is shown here"
-                action={<span className="text-xs tabular-nums text-ink-faint">{appointments.length}</span>}
-              />
-              <AppointmentsTable
-                appointments={appointments}
-                renderActions={() => (
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/appointments')}>
-                    View
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/outpatients?provider=${id}`)}>
+                    Outpatients · {appointments.length}
                   </Button>
-                )}
+                }
               />
+              <AppointmentsTable appointments={appointments} />
             </Card>
           </div>
         </div>

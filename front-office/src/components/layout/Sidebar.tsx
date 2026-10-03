@@ -4,7 +4,6 @@ import {
   LayoutGrid,
   Users,
   CalendarClock,
-  ListOrdered,
   BedDouble,
   IndianRupee,
   Stethoscope,
@@ -42,17 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
       { to: '/patients', label: 'Patients', icon: Users, tone: 'teal' },
-    ],
-  },
-  {
-    label: 'Outpatients',
-    items: [
-      { to: '/appointments', label: 'Appointments', icon: CalendarClock, tone: 'info' },
-      { to: '/op-queue', label: 'Queue', icon: ListOrdered, tone: 'info' },
-    ],
-  },
-  {
-    items: [
+      { to: '/outpatients', label: 'Outpatients', icon: CalendarClock, tone: 'info' },
       { to: '/admissions', label: 'Inpatients', icon: BedDouble, tone: 'purple' },
       { to: '/billing', label: 'Billing', icon: IndianRupee, tone: 'stable' },
       { to: '/doctors', label: 'Doctors', icon: Stethoscope, tone: 'indigo' },
