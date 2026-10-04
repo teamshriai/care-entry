@@ -248,7 +248,8 @@ export function RegisterPatientPage() {
                     : 'Optional'
                 }
               >
-                <div className="flex gap-2">
+                {/* Kept short, so the Create ABHA popup has room to open on its right. */}
+                <div className="flex max-w-md gap-2">
                   <input
                     id="reg-abha"
                     value={form.abhaId}
