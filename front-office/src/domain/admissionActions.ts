@@ -3,14 +3,16 @@
 // createBillForAdmission calls the existing createPaymentBill and only
 // stores the resulting paymentId back onto the Admission.
 import { getState, setState } from './store'
-import { withActivity, createPaymentBill, collectPayment } from './actions'
+import { withActivity, createPaymentBill } from './actions'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, isValidMobile } from '../utils/phone'
 import type { AppState } from '../types/store'
-import { computeAdmissionBilling } from './admissionSelectors'
-import { IP_PAYMENT_METHODS, admissionBillItems, formatRupees, sumItems } from '../utils/billing'
-import type { Admission, AdmissionPaymentInput, Bed, CreateAdmissionInput, DischargeDetails } from '../types/admission'
-import type { PaymentItem } from '../types/payment'
+import { computeAdmissionBilling, previewDischargeBill } from './admissionSelectors'
+import { admissionBillItems, formatRupees, sumItems } from '../utils/billing'
+import { DISCHARGE_TYPES } from '../types/admission'
+import type { Admission, Bed, CreateAdmissionInput, DischargeDetails } from '../types/admission'
+import type { Payment, PaymentItem } from '../types/payment'
+import type { GuestPass } from '../types/frontDesk'
 
 function requireAdmission(state: AppState, admissionId: string): Admission {
   const admission = state.admissions.find((a) => a.admissionId === admissionId)
@@ -24,6 +26,12 @@ function requireBed(state: AppState, bedId: string): Bed {
   return bed
 }
 
+function requireBill(state: AppState, paymentId: string): Payment {
+  const bill = state.payments.find((p) => p.paymentId === paymentId)
+  if (!bill) throw new DomainError('NOT_FOUND', 'That bill no longer exists.')
+  return bill
+}
+
 /** The only place a bed's status changes — every admit/cancel/discharge
  *  action routes through here so a bed can never end up pointing at two
  *  admissions at once. */
@@ -31,26 +39,25 @@ function setBedStatus(current: AppState, bedId: string, status: Bed['status'], a
   return current.beds.map((b) => (b.bedId === bedId ? { ...b, status, currentAdmissionId: admissionId } : b))
 }
 
-/** A payment collected at admission/discharge must use an allowed method and be the
- *  exact amount due. */
-function assertPayment(payment: AdmissionPaymentInput | undefined, due: number, what: string): void {
-  if (!payment || !IP_PAYMENT_METHODS.includes(payment.method)) {
-    throw new DomainError('VALIDATION', 'Select a payment method.')
-  }
-  if (!(payment.amount > 0)) throw new DomainError('VALIDATION', 'Payment amount must be greater than zero.')
-  if (payment.amount !== due) {
-    throw new DomainError('VALIDATION', `Collect the full ${what} of ${formatRupees(due)}.`)
-  }
-}
-
-export function admitPatient(input: CreateAdmissionInput): Admission {
+/**
+ * Admits a patient to a bed and raises the admission's bill, as one step.
+ * Care Entry takes no money: a self-pay patient pays the first day at the
+ * billing counter; an insured, TPA or corporate patient is billed to the
+ * payer and settled at discharge. A request already waiting for a bed is admitted rather than
+ * duplicated. Everything is checked before anything is saved.
+ */
+export function admitPatient(input: CreateAdmissionInput): { admission: Admission; bill: Payment } {
   const state = getState()
   if (!input.patientId) throw new DomainError('VALIDATION', 'Select a patient before admitting.')
   const patient = state.patients.find((p) => p.patientId === input.patientId)
   if (!patient) throw new DomainError('NOT_FOUND', 'That patient no longer exists.')
+  const already = state.admissions.find((a) => a.patientId === patient.patientId && a.status === 'Admitted')
+  if (already) {
+    throw new DomainError('ALREADY_ADMITTED', `${patient.name} is already admitted (${already.wardLabel} · ${already.bedNumber}).`)
+  }
 
   const doctor = state.providers.find((p) => p.providerId === input.doctorId)
-  if (!doctor) throw new DomainError('VALIDATION', 'Select an admitting doctor.')
+  if (!doctor || doctor.status !== 'Active') throw new DomainError('VALIDATION', 'Select an admitting doctor.')
 
   if (!input.reason?.trim()) throw new DomainError('VALIDATION', 'A reason for admission is required.')
   if (!input.attendant.name?.trim() || !input.attendant.phone?.trim()) {
@@ -63,24 +70,26 @@ export function admitPatient(input: CreateAdmissionInput): Admission {
     throw new DomainError('BED_UNAVAILABLE', `${bed.bedNumber} is no longer available — choose another bed.`)
   }
 
-  // The initial charges must be paid to admit: validated before anything is created.
+  const selfPay = input.paymentType === 'Self Pay'
   const billItems = admissionBillItems(bed.roomType, 1)
-  const initialAmount = sumItems(billItems)
-  assertPayment(input.initialPayment, initialAmount, 'initial amount')
 
+  // A request already waiting for a bed (Pending / Bed Reserved) becomes this admission.
+  const waiting = state.admissions.find(
+    (a) => a.patientId === patient.patientId && (a.status === 'Pending' || a.status === 'Bed Reserved'),
+  )
   const seq = state.nextIds.admission
-  const year = new Date().getFullYear()
-  const admissionNumber = `ADM-${year}-${String(seq).padStart(5, '0')}`
   const now = Date.now()
+  const admissionId = waiting?.admissionId ?? `adm-${seq}`
+  const admissionNumber = waiting?.admissionNumber ?? `ADM-${new Date().getFullYear()}-${String(seq).padStart(5, '0')}`
 
   const admission: Admission = {
-    admissionId: `adm-${seq}`,
+    admissionId,
     admissionNumber,
-    patientId: input.patientId,
-    patientName: input.patientName,
+    patientId: patient.patientId,
+    patientName: patient.name,
     doctorId: doctor.providerId,
     doctorName: doctor.name,
-    department: input.department,
+    department: doctor.department,
     admissionType: input.admissionType,
     reason: input.reason.trim(),
     referralSource: input.referralSource,
@@ -91,15 +100,15 @@ export function admitPatient(input: CreateAdmissionInput): Admission {
     roomType: bed.roomType,
     attendant: input.attendant,
     paymentType: input.paymentType,
-    insuranceProvider: input.insuranceProvider ?? null,
-    policyNumber: input.policyNumber ?? null,
+    insuranceProvider: selfPay ? null : input.insuranceProvider?.trim() || null,
+    policyNumber: selfPay ? null : input.policyNumber?.trim() || null,
     paymentId: null,
     status: 'Admitted',
     admittedAt: now,
     dischargedAt: null,
     cancelledAt: null,
     cancelReason: null,
-    createdAt: now,
+    createdAt: waiting?.createdAt ?? now,
     updatedAt: now,
   }
 
@@ -109,23 +118,25 @@ export function admitPatient(input: CreateAdmissionInput): Admission {
       throw new DomainError('BED_UNAVAILABLE', 'That bed was just taken — choose another bed.')
     }
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Patient admitted', meta: `${admissionNumber} · ${input.patientName} · ${bed.bedNumber}` },
+      { text: 'Patient admitted', meta: `${admissionNumber} · ${patient.name} · ${bed.bedNumber}` },
     ])
     return {
       ...current,
-      admissions: [...current.admissions, admission],
+      admissions: waiting
+        ? current.admissions.map((a) => (a.admissionId === admissionId ? admission : a))
+        : [...current.admissions, admission],
       beds: setBedStatus(current, bed.bedId, 'Occupied', admission.admissionId),
       activityLog,
-      nextIds: { ...current.nextIds, admission: seq + 1, activity: activitySeq },
+      nextIds: waiting ? { ...current.nextIds, activity: activitySeq } : { ...current.nextIds, admission: seq + 1, activity: activitySeq },
     }
   })
 
-  // Bill the admission through the existing Payment/Billing system and collect the
-  // initial payment against that one record; Ward Status and Discharge read it later.
-  const billed = createBillForAdmission(admission.admissionId, billItems)
-  collectPayment({ paymentId: billed.paymentId!, amount: input.initialPayment.amount, method: input.initialPayment.method })
+  // The admission's bill, linked both ways. A self-pay patient pays the first
+  // day at the billing counter; an insured stay is settled by its payer.
+  const billed = createBillForAdmission(admissionId, billItems)
+  const bill = getState().payments.find((p) => p.paymentId === billed.paymentId)!
 
-  return requireAdmission(getState(), admission.admissionId)
+  return { admission: requireAdmission(getState(), admissionId), bill }
 }
 
 /** Raises a bill against the existing Payment/Billing system for admission
@@ -136,7 +147,7 @@ export function createBillForAdmission(admissionId: string, items: { code: strin
   if (admission.paymentId) throw new DomainError('INVALID_TRANSITION', 'This admission already has a bill.')
   if (!items.length) throw new DomainError('VALIDATION', 'Select at least one charge.')
 
-  const bill = createPaymentBill({ patientId: admission.patientId, items })
+  const bill = createPaymentBill({ patientId: admission.patientId, items, admissionId })
 
   let updated!: Admission
   setState((current) => {
@@ -165,8 +176,10 @@ export function cancelAdmission(admissionId: string, reason: string): Admission 
   const now = Date.now()
   let updated!: Admission
   setState((current) => {
+    const passes = activePasses(current, admission.patientId)
     const { activityLog, activitySeq } = withActivity(current, [
       { text: 'Admission cancelled', meta: `${admission.admissionNumber} · ${reason.trim()}` },
+      ...passes.map((pass) => ({ text: 'Guest pass returned', meta: `${pass.passId} · admission cancelled` })),
     ])
     const admissions = current.admissions.map((a) => {
       if (a.admissionId !== admissionId) return a
@@ -174,87 +187,121 @@ export function cancelAdmission(admissionId: string, reason: string): Admission 
       return updated
     })
     const beds = admission.bedId ? setBedStatus(current, admission.bedId, 'Available', null) : current.beds
-    return { ...current, admissions, beds, activityLog, nextIds: { ...current.nextIds, activity: activitySeq } }
+    // Its bill goes with it while nothing has been paid; a paid deposit stays
+    // on the bill for a refund.
+    const payments = current.payments.map((p) =>
+      p.paymentId === admission.paymentId && p.status === 'Pending' && p.paidAmount === 0
+        ? { ...p, status: 'Cancelled' as const, cancelledAt: now, cancelReason: 'Admission cancelled', updatedAt: now }
+        : p,
+    )
+    return {
+      ...current,
+      admissions,
+      beds,
+      payments,
+      guestPasses: returnPasses(current, admission.patientId, now),
+      activityLog,
+      nextIds: { ...current.nextIds, activity: activitySeq },
+    }
   })
 
   return updated
 }
 
-/** Discharges an admitted patient. The final bill (admission charge + bed/room charge
- *  for the days stayed) is compared with what is already paid on the admission's
- *  Payment record; any pending amount must be collected here, in full, before the
- *  discharge goes through. Bed release, history and billing then follow from the one
- *  shared admission/bed/payment state. */
-export function dischargeAdmission(
-  admissionId: string,
-  details?: DischargeDetails,
-  pendingPayment?: AdmissionPaymentInput,
-): Admission {
+/** Discharges an admitted patient once the stay's final bill — re-priced to
+ *  the day they leave — is paid: at the billing counter, or by the insurer. The
+ *  patient's other bills never hold up a discharge. The bed is free the same
+ *  moment. */
+export function dischargeAdmission(admissionId: string, details: DischargeDetails): Admission {
   const state = getState()
   const admission = requireAdmission(state, admissionId)
   if (admission.status !== 'Admitted') {
     throw new DomainError('INVALID_TRANSITION', `Cannot discharge an admission that is ${admission.status}.`)
   }
+  if (!DISCHARGE_TYPES.includes(details.dischargeType)) {
+    throw new DomainError('VALIDATION', 'Choose how the patient is leaving.')
+  }
 
   const now = Date.now()
-  const dischargedAt = details?.dischargedAt ?? now
-  if (details) {
-    if (dischargedAt > now + 60_000) throw new DomainError('VALIDATION', 'Discharge date cannot be in the future.')
-    if (admission.admittedAt && dischargedAt < new Date(admission.admittedAt).setHours(0, 0, 0, 0)) {
-      throw new DomainError('VALIDATION', 'Discharge date cannot be before the admission date.')
-    }
+  const preview = previewDischargeBill(state, admissionId, now)
+  if (preview && preview.balance > 0) {
+    throw new DomainError('BALANCE_DUE', `${formatRupees(preview.balance)} on the final bill is still to be paid at the billing counter.`)
   }
-
-  // Final bill vs. what is already paid.
-  const billing = computeAdmissionBilling(state, admission, dischargedAt)
-  if (billing.pending > 0) assertPayment(pendingPayment, billing.pending, 'pending amount')
-
-  // Make the admission's Payment record carry the final bill (create it if the admission
-  // never had one), then collect the pending amount against it.
-  let paymentId = admission.paymentId
-  if (!paymentId) {
-    const bill = createPaymentBill({ patientId: admission.patientId, items: billing.items })
-    paymentId = bill.paymentId
-    setState((current) => ({
-      ...current,
-      admissions: current.admissions.map((a) => (a.admissionId === admissionId ? { ...a, paymentId: bill.paymentId } : a)),
-    }))
-  } else {
-    syncPaymentToBill(paymentId, billing.items)
-  }
-  if (billing.pending > 0 && pendingPayment) {
-    collectPayment({ paymentId, amount: pendingPayment.amount, method: pendingPayment.method })
-  }
+  // The stored bill becomes the final bill.
+  repriceAdmissionBill(admissionId, now)
 
   let updated!: Admission
   setState((current) => {
+    const passes = activePasses(current, admission.patientId)
     const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Patient discharged', meta: admission.admissionNumber },
+      { text: 'Patient discharged', meta: `${admission.admissionNumber} · ${admission.patientName} · ${admission.bedNumber ?? ''}` },
+      ...passes.map((pass) => ({ text: 'Guest pass returned', meta: `${pass.passId} · at discharge` })),
     ])
     const admissions = current.admissions.map((a) => {
       if (a.admissionId !== admissionId) return a
       updated = {
         ...a,
         status: 'Discharged',
-        dischargedAt,
-        dischargeType: details?.dischargeType ?? a.dischargeType ?? null,
-        dischargeRemarks: details?.remarks?.trim() ? details.remarks.trim() : (a.dischargeRemarks ?? null),
+        dischargedAt: now,
+        dischargeType: details.dischargeType,
+        dischargeRemarks: details.remarks?.trim() || null,
         updatedAt: now,
       }
       return updated
     })
     const beds = admission.bedId ? setBedStatus(current, admission.bedId, 'Available', null) : current.beds
-    return { ...current, admissions, beds, activityLog, nextIds: { ...current.nextIds, activity: activitySeq } }
+    return {
+      ...current,
+      admissions,
+      beds,
+      guestPasses: returnPasses(current, admission.patientId, now),
+      activityLog,
+      nextIds: { ...current.nextIds, activity: activitySeq },
+    }
   })
 
   return updated
 }
 
-/** Brings an admission's Payment record up to date with the final line items — the
- *  record's own items/total/balance/status, nothing else (paid amount and
- *  transactions are untouched). */
+/** A patient's guest passes still out. */
+function activePasses(current: AppState, patientId: string): GuestPass[] {
+  return current.guestPasses.filter((p) => p.patientId === patientId && !p.returned)
+}
+
+/** The pass comes back when the stay ends — collected at the desk with the
+ *  discharge (or the cancellation), so no one is left holding a live pass. */
+function returnPasses(current: AppState, patientId: string, at: number): GuestPass[] {
+  return current.guestPasses.map((p) => (p.patientId === patientId && !p.returned ? { ...p, returned: true, returnedAt: at } : p))
+}
+
+/** Brings a current stay's bill up to the stay so far — the admission charge
+ *  plus the bed charge for every day started by `asOf` — and returns it. The
+ *  stay keeps accruing, so this runs before money is taken on the bill and
+ *  at discharge. A stay without a bill gets one. */
+export function repriceAdmissionBill(admissionId: string, asOf: number): Payment {
+  const state = getState()
+  const admission = requireAdmission(state, admissionId)
+  if (admission.status !== 'Admitted') {
+    throw new DomainError('INVALID_TRANSITION', 'Only a current stay’s bill keeps accruing.')
+  }
+  const { items } = computeAdmissionBilling(state, admission, asOf)
+  if (!admission.paymentId) {
+    const billed = createBillForAdmission(admissionId, items)
+    return requireBill(getState(), billed.paymentId!)
+  }
+  syncPaymentToBill(admission.paymentId, items)
+  return requireBill(getState(), admission.paymentId)
+}
+
+/** Brings an admission's Payment record up to date with the stay's line items —
+ *  the record's own items/total/balance/status, nothing else (paid amount and
+ *  transactions are untouched). Charges already on the bill are never taken
+ *  back, and a cancelled or refunded bill is closed and never re-opened. */
 function syncPaymentToBill(paymentId: string, items: PaymentItem[]): void {
   const total = sumItems(items)
+  const bill = getState().payments.find((p) => p.paymentId === paymentId)
+  if (!bill || bill.status === 'Cancelled' || bill.status === 'Refunded') return
+  if (total <= bill.totalAmount) return
   setState((current) => ({
     ...current,
     payments: current.payments.map((p) => {

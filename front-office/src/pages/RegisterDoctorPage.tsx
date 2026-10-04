@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
+import { useFlow } from '../flows/useFlow'
 import { getDepartments } from '../domain/selectors'
 import { registerDoctor } from '../domain/actions'
 import { initialsOf } from '../utils/format'
@@ -28,7 +29,7 @@ const DAYS = [
   { value: 0, label: 'Sun' },
 ]
 const GENDERS: Gender[] = ['Male', 'Female', 'Other']
-const CONSULT_TYPES: ConsultationType[] = ['OPD', 'OPD + Teleconsult', 'Teleconsult only']
+const CONSULT_TYPES: ConsultationType[] = ['Outpatient', 'Outpatient + Teleconsult', 'Teleconsult only']
 const ROLES: DoctorRole[] = ['Consultant', 'Senior Consultant', 'Associate Consultant', 'Visiting Consultant', 'Registrar']
 const SLOT_LENGTHS = [10, 15, 20, 30, 45]
 
@@ -71,7 +72,7 @@ const EMPTY: DoctorFormState = {
   registrationNumber: '',
   experienceYears: '',
   employeeId: '',
-  consultationType: 'OPD',
+  consultationType: 'Outpatient',
   consultationFee: '',
   room: '',
   workingDays: [1, 2, 3, 4, 5],
@@ -92,6 +93,7 @@ const EMPTY: DoctorFormState = {
 export function RegisterDoctorPage() {
   const navigate = useNavigate()
   const { notify } = useToast()
+  const { openFlow } = useFlow()
   const departments = useStoreValue(getDepartments)
 
   const [form, setForm] = useState<DoctorFormState>(EMPTY)
@@ -141,7 +143,7 @@ export function RegisterDoctorPage() {
       <div>
         <PageHeader title="Register Doctor" subtitle="Profile created — the doctor is now in the directory." />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-2xl">
+          <Card accentTone="indigo" className="max-w-2xl">
             <CardBody className="flex flex-col gap-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stable-bg">
@@ -170,11 +172,8 @@ export function RegisterDoctorPage() {
                   Doctor directory
                 </Button>
                 {bookable ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => navigate('/appointments/new', { state: { providerId: created.providerId } })}
-                  >
-                    Schedule an appointment
+                  <Button variant="secondary" onClick={() => openFlow('schedule', { doctor: created.providerId })}>
+                    Schedule Appointment
                   </Button>
                 ) : null}
                 <Button
@@ -208,7 +207,7 @@ export function RegisterDoctorPage() {
           <div className="flex min-w-0 flex-col gap-6">
             {error ? <Alert tone="critical">{error}</Alert> : null}
 
-            <Card>
+            <Card accentTone="indigo">
               <CardHeader icon={UserRoundPlus} iconTone="indigo" title="Basic information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Doctor name" required className="sm:col-span-2">
@@ -256,7 +255,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="indigo">
               <CardHeader icon={Stethoscope} iconTone="indigo" title="Professional information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Department" required>
@@ -307,7 +306,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="indigo">
               <CardHeader icon={Building2} iconTone="indigo" title="Hospital information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Doctor / employee ID" hint="Left blank, one is allocated automatically">
@@ -342,14 +341,14 @@ export function RegisterDoctorPage() {
                   <input
                     value={form.room}
                     onChange={(e) => update('room', e.target.value)}
-                    placeholder="OPD Room 4, Block A"
+                    placeholder="Room 4, Block A"
                     className={inputClass}
                   />
                 </Field>
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="stable">
               <CardHeader
                 icon={CalendarCheck}
                 iconTone="stable"
@@ -407,7 +406,7 @@ export function RegisterDoctorPage() {
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="stable">
               <CardHeader icon={ShieldCheck} iconTone="stable" title="Account" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Login email / username" hint="Defaults to the contact email">
@@ -444,7 +443,7 @@ export function RegisterDoctorPage() {
 
           {/* Summary / submit */}
           <div className="min-w-0">
-            <Card className="2xl:sticky 2xl:top-6">
+            <Card accentTone="indigo" className="2xl:sticky 2xl:top-6">
               <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center gap-2.5">
                   <Avatar initials={form.name ? initialsOf(form.name) : 'DR'} />

@@ -20,6 +20,14 @@ import type { AppState } from '../types/store'
 type AnySelector = (state: AppState, ...args: any[]) => unknown
 const cache = new WeakMap<AppState, Map<AnySelector, Map<string, unknown>>>()
 
+// Selectors that take a clock (`now`) get a new argument on every tick of
+// useNow, and the state object — the only thing that drops the cache — can
+// stay the same for a long idle stretch. Each selector's entries are kept in
+// least-recently-used order (a hit moves its key to the end) and the coldest
+// is dropped past this size, so stale clock ticks age out while every value a
+// mounted component is still reading stays put.
+const MAX_ARG_SETS_PER_SELECTOR = 256
+
 function selectCached<TArgs extends unknown[], TResult>(
   state: AppState,
   selector: (state: AppState, ...args: TArgs) => TResult,
@@ -37,10 +45,19 @@ function selectCached<TArgs extends unknown[], TResult>(
     bySelector.set(key, byArgs)
   }
   const argsKey = JSON.stringify(args)
-  if (!byArgs.has(argsKey)) {
-    byArgs.set(argsKey, selector(state, ...args))
+  if (byArgs.has(argsKey)) {
+    const hit = byArgs.get(argsKey) as TResult
+    byArgs.delete(argsKey)
+    byArgs.set(argsKey, hit)
+    return hit
   }
-  return byArgs.get(argsKey) as TResult
+  if (byArgs.size >= MAX_ARG_SETS_PER_SELECTOR) {
+    const coldest = byArgs.keys().next().value
+    if (coldest !== undefined) byArgs.delete(coldest)
+  }
+  const value = selector(state, ...args)
+  byArgs.set(argsKey, value)
+  return value
 }
 
 /** Subscribes a component to the operational store and returns

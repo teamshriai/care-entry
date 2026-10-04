@@ -1,21 +1,19 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Receipt } from 'lucide-react'
-import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
+import { BillStatusBadge } from './BillStatusBadge'
 import { formatClock } from '../../utils/format'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import { cn } from '../../utils/cn'
-import { paymentStatusTone } from '../../utils/billing'
+import { billNumberFor, formatRupees } from '../../utils/billing'
 import type { Payment } from '../../types/payment'
+import { PatientStatusIcons } from '../patient/PatientStatusIcons'
+import { usePatientCareStatus } from '../../hooks/useCareStatus'
 
-function rupees(value: number): string {
-  return `₹${value.toLocaleString('en-IN')}`
-}
-
-/** Shared table for Payment History and Pending Payments — the two lists
- *  differ only in which rows they pass in and which columns they need. */
+/** The bill list — the Billing page passes in whichever bills its filter
+ *  selects, plus the row action. */
 export function PaymentsTable({
   payments,
   emptyTitle = 'No payments to show',
@@ -29,6 +27,7 @@ export function PaymentsTable({
   renderActions?: (payment: Payment) => ReactNode
   showBalance?: boolean
 }) {
+  const care = usePatientCareStatus()
   if (payments.length === 0) {
     return <EmptyState icon={Receipt} title={emptyTitle} description={emptyDescription} />
   }
@@ -38,7 +37,7 @@ export function PaymentsTable({
       <table className="w-full min-w-[880px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border-soft text-left text-xs font-medium uppercase tracking-wide text-ink-faint">
-            <th className="px-5 py-2.5 font-medium">Receipt No.</th>
+            <th className="px-5 py-2.5 font-medium">Bill no.</th>
             <th className="px-5 py-2.5 font-medium">Patient</th>
             <th className="px-5 py-2.5 font-medium">Date &amp; Time</th>
             <th className="px-5 py-2.5 font-medium">Description</th>
@@ -53,12 +52,15 @@ export function PaymentsTable({
             <tr key={payment.paymentId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-subtle">
               <td className="whitespace-nowrap px-5 py-3">
                 <Link to={`/payments/${payment.paymentId}`} className="font-medium text-primary-text hover:underline">
-                  {payment.receiptNo}
+                  {billNumberFor(payment)}
                 </Link>
               </td>
               <td className="px-5 py-3">
-                <p className="max-w-[12rem] truncate text-ink" title={payment.patientName}>
-                  {payment.patientName}
+                <p className="flex max-w-[14rem] items-center gap-1.5 text-ink">
+                  <span className="truncate" title={payment.patientName}>
+                    {payment.patientName}
+                  </span>
+                  <PatientStatusIcons status={care[payment.patientId]} />
                 </p>
                 <p className="text-2xs text-ink-faint">{payment.patientId}</p>
               </td>
@@ -71,7 +73,7 @@ export function PaymentsTable({
                 </span>
               </td>
               <td className="whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums text-ink">
-                {rupees(payment.totalAmount)}
+                {formatRupees(payment.totalAmount)}
               </td>
               {showBalance ? (
                 <td
@@ -80,11 +82,11 @@ export function PaymentsTable({
                     payment.balance > 0 ? 'text-warning' : 'text-ink-faint',
                   )}
                 >
-                  {rupees(payment.balance)}
+                  {formatRupees(payment.balance)}
                 </td>
               ) : null}
               <td className="whitespace-nowrap px-5 py-3">
-                <Badge tone={paymentStatusTone(payment.status)} status={payment.status} />
+                <BillStatusBadge payment={payment} />
               </td>
               <td className="whitespace-nowrap px-5 py-3 text-right">
                 <div className="flex justify-end gap-1.5">{renderActions?.(payment)}</div>

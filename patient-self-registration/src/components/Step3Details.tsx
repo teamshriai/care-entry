@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { INDIAN_STATES } from '../data';
+import { INDIAN_STATES, MOBILE_ERROR, isValidMobile } from '../data';
 import { IconBadge, Icon } from './Icon';
 import { LockedValue } from './LockedValue';
 import { trackSpotlight } from '../ui';
@@ -45,8 +45,8 @@ export function Step3Details({
       setFormError('Emergency contact name and mobile number are required.');
       return;
     }
-    if (ecMobile.length !== 10) {
-      setFormError('Enter a 10-digit mobile number for the emergency contact.');
+    if (!isValidMobile(ecMobile)) {
+      setFormError('Emergency contact: ' + MOBILE_ERROR.charAt(0).toLowerCase() + MOBILE_ERROR.slice(1));
       return;
     }
     setFormError('');

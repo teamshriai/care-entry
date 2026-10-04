@@ -1,11 +1,20 @@
-import type { Payment, PaymentItem, PaymentStatus } from '../types/payment'
-import { toneFor } from './tone'
+import type { BillDisplayStatus, Payment, PaymentItem } from '../types/payment'
 import type { Tone } from './tone'
 
 /** The one Registration Fee charge — Care Entry and appointment booking's
  *  own bill-creation step both reuse this exact item, so there is a single
  *  definition of what "Registration Fee" means as a charge. */
 export const REGISTRATION_FEE: PaymentItem = { code: 'REG-FEE', description: 'Registration Fee', amount: 100 }
+
+/** The administrative charges the counter can raise on the spot. Everything
+ *  else — consultations, admissions — is billed by the action itself. */
+export const SERVICE_CHARGE: PaymentItem = { code: 'SVC-CHG', description: 'Service Charge', amount: 200 }
+export const COUNTER_CHARGES: PaymentItem[] = [REGISTRATION_FEE, SERVICE_CHARGE]
+
+/** A bill with money still owed on it. */
+export function isBillDue(payment: Payment): boolean {
+  return payment.balance > 0 && payment.status !== 'Cancelled' && payment.status !== 'Refunded'
+}
 
 // Billing & Accounts reuses the Payment record as the "Bill" — a Payment
 // already carries everything a front-desk bill needs (items, total, paid,
@@ -21,14 +30,38 @@ export function billServicesSummary(payment: Payment): string {
   return payment.items.map((item) => item.description).join(' + ')
 }
 
-/** A bill's own status tone — deliberately separate from the shared,
- *  generic `toneFor('Pending')` (which many unrelated statuses across the
- *  app also key off, and stays amber for those). An unpaid bill reads as
- *  red here, everywhere a bill's status is shown, without touching that
- *  shared mapping or any other module's "Pending" badge. */
-export function paymentStatusTone(status: PaymentStatus): Tone {
-  if (status === 'Pending') return 'critical'
-  return toneFor(status)
+/** What a bill reads as everywhere it is shown. A stored Cancelled/Refunded
+ *  wins; otherwise the money decides: nothing due → Paid, the latest attempt
+ *  failed after the last collection → Failed, some collected → Partial,
+ *  nothing collected → Pending. */
+export function billDisplayStatus(payment: Payment): BillDisplayStatus {
+  if (payment.status === 'Cancelled' || payment.status === 'Refunded') return payment.status
+  if (payment.balance <= 0) return 'Paid'
+  const lastFailure = payment.failedAttempts[payment.failedAttempts.length - 1]?.attemptedAt ?? 0
+  const lastCollection = payment.transactions[payment.transactions.length - 1]?.collectedAt ?? 0
+  if (lastFailure > lastCollection) return 'Failed'
+  return payment.paidAmount > 0 ? 'Partial' : 'Pending'
+}
+
+/** What each bill status reads as. Care Entry never takes money, so a bill
+ *  only ever reads as where the billing counter has it. */
+export const BILL_STATUS_LABEL: Record<BillDisplayStatus, string> = {
+  Paid: 'Payment received',
+  Partial: 'Payment pending',
+  Pending: 'Payment pending',
+  Failed: 'Payment failed',
+  Cancelled: 'Cancelled',
+  Refunded: 'Refunded',
+}
+
+/** Green paid, yellow pending/partial, red failed; closed bills are quiet. */
+export const BILL_STATUS_TONE: Record<BillDisplayStatus, Tone> = {
+  Paid: 'stable',
+  Partial: 'warning',
+  Pending: 'warning',
+  Failed: 'critical',
+  Cancelled: 'neutral',
+  Refunded: 'info',
 }
 
 // ------------------------------------------------------------- IP admission
@@ -37,7 +70,6 @@ export function paymentStatusTone(status: PaymentStatus): Tone {
 // system: initial payment at admission and the pending balance at discharge are
 // both just collections against that one record.
 import type { RoomType } from '../types/admission'
-import type { PaymentMethod } from '../types/payment'
 
 export const ADMISSION_CHARGE = 500
 
@@ -48,9 +80,6 @@ export const DAILY_BED_CHARGE: Record<RoomType, number> = {
   Private: 5000,
   ICU: 8000,
 }
-
-/** The ways a patient can pay at admission and at discharge. */
-export const IP_PAYMENT_METHODS: PaymentMethod[] = ['Cash', 'UPI', 'Card', 'Other']
 
 const DAY_MS = 24 * 60 * 60 * 1000
 

@@ -6,14 +6,11 @@ import { DoctorIllustration } from '../ui/illustrations/DoctorIllustration'
 import { initialsOf } from '../../utils/format'
 import { cn } from '../../utils/cn'
 import { doctorStatusLabel } from '../../utils/appointment'
-import type { DoctorRow, DoctorStatus, Provider } from '../../types/doctor'
+import type { DoctorRow, Provider } from '../../types/doctor'
 
 // Purely presentational. Every row's status, next slot, delay and count is
 // derived by domain/selectors.getDoctorRows — nothing is hardcoded here and
 // no clinical information is ever shown.
-const BOOKABLE: DoctorStatus[] = ['Available', 'Running late', 'In consultation', 'On break']
-const QUEUEABLE: DoctorStatus[] = ['Available', 'Running late', 'In consultation', 'On break', 'Fully booked']
-
 function statusContext(row: DoctorRow): string | null {
   if (row.status === 'Inactive') return 'Account deactivated'
   if (row.status === 'On leave') return row.schedule?.leaveReason ?? 'Unavailable today'
@@ -27,18 +24,13 @@ function statusContext(row: DoctorRow): string | null {
 export function DoctorAvailabilityTable({
   rows,
   onBook,
-  onViewSlots,
-  onWalkIn,
   onOpenProfile,
-  patientInContext = false,
   compact = false,
 }: {
   rows: DoctorRow[]
-  onBook?: (provider: Provider, nextSlot: string | null) => void
-  onViewSlots?: (row: DoctorRow) => void
-  onWalkIn?: (provider: Provider) => void
+  /** Shows a Schedule button per doctor — omit for an information-only list. */
+  onBook?: (provider: Provider) => void
   onOpenProfile?: (provider: Provider) => void
-  patientInContext?: boolean
   compact?: boolean
 }) {
   if (rows.length === 0) {
@@ -62,13 +54,14 @@ export function DoctorAvailabilityTable({
             <th className="px-5 py-2 font-semibold">Status</th>
             <th className="px-5 py-2 font-semibold">Next slot</th>
             {compact ? null : <th className="px-5 py-2 font-semibold">Today</th>}
-            <th className="px-5 py-2 font-semibold" />
+            {onBook ? <th className="px-5 py-2 font-semibold" /> : null}
           </tr>
         </thead>
         <tbody>
           {visible.map((row) => {
-            const canBook = BOOKABLE.includes(row.status) && Boolean(row.nextSlot)
-            const canWalkIn = patientInContext && QUEUEABLE.includes(row.status)
+            // The schedule flow looks two weeks ahead, so any active doctor
+            // can be booked — not only those with a slot left today.
+            const canBook = row.provider.status === 'Active'
             return (
               <tr
                 key={row.provider.providerId}
@@ -109,28 +102,18 @@ export function DoctorAvailabilityTable({
                 {compact ? null : (
                   <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{row.todaysAppointmentCount} appts</td>
                 )}
-                <td className="whitespace-nowrap px-5 py-3 text-right">
-                  <div className="flex justify-end gap-1.5">
-                    {onViewSlots && !compact ? (
-                      <Button size="sm" variant="ghost" onClick={() => onViewSlots(row)}>
-                        View slots
-                      </Button>
-                    ) : null}
-                    {canWalkIn && onWalkIn ? (
-                      <Button size="sm" variant="secondary" onClick={() => onWalkIn(row.provider)}>
-                        Walk-in
-                      </Button>
-                    ) : null}
+                {onBook ? (
+                  <td className="whitespace-nowrap px-5 py-3 text-right">
                     <Button
                       size="sm"
                       variant={canBook ? 'primary' : 'secondary'}
                       disabled={!canBook}
-                      onClick={() => onBook?.(row.provider, row.nextSlot)}
+                      onClick={() => onBook(row.provider)}
                     >
-                      Schedule
+                      Schedule Appointment
                     </Button>
-                  </div>
-                </td>
+                  </td>
+                ) : null}
               </tr>
             )
           })}

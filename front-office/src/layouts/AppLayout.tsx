@@ -3,6 +3,8 @@ import { Outlet } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { Sidebar } from '../components/layout/Sidebar'
 import { AppBar } from '../components/layout/AppBar'
+import { FlowHost } from '../flows/FlowHost'
+import { BillingCounterNotices } from '../components/payment/BillingCounterNotices'
 
 export function AppLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -43,6 +45,10 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Schedule / reschedule / billing / admit / discharge open here, over the page. */}
+      <FlowHost />
+      <BillingCounterNotices />
     </div>
   )
 }

@@ -33,6 +33,24 @@ export function buildDateOptions(count: number = 7, from: Date = new Date()): Da
   return options
 }
 
+/** "Today", "Tomorrow", else "Sat 4 Oct" — for chips and confirmations. */
+export function relativeDayLabel(dateKey: string, today: string = todayKey()): string {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  const [ty, tm, td] = today.split('-').map(Number)
+  const diff = Math.round((date.getTime() - new Date(ty, tm - 1, td).getTime()) / 86400000)
+  if (diff === 0) return 'Today'
+  if (diff === 1) return 'Tomorrow'
+  return `${WEEKDAYS[date.getDay()]} ${day} ${MONTHS[month - 1]}`
+}
+
+/** "Today · Fri 02-Oct-2026", "Tomorrow · Sat 03-Oct-2026", else just
+ *  "Sun 04-Oct-2026" — a confirmation's day, never said twice. */
+export function dayWithDate(dateKey: string, today: string = todayKey()): string {
+  const label = relativeDayLabel(dateKey, today)
+  return label === 'Today' || label === 'Tomorrow' ? `${label} · ${formatDateKey(dateKey)}` : formatDateKey(dateKey)
+}
+
 export function formatDateKey(value: string | null | undefined): string {
   if (!value) return '—'
   const [year, month, day] = value.split('-').map(Number)

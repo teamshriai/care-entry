@@ -96,15 +96,36 @@
   --color-tile-amber: #8f5f32;
   --color-tile-amber-fg: #ffffff;
 
-  /* First-row card fills: rich solid colors chosen so WHITE text, numbers and
-     icons read clearly on every one (all >= 5:1). */
-  --color-action-blue: #1e40af;
-  --color-action-emerald: #047857;
-  --color-action-coral: #be123c;
-  --color-action-amber: #b45309;
-  --color-action-purple: #5b21b6;
-  --color-action-turquoise: #0f766e;
-  --color-action-magenta: #a21caf;
+  /* Dashboard figure cards — the clinician portal's tinted cards, a shade
+     deeper: a tinted fill, a solid icon square and the figure in the hue's
+     dark ink (every ink >= 5:1 on its fill). */
+  --color-stat-blue-bg: #dbe3ff;
+  --color-stat-blue: #3b5bdb;
+  --color-stat-blue-ink: #2f44ad;
+  --color-stat-orange-bg: #ffe2cc;
+  --color-stat-orange: #e8590c;
+  --color-stat-orange-ink: #b8460a;
+  --color-stat-purple-bg: #e5dbff;
+  --color-stat-purple: #7048e8;
+  --color-stat-purple-ink: #5535c4;
+  --color-stat-red-bg: #fbd5d5;
+  --color-stat-red: #e03131;
+  --color-stat-red-ink: #b02525;
+  --color-stat-teal-bg: #c9eee2;
+  --color-stat-teal: #0b8a68;
+  --color-stat-teal-ink: #08694f;
+  --color-stat-green-bg: #d3f0d9;
+  --color-stat-green: #2f9e44;
+  --color-stat-green-ink: #1b6e30;
+  --color-stat-indigo-bg: #dcdcfc;
+  --color-stat-indigo: #4f46e5;
+  --color-stat-indigo-ink: #3730a3;
+  --color-stat-pink-bg: #fbd3e6;
+  --color-stat-pink: #d6336c;
+  --color-stat-pink-ink: #a61e4d;
+  --color-stat-slate-bg: #dfe5ec;
+  --color-stat-slate: #64748b;
+  --color-stat-slate-ink: #334155;
 
   /* Operational Summary bars — vivid solid fills. */
   --color-bar-blue: #2563eb;
@@ -213,6 +234,21 @@
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+/* Flow sheets slide in from the right edge. */
+@keyframes sheetIn {
+  from { opacity: 0.6; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+/* An acknowledgement card's countdown bar. */
+@keyframes ackProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+/* The Create ABHA popup pops in beside its button. */
+@keyframes abha-pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
 
 /* ═════════════════════════════════════════════════════════════════════════
    THEME OVERRIDES — unlayered so nothing can out-specify them. The portal's
@@ -290,6 +326,34 @@
   --color-bar-green: #4ade80;
   --color-bar-amber: #fbbf24;
   --color-bar-rose: #fb7185;
+
+  --color-stat-blue-bg: #22305a;
+  --color-stat-blue: #4c6ef5;
+  --color-stat-blue-ink: #a5b8ff;
+  --color-stat-orange-bg: #4a2a14;
+  --color-stat-orange: #e8590c;
+  --color-stat-orange-ink: #ffc08a;
+  --color-stat-purple-bg: #33265e;
+  --color-stat-purple: #7950f2;
+  --color-stat-purple-ink: #c4b2ff;
+  --color-stat-red-bg: #4d1f22;
+  --color-stat-red: #e03131;
+  --color-stat-red-ink: #ffaaaa;
+  --color-stat-teal-bg: #133f35;
+  --color-stat-teal: #0b8a68;
+  --color-stat-teal-ink: #8ce9c8;
+  --color-stat-green-bg: #173f22;
+  --color-stat-green: #2f9e44;
+  --color-stat-green-ink: #8ce99a;
+  --color-stat-indigo-bg: #262a5e;
+  --color-stat-indigo: #5c56e8;
+  --color-stat-indigo-ink: #b4b8ff;
+  --color-stat-pink-bg: #4d1d33;
+  --color-stat-pink: #d6336c;
+  --color-stat-pink-ink: #ffa8cc;
+  --color-stat-slate-bg: #2b3442;
+  --color-stat-slate: #64748b;
+  --color-stat-slate-ink: #cbd5e1;
 
   --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
   --shadow-card-md: 0 2px 8px 0 rgba(0, 0, 0, 0.45), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
@@ -517,5 +581,16 @@ html[data-high-contrast='true'][data-theme='dark'] {
   aside,
   [data-print='hide'] {
     display: none !important;
+  }
+}
+
+/* A coloured card prints plain: no top bar, no tinted header. */
+@media print {
+  .card-accent {
+    border-color: var(--color-border) !important;
+    border-top-width: 1px !important;
+  }
+  .card-accent-head {
+    background: transparent !important;
   }
 }

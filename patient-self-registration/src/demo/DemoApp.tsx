@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import '../App.css';
 import '../identity/identity.css';
 import { Icon, IconBadge } from '../components/Icon';
-import { INDIAN_STATES, generateSystemId, maskAadhaar } from '../data';
+import { INDIAN_STATES, MOBILE_ERROR, dobError, generateSystemId, isValidMobile, maskAadhaar } from '../data';
 import { MethodChooser, type IdMethod } from '../identity/MethodChooser';
 import { IdentityVerify } from '../identity/IdentityVerify';
 import type { DemoIdentity } from '../identity/identityData';
@@ -97,8 +97,13 @@ export default function DemoApp() {
       setError('Enter your name.');
       return;
     }
-    if (form.mobile.length !== 10) {
-      setError('Enter a 10-digit mobile number.');
+    if (!isValidMobile(form.mobile)) {
+      setError(MOBILE_ERROR);
+      return;
+    }
+    const dobProblem = dobError(form.dob);
+    if (dobProblem) {
+      setError(dobProblem);
       return;
     }
     setError('');
@@ -150,7 +155,7 @@ export default function DemoApp() {
         </nav>
 
         <div className="side-foot">
-          <a className="side-action" href="/">
+          <a className="side-action" href="./">
             <Icon name="activity" size={15} />
             Full registration
           </a>

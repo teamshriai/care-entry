@@ -8,10 +8,8 @@ import { Button } from '../components/ui/Button'
 import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
-import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
+import { useFlow } from '../flows/useFlow'
 import { getDoctorRows, getDepartments, getSpecialties } from '../domain/selectors'
-import { openWalkInVisit } from '../domain/actions'
 import { cn } from '../utils/cn'
 import type { DoctorRow, Provider } from '../types/doctor'
 
@@ -30,8 +28,7 @@ function matchesAvailability(row: DoctorRow, filter: AvailabilityFilter): boolea
 export function DoctorDirectoryPage() {
   const navigate = useNavigate()
   const now = useNow(30000)
-  const { notify } = useToast()
-  const { patient } = usePatientContext()
+  const { openFlow } = useFlow()
 
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('All departments')
@@ -56,23 +53,10 @@ export function DoctorDirectoryPage() {
     })
   }, [rows, query, department, specialty, availability])
 
-  function handleBook(provider: Provider, nextSlot: string | null) {
-    navigate('/appointments/new', { state: { providerId: provider.providerId, slot: nextSlot } })
-  }
-
-  function handleWalkIn(provider: Provider) {
-    if (!patient) return
-    try {
-      const result = openWalkInVisit({
-        patientId: patient.patientId,
-        providerId: provider.providerId,
-        department: provider.department,
-      })
-      notify('Walk-in visit opened', { detail: `Token ${result.tokenNumber} · ${patient.name}` })
-      navigate('/op-queue', { state: { justCreatedToken: result.tokenNumber } })
-    } catch (err) {
-      notify('Could not open visit', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
+  // Scheduling picks the patient, then when — now as a walk-in, or a time
+  // to book — inside the flow; the doctor is all this page settles.
+  function handleBook(provider: Provider) {
+    openFlow('schedule', { doctor: provider.providerId })
   }
 
   return (
@@ -91,7 +75,7 @@ export function DoctorDirectoryPage() {
       />
 
       <div className="px-6 py-6 lg:px-8">
-        <Card>
+        <Card accentTone="indigo">
           <div className="flex flex-col gap-3 border-b border-border-soft p-4 xl:flex-row xl:items-center">
             <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
               <Search className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={1.75} />
@@ -141,7 +125,6 @@ export function DoctorDirectoryPage() {
               </button>
             ))}
             <span className="ml-auto text-xs text-ink-muted">
-              {patient ? `Walk-in enabled for ${patient.name}` : 'Select a patient to enable walk-in'} ·{' '}
               {filtered.length} of {rows.length} doctors
             </span>
           </div>
@@ -149,9 +132,7 @@ export function DoctorDirectoryPage() {
           <DoctorAvailabilityTable
             rows={filtered}
             onBook={handleBook}
-            onWalkIn={handleWalkIn}
             onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
-            patientInContext={Boolean(patient)}
           />
         </Card>
       </div>

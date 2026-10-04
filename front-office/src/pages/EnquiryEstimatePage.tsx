@@ -1,35 +1,33 @@
 import { useMemo, useState } from 'react'
-import { Receipt, Plus, Minus, Trash2, Search, IndianRupee, CalendarPlus } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Receipt, Plus, Minus, Trash2, Search, Send } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
-import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
+import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { usePatientContext } from '../hooks/usePatientContext'
-import { getTariffs, getDepartments, getActiveEstimateForPatient } from '../domain/selectors'
-import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem, saveEstimate, createPaymentBill } from '../domain/actions'
-import { initialsOf } from '../utils/format'
-import { billNumberFor } from '../utils/billing'
+import { BillAtCounter } from '../components/payment/BillAtCounter'
+import { sendToBillingCounter } from '../domain/billingCounter'
+import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate, getPatientById } from '../domain/selectors'
+import { addEstimateItem, createPaymentBill, updateEstimateItemQuantity, removeEstimateItem } from '../domain/actions'
+import { billNumberFor, formatRupees } from '../utils/billing'
 import type { Tariff } from '../types/frontDesk'
 
-const rupees = (value: number) => `₹${value.toLocaleString('en-IN')}`
 
-/** An estimate always belongs to exactly one patient — the counter's own
- *  patient context (the same one used by Book Appointment, Visit Opening
- *  and MLC) gates every "Add", so there is no anonymous/global estimate to
+/** An estimate always belongs to exactly one patient — the patient chosen
+ *  here gates every "Add", so there is no anonymous/global estimate to
  *  accidentally add a service into. */
 export function EnquiryEstimatePage() {
-  const navigate = useNavigate()
   const { notify } = useToast()
-  const { patient, clearPatient } = usePatientContext()
+  const [patientId, setPatientId] = useState('')
+  const patient = useStoreValue(getPatientById, patientId)
 
   const tariffs = useStoreValue(getTariffs)
   const departments = useStoreValue(getDepartments)
   const estimate = useStoreValue(getActiveEstimateForPatient, patient?.patientId ?? '')
+  const estimateBill = useStoreValue(getBillForEstimate, estimate?.estimateId ?? '')
 
   const [query, setQuery] = useState('')
   const [department, setDepartment] = useState('All departments')
@@ -73,37 +71,25 @@ export function EnquiryEstimatePage() {
     removeEstimateItem({ estimateId: estimate.estimateId, code })
   }
 
-  function handleSave() {
-    if (!estimate) return
-    try {
-      const saved = saveEstimate(estimate.estimateId)
-      notify('Estimate saved', { detail: `${saved.estimateId} · ${rupees(saved.total)}` })
-    } catch (err) {
-      notify('Could not save estimate', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
-  }
-
-  function handleCreateBill() {
+  // Care Entry takes no money: the estimate is raised as a bill and the
+  // patient pays it at the billing counter.
+  function sendToCounter() {
     if (!estimate || !patient) return
     try {
       const bill = createPaymentBill({
         patientId: patient.patientId,
+        items: estimate.items.map((item) => ({ code: item.code, description: item.name, amount: item.rate * (item.quantity ?? 1) })),
         estimateId: estimate.estimateId,
-        items: estimate.items.map((item) => ({
-          code: item.code,
-          description: item.name,
-          amount: item.rate * (item.quantity ?? 1),
-        })),
       })
-      notify('Bill created', { detail: `${billNumberFor(bill)} · ${rupees(bill.totalAmount)}` })
-      navigate(`/payments/${bill.paymentId}`)
+      sendToBillingCounter(bill.paymentId)
+      notify('Bill sent to the billing counter', { detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}` })
     } catch (err) {
-      notify('Could not create bill', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
+      notify('Could not raise the bill', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
     }
   }
 
   const hasItems = Boolean(estimate && estimate.items.length > 0)
-  const canCreateBill = Boolean(estimate && estimate.status !== 'Cancelled' && hasItems)
+  const canBill = Boolean(estimate && estimate.status !== 'Cancelled' && hasItems && !estimateBill)
 
   return (
     <div>
@@ -113,52 +99,25 @@ export function EnquiryEstimatePage() {
       />
 
       <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
-        {/* Patient gate / context — the same PatientContext used across the portal */}
-        <Card>
-          <CardBody>
-            {patient ? (
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar initials={initialsOf(patient.name)} size="sm" />
-                    <div>
-                      <p className="text-2xs font-medium uppercase tracking-wide text-ink-faint">Patient</p>
-                      <p className="text-sm font-semibold text-ink">{patient.name}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-2xs font-medium uppercase tracking-wide text-ink-faint">UHID</p>
-                    <p className="text-sm text-ink">{patient.uhid}</p>
-                  </div>
-                  <div>
-                    <p className="text-2xs font-medium uppercase tracking-wide text-ink-faint">Mobile</p>
-                    <p className="text-sm text-ink">{patient.mobile}</p>
-                  </div>
-                </div>
-                <Button size="sm" variant="secondary" onClick={clearPatient}>
-                  Change Patient
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-ink">Select a patient to create an estimate</p>
-                  <p className="text-xs text-ink-muted">
-                    Services can be browsed below, but every estimate belongs to a specific patient.
-                  </p>
-                </div>
-                <Button size="sm" onClick={() => navigate('/patients/search')}>
-                  <Search className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Find Patient
-                </Button>
-              </div>
-            )}
+        {/* Patient gate — every estimate belongs to one patient */}
+        <Card accentTone="cyan">
+          <CardBody className="flex flex-col gap-2 lg:max-w-xl">
+            <p className="text-xs font-medium text-ink-muted">Patient</p>
+            <PatientPickField
+              patient={patient}
+              onChange={(next) => setPatientId(next.patientId)}
+              placeholder="Search the patient this estimate is for"
+              detail={patient?.mobile}
+            />
+            {!patient ? (
+              <p className="text-xs text-ink-muted">Services can be browsed below; every estimate belongs to a specific patient.</p>
+            ) : null}
           </CardBody>
         </Card>
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* Available services */}
-          <Card className="min-w-0">
+          <Card accentTone="stable" className="min-w-0">
             <CardHeader icon={Receipt} iconTone="stable" title="Available Services" subtitle="Displayed rates for enquiries at the counter" />
             <div className="flex flex-col gap-3 border-b border-border-soft p-4 lg:flex-row lg:items-center">
               <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
@@ -204,7 +163,7 @@ export function EnquiryEstimatePage() {
                         </td>
                         <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{tariff.department}</td>
                         <td className="whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums text-ink">
-                          {rupees(tariff.rate)}
+                          {formatRupees(tariff.rate)}
                         </td>
                         <td className="whitespace-nowrap px-5 py-3 text-right">
                           <Button
@@ -228,7 +187,7 @@ export function EnquiryEstimatePage() {
 
           {/* Estimate for the selected patient */}
           <div className="min-w-0">
-            <Card className="2xl:sticky 2xl:top-6">
+            <Card accentTone="cyan" className="2xl:sticky 2xl:top-6">
               <CardHeader
                 title={patient ? `Estimate for ${patient.name}` : 'Estimate'}
                 subtitle={estimate ? estimate.estimateId : undefined}
@@ -249,7 +208,7 @@ export function EnquiryEstimatePage() {
                             <p className="truncate text-sm text-ink" title={item.name}>
                               {item.name}
                             </p>
-                            <p className="text-xs text-ink-muted">{rupees(item.rate)} each</p>
+                            <p className="text-xs text-ink-muted">{formatRupees(item.rate)} each</p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <div className="flex items-center gap-1 rounded-lg border border-border px-1">
@@ -273,7 +232,7 @@ export function EnquiryEstimatePage() {
                               </button>
                             </div>
                             <span className="w-16 shrink-0 text-right text-sm font-medium tabular-nums text-ink">
-                              {rupees(item.rate * quantity)}
+                              {formatRupees(item.rate * quantity)}
                             </span>
                             <button
                               type="button"
@@ -293,36 +252,30 @@ export function EnquiryEstimatePage() {
                 {hasItems && estimate ? (
                   <div className="flex items-baseline justify-between border-t border-border-soft pt-3">
                     <span className="text-sm text-ink-muted">Estimated Total</span>
-                    <span className="text-xl font-semibold tabular-nums text-ink">{rupees(estimate.total)}</span>
+                    <span className="text-xl font-semibold tabular-nums text-ink">{formatRupees(estimate.total)}</span>
                   </div>
                 ) : null}
 
                 <p className="text-xs text-ink-faint">
-                  An estimate is not an invoice — billing and collection happen at the billing counter.
+                  An estimate is not an invoice — sending it raises the bill, paid at the billing counter.
                 </p>
 
                 {patient ? (
                   <div className="flex flex-wrap gap-2 border-t border-border-soft pt-4">
                     {hasItems && estimate ? (
                       <>
-                        <Button size="sm" onClick={handleSave}>
-                          Save Estimate
-                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => window.print()}>
                           Print Estimate
                         </Button>
-                        {canCreateBill ? (
-                          <Button size="sm" variant="secondary" onClick={handleCreateBill}>
-                            <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            Create Bill
+                        {canBill && estimate ? (
+                          <Button size="sm" onClick={sendToCounter}>
+                            <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
+                            Send {formatRupees(estimate.total)} to the billing counter
                           </Button>
                         ) : null}
+                        {estimateBill ? <BillAtCounter paymentId={estimateBill.paymentId} className="w-full" /> : null}
                       </>
                     ) : null}
-                    <Button size="sm" variant="ghost" onClick={() => navigate('/appointments/new')}>
-                      <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Schedule Appointment
-                    </Button>
                   </div>
                 ) : null}
               </CardBody>

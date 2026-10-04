@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { Printer } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
+import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { useStoreValue } from '../hooks/useStore'
 import { getPaymentById } from '../domain/selectors'
@@ -13,11 +13,7 @@ import { currentFrontOfficeUser } from '../data/currentUser'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
-import { paymentStatusTone } from '../utils/billing'
-
-function rupees(value: number): string {
-  return `₹${value.toLocaleString('en-IN')}`
-}
+import { formatRupees } from '../utils/billing'
 
 function timestampLabel(ts: number): string {
   return `${formatDateKey(todayKey(new Date(ts)))} · ${formatClock(ts)}`
@@ -27,9 +23,9 @@ interface ReceiptLocationState {
   autoPrint?: boolean
 }
 
-/** The printable receipt. Reachable from the Collect Payment success step
- *  and from every payment row in History/Detail — the same view either
- *  way, so what staff hand a patient always matches what's on record. */
+/** The printable receipt. Reachable from a payment's acknowledgement and
+ *  from the bill itself — the same view either way, so what staff hand a
+ *  patient always matches what's on record. */
 export function PaymentReceiptPage() {
   const { paymentId } = useParams<{ paymentId: string }>()
   const navigate = useNavigate()
@@ -51,12 +47,12 @@ export function PaymentReceiptPage() {
       <div>
         <PageHeader title="Receipt not found" />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-xl">
+          <Card accentTone="stable" className="max-w-xl">
             <CardBody>
               <EmptyState
                 title="No such receipt"
-                description="Return to Payment History to find the payment you're looking for."
-                action={<Button size="sm" onClick={() => navigate('/payments/history')}>Payment History</Button>}
+                description="Every bill is listed on the Billing page."
+                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Billing</Button>}
               />
             </CardBody>
           </Card>
@@ -73,21 +69,15 @@ export function PaymentReceiptPage() {
         title="Payment Receipt"
         subtitle={payment.receiptNo}
         actions={
-          <>
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${payment.paymentId}`)} className="print:hidden">
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Back
-            </Button>
-            <Button size="sm" onClick={() => window.print()} className="print:hidden">
-              <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Print
-            </Button>
-          </>
+          <Button size="sm" onClick={() => window.print()} className="print:hidden">
+            <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+            Print
+          </Button>
         }
       />
 
       <div className="px-6 py-6 lg:px-8">
-        <Card className="mx-auto max-w-xl">
+        <Card accentTone="stable" className="mx-auto max-w-xl">
           <CardBody className="flex flex-col gap-4">
             <div className="border-b border-border-soft pb-4 text-center">
               <p className="text-lg font-semibold tracking-tight text-ink">{facility.name}</p>
@@ -109,7 +99,7 @@ export function PaymentReceiptPage() {
                 {payment.items.map((item) => (
                   <div key={item.code} className="flex items-center justify-between">
                     <span className="text-ink">{item.description}</span>
-                    <span className="tabular-nums text-ink">{rupees(item.amount)}</span>
+                    <span className="tabular-nums text-ink">{formatRupees(item.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -117,12 +107,12 @@ export function PaymentReceiptPage() {
 
             <div className="flex items-center justify-between border-t border-border-soft pt-3">
               <span className="text-sm font-semibold text-ink">Total Paid</span>
-              <span className="text-lg font-semibold tabular-nums text-ink">{rupees(payment.paidAmount)}</span>
+              <span className="text-lg font-semibold tabular-nums text-ink">{formatRupees(payment.paidAmount)}</span>
             </div>
             {payment.balance > 0 ? (
               <div className="flex items-center justify-between text-sm text-warning">
                 <span>Balance due</span>
-                <span className="tabular-nums">{rupees(payment.balance)}</span>
+                <span className="tabular-nums">{formatRupees(payment.balance)}</span>
               </div>
             ) : null}
 
@@ -132,12 +122,12 @@ export function PaymentReceiptPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-ink-muted">Status</span>
-              <Badge tone={paymentStatusTone(payment.status)} status={payment.status} />
+              <BillStatusBadge payment={payment} />
             </div>
 
             {payment.refund ? (
               <div className="rounded-lg border border-info-border bg-info-bg px-3 py-2.5 text-xs text-info">
-                Refunded {rupees(payment.refund.amount)} on {timestampLabel(payment.refund.refundedAt)} — {payment.refund.reason}
+                Refunded {formatRupees(payment.refund.amount)} on {timestampLabel(payment.refund.refundedAt)} — {payment.refund.reason}
               </div>
             ) : null}
 

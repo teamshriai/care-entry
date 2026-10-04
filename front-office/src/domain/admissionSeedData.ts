@@ -1,9 +1,11 @@
 // DEVELOPMENT SEED DATA — NOT A BACKEND. Same convention as the other
 // domain seed files: timestamps generated relative to app start.
-import type { Admission, Bed } from '../types/admission'
+import type { Admission, AdmissionStatus, Bed, DischargeType } from '../types/admission'
 import type { NextIds } from '../types/store'
 
 const MINUTE = 60000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
 
 export interface AdmissionSeed {
   beds: Bed[]
@@ -11,159 +13,217 @@ export interface AdmissionSeed {
   nextIds: Pick<NextIds, 'admission'>
 }
 
-export function createAdmissionSeed(now: number = Date.now()): AdmissionSeed {
+/** Names come from the patient and doctor records, so an admission can never
+ *  disagree with them; a request made in clinic follows that visit. */
+export interface AdmissionSeedContext {
+  patientName: (patientId: string) => string
+  doctor: (providerId: string) => { name: string; department: string }
+  /** When the patient's latest finished outpatient visit ended. */
+  visitEnd: (patientId: string) => number | null
+}
+
+type StaySeed = Pick<Admission, 'patientId' | 'doctorId' | 'admissionType' | 'reason' | 'referralSource' | 'attendant' | 'paymentType'> & {
+  status: AdmissionStatus
+  bedId?: string
+  insuranceProvider?: string
+  policyNumber?: string
+  /** When the request was made — for a stay still waiting for a bed. */
+  requestedAt?: number
+  admittedAt?: number
+  dischargedAt?: number
+  dischargeType?: DischargeType
+  dischargeRemarks?: string
+  cancelledAt?: number
+  cancelReason?: string
+}
+
+export function createAdmissionSeed(now: number, context: AdmissionSeedContext): AdmissionSeed {
   const minutesAgo = (minutes: number) => now - minutes * MINUTE
+  const hoursAgo = (hours: number) => now - hours * HOUR
+  const daysAgo = (days: number) => now - days * DAY
 
+  // Every bed starts free; who is in which bed is derived from the stays below.
+  const bed = (bedId: string, bedNumber: string, ward: Bed['ward'], roomType: Bed['roomType'], status: Bed['status'] = 'Available'): Bed => ({
+    bedId,
+    bedNumber,
+    roomNumber: bedNumber.replace(/-B$/, ''),
+    ward,
+    roomType,
+    status,
+    currentAdmissionId: null,
+  })
   const beds: Bed[] = [
-    { bedId: 'bed-1', bedNumber: 'G-101-B', roomNumber: 'G-101', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-2', bedNumber: 'G-102-B', roomNumber: 'G-102', ward: 'General Ward', roomType: 'General', status: 'Occupied', currentAdmissionId: 'adm-1' },
-    { bedId: 'bed-3', bedNumber: 'G-103-B', roomNumber: 'G-103', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-4', bedNumber: 'G-104-B', roomNumber: 'G-104', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-5', bedNumber: 'G-105-B', roomNumber: 'G-105', ward: 'General Ward', roomType: 'General', status: 'Maintenance', currentAdmissionId: null },
-    { bedId: 'bed-6', bedNumber: 'P-201-B', roomNumber: 'P-201', ward: 'Private Ward', roomType: 'Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-7', bedNumber: 'P-202-B', roomNumber: 'P-202', ward: 'Private Ward', roomType: 'Private', status: 'Occupied', currentAdmissionId: 'adm-2' },
-    { bedId: 'bed-8', bedNumber: 'SP-301-B', roomNumber: 'SP-301', ward: 'Semi-Private Ward', roomType: 'Semi-Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-9', bedNumber: 'SP-302-B', roomNumber: 'SP-302', ward: 'Semi-Private Ward', roomType: 'Semi-Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-10', bedNumber: 'ICU-01-B', roomNumber: 'ICU-01', ward: 'ICU', roomType: 'ICU', status: 'Occupied', currentAdmissionId: 'adm-3' },
-    { bedId: 'bed-11', bedNumber: 'ICU-02-B', roomNumber: 'ICU-02', ward: 'ICU', roomType: 'ICU', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-12', bedNumber: 'ER-01-B', roomNumber: 'ER-01', ward: 'Emergency', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-13', bedNumber: 'ER-02-B', roomNumber: 'ER-02', ward: 'Emergency', roomType: 'General', status: 'Reserved', currentAdmissionId: null },
-    { bedId: 'bed-14', bedNumber: 'G-106-B', roomNumber: 'G-106', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-15', bedNumber: 'G-107-B', roomNumber: 'G-107', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-16', bedNumber: 'G-108-B', roomNumber: 'G-108', ward: 'General Ward', roomType: 'General', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-17', bedNumber: 'P-203-B', roomNumber: 'P-203', ward: 'Private Ward', roomType: 'Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-18', bedNumber: 'P-204-B', roomNumber: 'P-204', ward: 'Private Ward', roomType: 'Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-19', bedNumber: 'SP-303-B', roomNumber: 'SP-303', ward: 'Semi-Private Ward', roomType: 'Semi-Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-20', bedNumber: 'SP-304-B', roomNumber: 'SP-304', ward: 'Semi-Private Ward', roomType: 'Semi-Private', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-21', bedNumber: 'ICU-03-B', roomNumber: 'ICU-03', ward: 'ICU', roomType: 'ICU', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-22', bedNumber: 'ICU-04-B', roomNumber: 'ICU-04', ward: 'ICU', roomType: 'ICU', status: 'Available', currentAdmissionId: null },
-    { bedId: 'bed-23', bedNumber: 'ER-03-B', roomNumber: 'ER-03', ward: 'Emergency', roomType: 'General', status: 'Available', currentAdmissionId: null },
+    bed('bed-1', 'G-101-B', 'General Ward', 'General'),
+    bed('bed-2', 'G-102-B', 'General Ward', 'General'),
+    bed('bed-3', 'G-103-B', 'General Ward', 'General'),
+    bed('bed-4', 'G-104-B', 'General Ward', 'General'),
+    bed('bed-5', 'G-105-B', 'General Ward', 'General', 'Maintenance'),
+    bed('bed-6', 'P-201-B', 'Private Ward', 'Private'),
+    bed('bed-7', 'P-202-B', 'Private Ward', 'Private'),
+    bed('bed-8', 'SP-301-B', 'Semi-Private Ward', 'Semi-Private'),
+    bed('bed-9', 'SP-302-B', 'Semi-Private Ward', 'Semi-Private'),
+    bed('bed-10', 'ICU-01-B', 'ICU', 'ICU'),
+    bed('bed-11', 'ICU-02-B', 'ICU', 'ICU'),
+    bed('bed-12', 'ER-01-B', 'Emergency', 'General'),
+    bed('bed-13', 'ER-02-B', 'Emergency', 'General'),
+    bed('bed-14', 'G-106-B', 'General Ward', 'General'),
+    bed('bed-15', 'G-107-B', 'General Ward', 'General'),
+    bed('bed-16', 'G-108-B', 'General Ward', 'General'),
+    bed('bed-17', 'P-203-B', 'Private Ward', 'Private'),
+    bed('bed-18', 'P-204-B', 'Private Ward', 'Private'),
+    bed('bed-19', 'SP-303-B', 'Semi-Private Ward', 'Semi-Private'),
+    bed('bed-20', 'SP-304-B', 'Semi-Private Ward', 'Semi-Private'),
+    bed('bed-21', 'ICU-03-B', 'ICU', 'ICU'),
+    bed('bed-22', 'ICU-04-B', 'ICU', 'ICU'),
+    bed('bed-23', 'ER-03-B', 'Emergency', 'General'),
   ]
 
-  function attendant(name: string, relationship: Admission['attendant']['relationship'], phone: string): Admission['attendant'] {
-    return { name, relationship, phone, address: null }
-  }
+  const attendant = (name: string, relationship: Admission['attendant']['relationship'], phone: string): Admission['attendant'] => ({
+    name,
+    relationship,
+    phone,
+    address: null,
+  })
 
-  const admissions: Admission[] = [
+  const stays: StaySeed[] = [
+    // Admitted after a clinic visit, then declined within the hour — the
+    // unpaid bill went with it.
     {
-      admissionId: 'adm-1',
-      admissionNumber: 'ADM-2026-00001',
-      patientId: 'SHRI-0044120',
-      patientName: 'Arun Kumar',
-      doctorId: 'dr-arun-kumar',
-      doctorName: 'Dr. Arun Kumar',
-      department: 'Neurology',
-      admissionType: 'Elective',
-      reason: 'Elective admission for observation',
-      referralSource: 'OPD',
-      bedId: 'bed-2',
-      wardLabel: 'General Ward',
-      roomNumber: 'G-102',
-      bedNumber: 'G-102-B',
-      roomType: 'General',
-      attendant: attendant('Vikram Kumar', 'Son', '+91 98430 55112'),
-      paymentType: 'Self Pay',
-      insuranceProvider: null,
-      policyNumber: null,
-      paymentId: null,
-      status: 'Admitted',
-      admittedAt: minutesAgo(600),
-      dischargedAt: null,
-      cancelledAt: null,
-      cancelReason: null,
-      createdAt: minutesAgo(600),
-      updatedAt: minutesAgo(600),
+      patientId: 'SHRI-0048305', doctorId: 'dr-vikram-das', admissionType: 'Elective',
+      reason: 'Diabetic foot ulcer — wound care', referralSource: 'Outpatient',
+      attendant: attendant('Mary Thomas', 'Spouse', '+91 94473 50128'),
+      paymentType: 'Insurance', insuranceProvider: 'New India Assurance', policyNumber: 'NIA-7720915',
+      status: 'Cancelled', bedId: 'bed-19', admittedAt: daysAgo(6), cancelledAt: daysAgo(6) + 40 * MINUTE,
+      cancelReason: 'Patient declined admission — chose outpatient care',
     },
+    // Day 5 after an angioplasty; two deposits paid, the rest still due.
     {
-      admissionId: 'adm-2',
-      admissionNumber: 'ADM-2026-00002',
-      patientId: 'SHRI-0102234',
-      patientName: 'Priya Nair',
-      doctorId: 'dr-priya-nair',
-      doctorName: 'Dr. Priya Nair',
-      department: 'Cardiology',
-      admissionType: 'Emergency',
-      reason: 'Chest pain, admitted for cardiac workup',
-      referralSource: 'Emergency',
-      bedId: 'bed-7',
-      wardLabel: 'Private Ward',
-      roomNumber: 'P-202',
-      bedNumber: 'P-202-B',
-      roomType: 'Private',
-      attendant: attendant('Rajesh Nair', 'Spouse', '+91 99000 44311'),
-      paymentType: 'Insurance',
-      insuranceProvider: 'Star Health',
-      policyNumber: 'SH-88213340',
-      paymentId: null,
-      status: 'Admitted',
-      admittedAt: minutesAgo(180),
-      dischargedAt: null,
-      cancelledAt: null,
-      cancelReason: null,
-      createdAt: minutesAgo(180),
-      updatedAt: minutesAgo(180),
+      patientId: 'SHRI-0069958', doctorId: 'dr-priya-nair', admissionType: 'Elective',
+      reason: 'Coronary angioplasty — post-procedure care', referralSource: 'Outpatient',
+      attendant: attendant('Salim Rahman', 'Son', '+91 98422 70316'),
+      paymentType: 'Self Pay', status: 'Admitted', bedId: 'bed-6', admittedAt: daysAgo(4) - 2 * HOUR,
     },
+    // Three days for gastroenteritis; discharged yesterday, bill settled.
     {
-      admissionId: 'adm-3',
-      admissionNumber: 'ADM-2026-00003',
-      patientId: 'SHRI-0125590',
-      patientName: 'Karthik Subramanian',
-      doctorId: 'dr-rahul-menon',
-      doctorName: 'Dr. Rahul Menon',
-      department: 'General Medicine',
-      admissionType: 'Emergency',
-      reason: 'Post-operative ICU monitoring',
-      referralSource: 'Transfer',
-      bedId: 'bed-10',
-      wardLabel: 'ICU',
-      roomNumber: 'ICU-01',
-      bedNumber: 'ICU-01-B',
-      roomType: 'ICU',
+      patientId: 'SHRI-0052719', doctorId: 'dr-rahul-menon', admissionType: 'Emergency',
+      reason: 'Acute gastroenteritis with dehydration', referralSource: 'Outpatient',
+      attendant: attendant('Kannan', 'Son', '+91 98425 66019'),
+      paymentType: 'Self Pay', status: 'Discharged', bedId: 'bed-1',
+      admittedAt: daysAgo(4) - HOUR, dischargedAt: daysAgo(1) - 3 * HOUR,
+      dischargeType: 'Normal Discharge', dischargeRemarks: 'Recovered — review in the outpatient clinic in a week',
+    },
+    // Day 3, billed to the employer.
+    {
+      patientId: 'SHRI-0106392', doctorId: 'dr-vikram-das', admissionType: 'Elective',
+      reason: 'Uncontrolled diabetes — insulin titration', referralSource: 'Outpatient',
+      attendant: attendant('Revathi Murugan', 'Daughter', '+91 98940 31877'),
+      paymentType: 'Corporate', insuranceProvider: 'Larsen & Toubro', policyNumber: 'LT-EMP-20417',
+      status: 'Admitted', bedId: 'bed-8', admittedAt: daysAgo(2) - 3 * HOUR,
+    },
+    // Day 2: the first day paid at admission, today's bed charge due.
+    {
+      patientId: 'SHRI-0044120', doctorId: 'dr-arun-kumar', admissionType: 'Elective',
+      reason: 'Recurrent giddiness — observation and MRI brain', referralSource: 'Outpatient',
+      attendant: attendant('Vikram Babu', 'Son', '+91 98430 55112'),
+      paymentType: 'Self Pay', status: 'Admitted', bedId: 'bed-2', admittedAt: hoursAgo(26),
+    },
+    // Planned knee replacement, waiting for a bed.
+    {
+      patientId: 'SHRI-0122871', doctorId: 'dr-meera-shah', admissionType: 'Elective',
+      reason: 'Planned right total knee replacement', referralSource: 'Outpatient',
+      attendant: attendant('Balaji Raman', 'Spouse', '+91 99438 12056'),
+      paymentType: 'TPA', insuranceProvider: 'Vidal Health TPA', policyNumber: 'VH-5510234',
+      status: 'Pending', requestedAt: hoursAgo(26) + 30 * MINUTE,
+    },
+    // Road accident, observed overnight in Emergency and discharged this morning.
+    {
+      patientId: 'SHRI-0125584', doctorId: 'dr-rahul-menon', admissionType: 'Emergency',
+      reason: 'Road traffic accident — minor injuries, observation', referralSource: 'Emergency',
+      attendant: attendant('Lalitha Chandra', 'Mother', '+91 96007 18234'),
+      paymentType: 'Self Pay', status: 'Discharged', bedId: 'bed-23',
+      admittedAt: hoursAgo(22) - 30 * MINUTE, dischargedAt: hoursAgo(3),
+      dischargeType: 'Normal Discharge', dischargeRemarks: 'Stable — police statement recorded',
+    },
+    // Transferred in after surgery elsewhere; the TPA settles at discharge.
+    {
+      patientId: 'SHRI-0125590', doctorId: 'dr-rahul-menon', admissionType: 'Emergency',
+      reason: 'Post-operative monitoring — transferred from another hospital', referralSource: 'Transfer',
       attendant: attendant('Lakshmi Subramanian', 'Spouse', '+91 94440 66232'),
-      paymentType: 'TPA',
-      insuranceProvider: 'MediAssist TPA',
-      policyNumber: 'MA-2231987',
-      paymentId: null,
-      status: 'Admitted',
-      admittedAt: minutesAgo(1200),
-      dischargedAt: null,
-      cancelledAt: null,
-      cancelReason: null,
-      createdAt: minutesAgo(1200),
-      updatedAt: minutesAgo(1200),
+      paymentType: 'TPA', insuranceProvider: 'MediAssist TPA', policyNumber: 'MA-2231987',
+      status: 'Admitted', bedId: 'bed-10', admittedAt: hoursAgo(20),
     },
-    // A pending admission — expected, not yet actioned (demonstrates the
-    // Pending/Expected metric distinctly from an already-Admitted record).
+    // Chest pain this morning; the insurer settles at discharge.
     {
-      admissionId: 'adm-4',
-      admissionNumber: 'ADM-2026-00004',
-      patientId: 'SHRI-0111045',
-      patientName: 'Mohammed Irfan',
-      doctorId: 'dr-arun-kumar',
-      doctorName: 'Dr. Arun Kumar',
-      department: 'Neurology',
-      admissionType: 'Elective',
-      reason: 'Scheduled admission pending bed availability',
-      referralSource: 'OPD',
-      bedId: null,
-      wardLabel: null,
-      roomNumber: null,
-      bedNumber: null,
-      roomType: null,
+      patientId: 'SHRI-0102234', doctorId: 'dr-priya-nair', admissionType: 'Emergency',
+      reason: 'Chest pain — cardiac workup', referralSource: 'Emergency',
+      attendant: attendant('Rajesh Menon', 'Spouse', '+91 99000 44311'),
+      paymentType: 'Insurance', insuranceProvider: 'Star Health', policyNumber: 'SH-88213340',
+      status: 'Admitted', bedId: 'bed-7', admittedAt: hoursAgo(3),
+    },
+    // Road accident brought in by ambulance — a medico-legal case.
+    {
+      patientId: 'SHRI-0129901', doctorId: 'dr-rahul-menon', admissionType: 'Emergency',
+      reason: 'Road traffic accident — head injury, under observation', referralSource: 'Emergency',
+      attendant: attendant('Suresh Raj', 'Brother', '+91 97890 22145'),
+      paymentType: 'Self Pay', status: 'Admitted', bedId: 'bed-12', admittedAt: minutesAgo(140),
+    },
+    // Seen by Dr. Arun Kumar; admission advised at that visit, bed awaited.
+    {
+      patientId: 'SHRI-0111045', doctorId: 'dr-arun-kumar', admissionType: 'Elective',
+      reason: 'Lumbar disc prolapse — pain management', referralSource: 'Outpatient',
       attendant: attendant('Ayesha Irfan', 'Spouse', '+91 90031 77813'),
-      paymentType: 'Self Pay',
-      insuranceProvider: null,
-      policyNumber: null,
-      paymentId: null,
-      status: 'Pending',
-      admittedAt: null,
-      dischargedAt: null,
-      cancelledAt: null,
-      cancelReason: null,
-      createdAt: minutesAgo(60),
-      updatedAt: minutesAgo(60),
+      paymentType: 'Self Pay', status: 'Pending',
+      requestedAt: Math.min((context.visitEnd('SHRI-0111045') ?? minutesAgo(65)) + 15 * MINUTE, minutesAgo(1)),
     },
   ]
+
+  // Numbered in the order they were made, as the admissions desk numbers them.
+  const ordered = [...stays].sort((a, b) => (a.requestedAt ?? a.admittedAt ?? 0) - (b.requestedAt ?? b.admittedAt ?? 0))
+  const admissions: Admission[] = ordered.map((stay, index) => {
+    const seq = index + 1
+    const createdAt = stay.requestedAt ?? stay.admittedAt ?? now
+    const allotted = stay.bedId ? beds.find((b) => b.bedId === stay.bedId) ?? null : null
+    const doctor = context.doctor(stay.doctorId)
+    const closedAt = stay.dischargedAt ?? stay.cancelledAt ?? stay.admittedAt ?? createdAt
+    return {
+      admissionId: `adm-${seq}`,
+      admissionNumber: `ADM-${new Date(createdAt).getFullYear()}-${String(seq).padStart(5, '0')}`,
+      patientId: stay.patientId,
+      patientName: context.patientName(stay.patientId),
+      doctorId: stay.doctorId,
+      doctorName: doctor.name,
+      department: doctor.department,
+      admissionType: stay.admissionType,
+      reason: stay.reason,
+      referralSource: stay.referralSource,
+      bedId: allotted?.bedId ?? null,
+      wardLabel: allotted?.ward ?? null,
+      roomNumber: allotted?.roomNumber ?? null,
+      bedNumber: allotted?.bedNumber ?? null,
+      roomType: allotted?.roomType ?? null,
+      attendant: stay.attendant,
+      paymentType: stay.paymentType,
+      insuranceProvider: stay.insuranceProvider ?? null,
+      policyNumber: stay.policyNumber ?? null,
+      paymentId: null,
+      status: stay.status,
+      admittedAt: stay.admittedAt ?? null,
+      dischargedAt: stay.dischargedAt ?? null,
+      dischargeType: stay.dischargeType ?? null,
+      dischargeRemarks: stay.dischargeRemarks ?? null,
+      cancelledAt: stay.cancelledAt ?? null,
+      cancelReason: stay.cancelReason ?? null,
+      createdAt,
+      updatedAt: closedAt,
+    }
+  })
+
+  for (const admission of admissions) {
+    if (admission.status !== 'Admitted' || !admission.bedId) continue
+    const occupied = beds.find((b) => b.bedId === admission.bedId)!
+    occupied.status = 'Occupied'
+    occupied.currentAdmissionId = admission.admissionId
+  }
 
   return {
     beds,

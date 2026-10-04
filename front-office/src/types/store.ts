@@ -4,7 +4,7 @@ import type { DoctorLeave } from './schedule'
 import type { Appointment } from './appointment'
 import type { Visit } from './visit'
 import type { QueueToken } from './queue'
-import type { AttendantPass, Estimate, MlcRecord, Tariff, RegistrationLogEntry } from './frontDesk'
+import type { GuestPass, Estimate, MlcRecord, Tariff, RegistrationLogEntry } from './frontDesk'
 import type { ActivityLogEntry } from './activity'
 import type { Connectivity } from './connectivity'
 import type { Payment } from './payment'
@@ -35,7 +35,15 @@ export interface NextIds {
   mlc: number
   payment: number
   transaction: number
+  attempt: number
   admission: number
+}
+
+/** How often, and how recently, staff opened a patient's profile — feeds
+ *  the search box's "Most opened" list. */
+export interface PatientOpenStat {
+  count: number
+  lastOpenedAt: number
 }
 
 /** The single in-memory operational store's whole state shape — the ONE
@@ -50,7 +58,7 @@ export interface AppState {
   appointments: Appointment[]
   visits: Visit[]
   queueTokens: QueueToken[]
-  attendantPasses: AttendantPass[]
+  guestPasses: GuestPass[]
   estimates: Estimate[]
   mlcRecords: MlcRecord[]
   tariffs: Tariff[]
@@ -58,6 +66,8 @@ export interface AppState {
   beds: Bed[]
   admissions: Admission[]
   registrationLog: RegistrationLogEntry[]
+  /** Keyed by patientId. */
+  patientOpens: Record<string, PatientOpenStat>
   activityLog: ActivityLogEntry[]
   connectivity: Connectivity
   tokenCounters: TokenCounters

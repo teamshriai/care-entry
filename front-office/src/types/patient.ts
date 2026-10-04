@@ -23,24 +23,30 @@ export interface Patient {
 /** actions.registerPatient's input shape. */
 export interface RegisterPatientInput {
   name: string
-  age?: number | string
-  sex?: Sex
+  age: number | string
+  sex: Sex | ''
   mobile: string
   abhaId?: string
+  /** An age of 100 or more has been confirmed with the patient. */
+  ageConfirmed?: boolean
 }
 
 /** actions.updatePatientDemographics's input shape — a partial edit. */
 export interface PatientDemographicsInput {
   name?: string
-  age?: number | null
+  age?: number | string
+  /** An age of 100 or more has been confirmed with the patient. */
+  ageConfirmed?: boolean
   sex?: Sex
   mobile?: string
   email?: string | null
   address?: string | null
 }
 
-/** One row of domain/selectors.searchPatients / getPatientSearchResults. */
+/** One row of domain/selectors.searchPatients. */
 export interface PatientSearchMatch {
   patient: Patient
-  matchedOn: 'UHID' | 'Name' | 'Name (native script)' | 'Name (known alias)' | 'Phone' | 'ABHA'
+  matchedOn: 'UHID' | 'Name' | 'Name (native script)' | 'Name (known alias)' | 'Mobile' | 'ABHA'
+  /** How well it matched: 4 exact · 3 starts with · 2 word starts · 1 contains. */
+  tier: number
 }

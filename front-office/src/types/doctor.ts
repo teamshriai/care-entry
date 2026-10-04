@@ -2,7 +2,7 @@ import type { ScheduleConfig, ScheduleConfigInput, DoctorSchedule } from './sche
 
 export type Gender = 'Male' | 'Female' | 'Other'
 export type ProviderStatus = 'Active' | 'Inactive'
-export type ConsultationType = 'OPD' | 'OPD + Teleconsult' | 'Teleconsult only'
+export type ConsultationType = 'Outpatient' | 'Outpatient + Teleconsult' | 'Teleconsult only'
 export type DoctorRole = 'Consultant' | 'Senior Consultant' | 'Associate Consultant' | 'Visiting Consultant' | 'Registrar'
 
 /** The Doctor Management hospital profile — identity, department, schedule

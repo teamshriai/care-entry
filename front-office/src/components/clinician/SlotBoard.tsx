@@ -18,11 +18,14 @@ export function SlotBoard({
   selectedSlot,
   onSelect,
   emptyMessage = 'No slots in this session.',
+  currentAppointmentId,
 }: {
   entries: SlotBoardEntry[]
   selectedSlot?: string | null
   onSelect?: (slot: string) => void
   emptyMessage?: string
+  /** A booking being moved: its own slot reads "Current", not "Booked". */
+  currentAppointmentId?: string
 }) {
   if (entries.length === 0) {
     return <p className="text-sm text-ink-muted">{emptyMessage}</p>
@@ -33,13 +36,18 @@ export function SlotBoard({
       {entries.map((entry) => {
         const selectable = entry.status === 'available' && Boolean(onSelect)
         const isSelected = selectedSlot === entry.slot
+        // A booking not yet paid still holds its slot — say so, so the desk
+        // knows it may free up.
+        const current = Boolean(currentAppointmentId) && entry.appointment?.appointmentId === currentAppointmentId
+        const label = current ? 'Current' : entry.status === 'booked' && entry.appointment?.status === 'Payment Pending' ? 'Held' : LABEL[entry.status]
         return (
           <button
             key={entry.slot}
             type="button"
             disabled={!selectable}
+            aria-pressed={selectable ? isSelected : undefined}
             onClick={() => selectable && onSelect?.(entry.slot)}
-            title={`${entry.slot} · ${LABEL[entry.status]}`}
+            title={`${entry.slot} · ${entry.status === 'booked' && label === 'Held' ? 'Held — booked, not yet paid' : label}`}
             className={cn(
               'rounded-lg border-2 px-3 py-2.5 text-left transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1',
@@ -47,7 +55,8 @@ export function SlotBoard({
               !isSelected &&
                 entry.status === 'available' &&
                 'border-stable-border bg-stable-bg text-ink hover:border-brand-500 hover:bg-brand-50 hover:shadow-sm',
-              entry.status === 'booked' && 'cursor-not-allowed border-border bg-surface-muted text-ink-faint',
+              entry.status === 'booked' && !current && 'cursor-not-allowed border-border bg-surface-muted text-ink-faint',
+              current && 'cursor-not-allowed border-dashed border-info-border bg-info-bg text-info',
               entry.status === 'past' && 'cursor-not-allowed border-border bg-surface-subtle text-ink-faint',
               entry.status === 'break' && 'cursor-not-allowed border-warning-border bg-warning-bg text-warning',
             )}
@@ -59,7 +68,7 @@ export function SlotBoard({
                 isSelected ? 'text-white/85' : 'opacity-80',
               )}
             >
-              {LABEL[entry.status]}
+              {label}
             </span>
           </button>
         )

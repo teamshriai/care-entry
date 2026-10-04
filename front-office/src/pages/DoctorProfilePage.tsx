@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CalendarCheck, CalendarX2, Stethoscope, Trash2 } from 'lucide-react'
+import { CalendarCheck, Stethoscope } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -19,10 +19,12 @@ import {
   getDoctorRow,
   getSlotBoard,
   getAppointmentsForProvider,
-  getDoctorLeaves,
+  getToday,
 } from '../domain/selectors'
-import { setDoctorStatus, addDoctorLeave, removeDoctorLeave } from '../domain/actions'
+import { setDoctorStatus } from '../domain/actions'
+import { DoctorLeaveCard } from '../components/doctor/DoctorLeaveCard'
 import { initialsOf } from '../utils/format'
+import { useFlow } from '../flows/useFlow'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -31,15 +33,14 @@ export function DoctorProfilePage() {
   const navigate = useNavigate()
   const now = useNow(30000)
   const { notify } = useToast()
+  const { openFlow } = useFlow()
   const id = providerId ?? ''
+  const today = useStoreValue(getToday)
 
   const row = useStoreValue(getDoctorRow, id, now)
   const slotEntries = useStoreValue(getSlotBoard, id, now)
   const appointments = useStoreValue(getAppointmentsForProvider, id)
-  const leaves = useStoreValue(getDoctorLeaves, id)
 
-  const [leaveDate, setLeaveDate] = useState('')
-  const [leaveReason, setLeaveReason] = useState('Leave')
   const [error, setError] = useState<string | null>(null)
 
   if (!row) {
@@ -47,13 +48,13 @@ export function DoctorProfilePage() {
       <div>
         <PageHeader title="Doctor not found" />
         <div className="px-6 py-6 lg:px-8">
-          <Card className="max-w-xl">
+          <Card accentTone="indigo" className="max-w-xl">
             <CardBody>
               <EmptyState
                 icon={Stethoscope}
                 title="No such doctor"
-                description="This doctor may have been removed. Return to the directory to find another."
-                action={<Button size="sm" onClick={() => navigate('/doctors')}>Back to directory</Button>}
+                description="This doctor may have been removed. Every doctor is listed in the directory."
+                action={<Button size="sm" onClick={() => navigate('/doctors')}>Doctors</Button>}
               />
             </CardBody>
           </Card>
@@ -78,13 +79,6 @@ export function DoctorProfilePage() {
     }
   }
 
-  function handleAddLeave(event: React.FormEvent) {
-    event.preventDefault()
-    if (run(() => addDoctorLeave(id, leaveDate, leaveReason), 'Leave recorded')) {
-      setLeaveDate('')
-    }
-  }
-
   return (
     <div>
       <PageHeader
@@ -93,16 +87,9 @@ export function DoctorProfilePage() {
         subtitle={`${provider.department} · ${provider.specialty} · ${provider.employeeId}`}
         actions={
           <>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/doctors')}>
-              <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Directory
-            </Button>
-            <Button
-              size="sm"
-              disabled={!row.nextSlot}
-              onClick={() => navigate('/appointments/new', { state: { providerId: id, slot: row.nextSlot } })}
-            >
-              Schedule appointment
+            <Button size="sm" onClick={() => openFlow('schedule', { doctor: id })}>
+              <CalendarCheck className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Schedule Appointment
             </Button>
           </>
         }
@@ -114,7 +101,7 @@ export function DoctorProfilePage() {
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[340px_minmax(0,1fr)]">
           {/* Profile */}
           <div className="flex min-w-0 flex-col gap-6">
-            <Card>
+            <Card accentTone="indigo">
               <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
                   <Avatar initials={initialsOf(provider.name)} size="lg" />
@@ -165,55 +152,12 @@ export function DoctorProfilePage() {
               </CardBody>
             </Card>
 
-            <Card>
-              <CardHeader icon={CalendarX2} iconTone="warning" title="Leave & unavailability" />
-              <CardBody className="flex flex-col gap-3">
-                <form onSubmit={handleAddLeave} className="flex flex-col gap-2">
-                  <input
-                    type="date"
-                    value={leaveDate}
-                    onChange={(event) => setLeaveDate(event.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
-                  />
-                  <input
-                    value={leaveReason}
-                    onChange={(event) => setLeaveReason(event.target.value)}
-                    placeholder="Reason"
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
-                  />
-                  <Button type="submit" size="sm" variant="secondary" disabled={!leaveDate}>
-                    Record leave
-                  </Button>
-                </form>
-                {leaves.length === 0 ? (
-                  <p className="text-xs text-ink-faint">No leave recorded.</p>
-                ) : (
-                  <div className="divide-y divide-border-soft border-t border-border-soft">
-                    {leaves.map((leave) => (
-                      <div key={leave.leaveId} className="flex items-center justify-between gap-2 py-2">
-                        <div className="min-w-0">
-                          <p className="text-sm text-ink">{leave.date}</p>
-                          <p className="truncate text-xs text-ink-muted">{leave.reason}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => run(() => removeDoctorLeave(leave.leaveId), 'Leave removed')}
-                          className="rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-muted hover:text-critical"
-                          aria-label={`Remove leave on ${leave.date}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
+            <DoctorLeaveCard providerId={id} providerName={provider.name} />
           </div>
 
           {/* Schedule + appointments */}
           <div className="flex min-w-0 flex-col gap-6">
-            <Card>
+            <Card accentTone="info">
               <CardHeader
                 icon={CalendarCheck}
                 iconTone="info"
@@ -238,33 +182,25 @@ export function DoctorProfilePage() {
                 ) : (
                   <SlotBoard
                     entries={slotEntries}
-                    onSelect={(slot) => navigate('/appointments/new', { state: { providerId: id, slot } })}
+                    onSelect={(slot) => openFlow('schedule', { doctor: id, date: today, slot })}
                   />
                 )}
               </CardBody>
             </Card>
 
-            <Card>
+            <Card accentTone="info">
               <CardHeader
                 icon={Stethoscope}
                 iconTone="info"
                 title="Today's appointments"
                 subtitle="Operational schedule only — no clinical record is shown here"
-                action={<span className="text-xs tabular-nums text-ink-faint">{appointments.length}</span>}
-              />
-              <AppointmentsTable
-                appointments={appointments}
-                emptyAction={
-                  <Button size="sm" onClick={() => navigate('/appointments/new', { state: { providerId: id } })}>
-                    Schedule an appointment
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/patients/outpatients?provider=${id}`)}>
+                    Outpatients · {appointments.length}
                   </Button>
                 }
-                renderActions={() => (
-                  <Button size="sm" variant="ghost" onClick={() => navigate('/appointments')}>
-                    View
-                  </Button>
-                )}
               />
+              <AppointmentsTable appointments={appointments} />
             </Card>
           </div>
         </div>

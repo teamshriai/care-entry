@@ -8,13 +8,13 @@ import type { AppState } from '../types/store'
 import type { Patient, PatientSearchMatch } from '../types/patient'
 import type { Provider, DoctorRow, DoctorStatus } from '../types/doctor'
 import type { DoctorLeave, DoctorSchedule, ScheduleBreak } from '../types/schedule'
-import type { Appointment, AppointmentRow, PatientAppointmentRow, SlotBoardEntry, UpcomingAppointmentRow } from '../types/appointment'
+import type { Appointment, AppointmentRow, PatientAppointmentRow, SlotBoardEntry } from '../types/appointment'
 import type { QueueTokenRow, QueueView } from '../types/queue'
-import type { AttendantPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
-import type { ActivityLogEntry } from '../types/activity'
+import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
 import type { Connectivity } from '../types/connectivity'
-import type { Payment, PaymentSummary } from '../types/payment'
-import type { Tone } from '../utils/tone'
+import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
+import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
+import { abhaError, normalizeAbha } from '../utils/validation'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -22,16 +22,13 @@ const RELEASED_APPOINTMENT_STATUSES = ['Cancelled']
 const LATE_THRESHOLD_MINUTES = 10
 const LONG_WAIT_MINUTES = 15
 
-export function getPatients(state: AppState): Patient[] {
-  return state.patients
+/** The operational day (YYYY-MM-DD) the store is running on. */
+export function getToday(state: AppState): string {
+  return state.today
 }
 
 export function getProviders(state: AppState): Provider[] {
   return state.providers
-}
-
-export function getActiveProviders(state: AppState): Provider[] {
-  return state.providers.filter((p) => p.status === 'Active')
 }
 
 export function getPatientById(state: AppState, patientId: string): Patient | null {
@@ -54,23 +51,23 @@ export function getTariffs(state: AppState): Tariff[] {
   return state.tariffs
 }
 
-export function getAttendantPasses(state: AppState): AttendantPass[] {
-  return [...state.attendantPasses].sort((a, b) => b.issuedAt - a.issuedAt)
+export function getGuestPasses(state: AppState): GuestPass[] {
+  return [...state.guestPasses].sort((a, b) => b.issuedAt - a.issuedAt)
 }
 
-/** Wards already defined in the project — every ward that has beds in the
- *  admission data plus any ward an existing pass was issued against. The
- *  Attendant Pass form offers these (with a few standard wards) as its only
- *  choices; no ward name is ever typed in freehand. */
-export function getKnownWards(state: AppState): string[] {
-  const wards = new Set<string>()
-  for (const bed of state.beds) wards.add(bed.ward)
-  for (const pass of state.attendantPasses) wards.add(pass.ward)
-  return [...wards]
+/** A patient's guest passes still out. */
+export function getActiveGuestPasses(state: AppState, patientId: string): GuestPass[] {
+  return state.guestPasses.filter((p) => p.patientId === patientId && !p.returned)
 }
 
-export function getEstimates(state: AppState): Estimate[] {
-  return [...state.estimates].sort((a, b) => b.createdAt - a.createdAt)
+export function getEstimateById(state: AppState, estimateId: string): Estimate | null {
+  return state.estimates.find((e) => e.estimateId === estimateId) ?? null
+}
+
+/** The bill an estimate became, once it was paid — an estimate is billed once. */
+export function getBillForEstimate(state: AppState, estimateId: string): Payment | null {
+  if (!estimateId) return null
+  return state.payments.find((p) => p.estimateId === estimateId && p.status !== 'Cancelled') ?? null
 }
 
 /** The one estimate a patient is currently working on — Cancelled ones don't
@@ -248,6 +245,140 @@ export function getDoctorRow(state: AppState, providerId: string, now: number = 
   return getDoctorRows(state, now, date).find((row) => row.provider.providerId === providerId) ?? null
 }
 
+// --------------------------------------------------------------- scheduling
+
+const SUGGESTION_HORIZON_DAYS = 14
+
+/** The date `days` after a YYYY-MM-DD key, as a key. */
+export function addDaysToKey(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return todayKey(new Date(year, month - 1, day + days))
+}
+
+export interface FreeSlot {
+  date: string
+  slot: string
+}
+
+export interface DoctorSuggestion {
+  provider: Provider
+  /** How the doctor stands today. */
+  status: DoctorStatus
+  /** The soonest free slots, across the next two weeks. */
+  nextSlots: FreeSlot[]
+  bookable: boolean
+  /** Why the doctor can't be booked, when they can't. */
+  reason: string | null
+}
+
+/** A department's doctors, the soonest bookable first — what the schedule
+ *  flow suggests once a department is chosen. */
+export function getDoctorSuggestions(state: AppState, department: string, now: number): DoctorSuggestion[] {
+  const firstSlotAt = (s: DoctorSuggestion) =>
+    s.nextSlots[0] ? slotToTimestamp(s.nextSlots[0].date, s.nextSlots[0].slot) : Number.POSITIVE_INFINITY
+  return state.providers
+    .filter((p) => p.department === department && p.status === 'Active')
+    .map((provider) => {
+      const status = getDoctorStatus(state, provider.providerId, now, state.today)
+      const nextSlots: FreeSlot[] = []
+      for (let i = 0; i < SUGGESTION_HORIZON_DAYS && nextSlots.length < 4; i += 1) {
+        const date = addDaysToKey(state.today, i)
+        for (const slot of getAvailableSlots(state, provider.providerId, now, date)) {
+          nextSlots.push({ date, slot })
+          if (nextSlots.length >= 4) break
+        }
+      }
+      const bookable = nextSlots.length > 0
+      return {
+        provider,
+        status,
+        nextSlots,
+        bookable,
+        reason: bookable ? null : `No open slots in the next ${SUGGESTION_HORIZON_DAYS} days`,
+      }
+    })
+    .sort((a, b) => Number(b.bookable) - Number(a.bookable) || firstSlotAt(a) - firstSlotAt(b))
+}
+
+export interface DateStripDay {
+  date: string
+  open: number
+  state: 'open' | 'full' | 'leave' | 'off'
+}
+
+/** Two weeks of one doctor's days: open (with how many free slots), full,
+ *  on leave, or not working. */
+export function getDoctorDateStrip(state: AppState, providerId: string, now: number): DateStripDay[] {
+  const days: DateStripDay[] = []
+  for (let i = 0; i < SUGGESTION_HORIZON_DAYS; i += 1) {
+    const date = addDaysToKey(state.today, i)
+    const schedule = getDoctorSchedule(state, providerId, date)
+    if (!schedule) {
+      days.push({ date, open: 0, state: 'off' })
+    } else if (schedule.onLeave) {
+      days.push({ date, open: 0, state: 'leave' })
+    } else {
+      const open = getAvailableSlots(state, providerId, now, date).length
+      days.push({ date, open, state: open > 0 ? 'open' : 'full' })
+    }
+  }
+  return days
+}
+
+/** Whether a patient still owes the one-time registration fee — true until
+ *  a registration fee is on one of their bills (cancelled or refunded ones
+ *  don't count). */
+export function needsRegistrationFee(state: AppState, patientId: string): boolean {
+  return !state.payments.some(
+    (p) =>
+      p.patientId === patientId &&
+      p.status !== 'Cancelled' &&
+      p.status !== 'Refunded' &&
+      p.items.some((item) => item.code === REGISTRATION_FEE.code),
+  )
+}
+
+/** A consultation's bill lines: the registration fee the first time, then
+ *  the doctor's own consultation fee. */
+export function getConsultationBillItems(state: AppState, patientId: string, providerId: string): PaymentItem[] {
+  const provider = getProviderById(state, providerId)
+  if (!provider) return []
+  return [
+    ...(needsRegistrationFee(state, patientId) ? [REGISTRATION_FEE] : []),
+    { code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee },
+  ]
+}
+
+export function getAppointmentById(state: AppState, appointmentId: string): Appointment | null {
+  return state.appointments.find((a) => a.appointmentId === appointmentId) ?? null
+}
+
+export interface DayBooking {
+  appointment: Appointment
+  patient: Patient | null
+  /** Everything paid on the booking — what a doctor-unavailable cancel refunds. */
+  paid: number
+}
+
+/** A doctor's open bookings on one day, by time — what has to be moved or
+ *  cancelled before that day can be leave. */
+export function getDoctorDayBookings(state: AppState, providerId: string, date: string): DayBooking[] {
+  if (!providerId || !date) return []
+  return state.appointments
+    .filter((a) => a.providerId === providerId && a.date === date && ['Scheduled', 'Payment Pending', 'Confirmed'].includes(a.status))
+    .sort((a, b) => a.slot.localeCompare(b.slot))
+    .map((appointment) => ({
+      appointment,
+      patient: getPatientById(state, appointment.patientId),
+      paid: getBillsForAppointment(state, appointment.appointmentId).reduce((sum, bill) => sum + bill.paidAmount, 0),
+    }))
+}
+
+/** Patients in a doctor's queue right now. */
+export function getDoctorQueueCount(state: AppState, providerId: string): number {
+  return state.queueTokens.filter((t) => t.providerId === providerId && ['Waiting', 'Called', 'In consultation'].includes(t.status)).length
+}
+
 export function getAppointmentsForDate(state: AppState, date: string = state.today): AppointmentRow[] {
   return state.appointments
     .filter((a) => a.date === date)
@@ -264,26 +395,6 @@ export function getAppointmentsForDate(state: AppState, date: string = state.tod
       }
     })
     .sort((a, b) => a.slot.localeCompare(b.slot))
-}
-
-/** Appointments across the next N days (today included), soonest first. */
-export function getUpcomingAppointments(state: AppState, days: number = 7): UpcomingAppointmentRow[] {
-  const start = dayStartTimestamp(state.today)
-  const dates = new Set<string>()
-  for (let i = 0; i < days; i += 1) {
-    const d = new Date(start + i * 24 * 60 * 60 * 1000)
-    dates.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
-  }
-  return state.appointments
-    .filter((a) => dates.has(a.date))
-    .map((a) => ({
-      ...a,
-      patient: getPatientById(state, a.patientId),
-      provider: getProviderById(state, a.providerId),
-      visit: a.visitId ? state.visits.find((v) => v.visitId === a.visitId) ?? null : null,
-      slotTimestamp: slotToTimestamp(a.date, a.slot),
-    }))
-    .sort((a, b) => a.slotTimestamp - b.slotTimestamp)
 }
 
 export function getAppointmentsForPatient(state: AppState, patientId: string): PatientAppointmentRow[] {
@@ -316,15 +427,18 @@ export function getAverageConsultationMinutes(state: AppState, providerId: strin
 }
 
 export function getQueueView(state: AppState, now: number = Date.now()): QueueView {
+  // A queue is one day's: yesterday's tokens are history, not a queue.
+  const today = todayKey(new Date(now))
+  const tokens = state.queueTokens.filter((t) => todayKey(new Date(t.createdAt)) === today)
   const waitingByProvider = new Map<string, typeof state.queueTokens>()
-  for (const token of state.queueTokens) {
+  for (const token of tokens) {
     if (token.status !== 'Waiting') continue
     if (!waitingByProvider.has(token.providerId)) waitingByProvider.set(token.providerId, [])
     waitingByProvider.get(token.providerId)!.push(token)
   }
   for (const list of waitingByProvider.values()) list.sort((a, b) => a.createdAt - b.createdAt)
 
-  const rows: QueueTokenRow[] = state.queueTokens.map((token) => {
+  const rows: QueueTokenRow[] = tokens.map((token) => {
     const visit = state.visits.find((v) => v.visitId === token.visitId) ?? null
     const appointment = visit?.appointmentId
       ? state.appointments.find((a) => a.appointmentId === visit.appointmentId) ?? null
@@ -335,7 +449,7 @@ export function getQueueView(state: AppState, now: number = Date.now()): QueueVi
     if (token.status === 'Waiting') {
       const queueForDoctor = waitingByProvider.get(token.providerId) ?? []
       position = queueForDoctor.findIndex((t) => t.tokenId === token.tokenId) + 1
-      const doctorBusy = state.queueTokens.some(
+      const doctorBusy = tokens.some(
         (t) => t.providerId === token.providerId && (t.status === 'Called' || t.status === 'In consultation'),
       )
       const ahead = position - 1 + (doctorBusy ? 1 : 0)
@@ -367,45 +481,6 @@ export function getQueueView(state: AppState, now: number = Date.now()): QueueVi
   }
 }
 
-export function getAverageWaitMinutes(state: AppState, now: number = Date.now()): number {
-  const { waiting } = getQueueView(state, now)
-  if (waiting.length === 0) return 0
-  return Math.round(waiting.reduce((sum, t) => sum + (t.waitingMinutes ?? 0), 0) / waiting.length)
-}
-
-export interface OperationalSummary {
-  todaysRegistrations: number
-  todaysAppointments: number
-  cancelledAppointments: number
-  waitingPatients: number
-  averageWaitMinutes: number
-  pendingPayments: number
-  doctorsAvailable: number
-  doctorsOnDuty: number
-  doctorsTotal: number
-  pendingActions: number
-}
-
-export function getOperationalSummary(state: AppState, now: number = Date.now()): OperationalSummary {
-  const date = state.today
-  const appointments = getAppointmentsForDate(state, date)
-  const queue = getQueueView(state, now)
-  const doctorRows = getDoctorRows(state, now, date)
-
-  return {
-    todaysRegistrations: state.registrationLog.length,
-    todaysAppointments: appointments.filter((a) => a.status !== 'Cancelled').length,
-    cancelledAppointments: appointments.filter((a) => a.status === 'Cancelled').length,
-    waitingPatients: queue.waiting.length,
-    averageWaitMinutes: getAverageWaitMinutes(state, now),
-    pendingPayments: getPendingPayments(state).length,
-    doctorsAvailable: doctorRows.filter((r) => r.status === 'Available').length,
-    doctorsOnDuty: doctorRows.filter((r) => !['On leave', 'Not scheduled', 'Inactive'].includes(r.status)).length,
-    doctorsTotal: doctorRows.filter((r) => r.provider.status === 'Active').length,
-    pendingActions: getNeedsAttention(state, now).length,
-  }
-}
-
 /** Patient records that look like the same human being — matched on an
  *  identical mobile number, derived from the records themselves. */
 export function getPossibleDuplicates(state: AppState): Patient[][] {
@@ -419,15 +494,24 @@ export function getPossibleDuplicates(state: AppState): Patient[][] {
   return [...byMobile.values()].filter((group) => group.length > 1)
 }
 
+/** The patient an ABHA is already linked to, if any — one ABHA, one patient. */
+export function findAbhaHolder(state: AppState, abhaId: string): Patient | null {
+  if (!abhaId.trim() || abhaError(abhaId)) return null
+  const wanted = normalizeAbha(abhaId)
+  return state.patients.find((p) => p.abhaId && normalizeAbha(p.abhaId) === wanted) ?? null
+}
+
 export function findPossibleDuplicatesFor(
   state: AppState,
-  { name = '', mobile = '' }: { name?: string; mobile?: string },
+  { name = '', mobile = '', abhaId = '' }: { name?: string; mobile?: string; abhaId?: string },
 ): Patient[] {
   const digits = mobile.replace(/[^0-9]/g, '').slice(-10)
   const normalizedName = name.trim().toLowerCase()
-  if (digits.length < 10 && normalizedName.length < 3) return []
+  const abhaHolder = findAbhaHolder(state, abhaId)
+  if (digits.length < 10 && normalizedName.length < 3 && !abhaHolder) return []
 
   return state.patients.filter((patient) => {
+    if (patient === abhaHolder) return true
     const patientDigits = patient.mobile.replace(/[^0-9]/g, '').slice(-10)
     if (digits.length === 10 && patientDigits === digits) return true
     if (normalizedName.length >= 3) {
@@ -438,15 +522,62 @@ export function findPossibleDuplicatesFor(
   })
 }
 
+/** The one thing the desk does about an item — the dashboard turns it into
+ *  a single button. */
+export type AttentionAction =
+  | { kind: 'bill'; patientId: string; paymentId: string }
+  | { kind: 'admit'; patientId: string }
+  | { kind: 'return-pass'; passId: string }
+  | { kind: 'open'; label: string; to: string }
+
 export interface NeedsAttentionItem {
   id: string
   tone: 'warning' | 'neutral' | 'info' | 'critical'
   title: string
   detail: string
+  action: AttentionAction | null
 }
 
+const ATTENTION_ORDER: Record<NeedsAttentionItem['tone'], number> = { critical: 0, warning: 1, info: 2, neutral: 3 }
+
+/** What the front desk should deal with now, most urgent first. */
 export function getNeedsAttention(state: AppState, now: number = Date.now()): NeedsAttentionItem[] {
   const items: NeedsAttentionItem[] = []
+
+  for (const pass of state.guestPasses) {
+    if (!pass.returned && now > pass.validUntil) {
+      items.push({
+        id: `na-pass-${pass.passId}`,
+        tone: 'critical',
+        title: 'Guest pass overdue',
+        detail: `${pass.passId} · ${pass.holderName} (${pass.patientName ? `visiting ${pass.patientName}` : pass.relationship}, ${pass.ward}) has not been returned.`,
+        action: { kind: 'return-pass', passId: pass.passId },
+      })
+    }
+  }
+
+  for (const bill of state.payments) {
+    if (isBillDue(bill) && billDisplayStatus(bill) === 'Failed') {
+      items.push({
+        id: `na-failed-${bill.paymentId}`,
+        tone: 'critical',
+        title: 'Payment failed',
+        detail: `${bill.patientName} · ${billNumberFor(bill)} · ${formatRupees(bill.balance)} still due — the last attempt failed.`,
+        action: { kind: 'bill', patientId: bill.patientId, paymentId: bill.paymentId },
+      })
+    }
+  }
+
+  for (const record of state.mlcRecords) {
+    if (record.acknowledgedAt) continue
+    items.push({
+      id: `na-mlc-${record.mlcId}`,
+      tone: 'warning',
+      title: record.intimationSent ? 'MLC acknowledgement awaited' : 'MLC intimation not sent',
+      detail: `${record.mlcId} · ${record.patientName} · ${record.policeStation}`,
+      action: { kind: 'open', label: 'MLC', to: '/services/mlc' },
+    })
+  }
 
   for (const group of getPossibleDuplicates(state)) {
     items.push({
@@ -454,6 +585,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
       tone: 'warning',
       title: 'Possible duplicate patient',
       detail: `${group.map((p) => p.uhid).join(' and ')} share a mobile number (${group[0].name})`,
+      action: { kind: 'open', label: 'Review', to: '/patients?filter=duplicates' },
     })
   }
 
@@ -464,6 +596,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Patient awaiting doctor',
         detail: `${token.patient?.name ?? 'A patient'} has been awaiting the doctor for ${token.waitingMinutes} minutes (${token.tokenNumber}).`,
+        action: { kind: 'open', label: 'Outpatients', to: '/patients/outpatients?filter=waiting' },
       })
     }
   }
@@ -475,6 +608,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'warning',
         title: 'Doctor running late',
         detail: `${row.provider.name} is about ${row.delayMinutes} minutes behind schedule.`,
+        action: { kind: 'open', label: 'Their patients', to: `/patients/outpatients?provider=${row.provider.providerId}` },
       })
     }
     if (row.status === 'On leave') {
@@ -483,157 +617,197 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'neutral',
         title: 'Doctor unavailable',
         detail: `${row.provider.name} is on leave today — no bookable slots in ${row.provider.department}.`,
+        action: { kind: 'open', label: 'Doctor', to: `/doctors/${row.provider.providerId}` },
       })
     }
   }
 
-  for (const appointment of getAppointmentsForDate(state)) {
-    if (appointment.status === 'Scheduled' && appointment.slotTimestamp <= now + 60 * 60000) {
-      items.push({
-        id: `na-confirm-${appointment.appointmentId}`,
-        tone: 'info',
-        title: 'Appointment needs confirmation',
-        detail: `${appointment.patient?.name ?? 'A patient'} at ${appointment.slot} with ${appointment.provider?.name ?? ''}.`,
-      })
-    }
+  for (const admission of state.admissions) {
+    if (admission.status !== 'Pending' && admission.status !== 'Bed Reserved') continue
+    items.push({
+      id: `na-bed-${admission.admissionId}`,
+      tone: 'info',
+      title: 'Waiting for a bed',
+      detail: `${admission.patientName} · ${admission.admissionNumber} · ${admission.doctorName}`,
+      action: { kind: 'admit', patientId: admission.patientId },
+    })
   }
 
-  const dayMs = 24 * 60 * 60 * 1000
-  for (const pass of state.attendantPasses) {
-    if (!pass.returned && now - pass.issuedAt > dayMs) {
-      items.push({
-        id: `na-pass-${pass.passId}`,
-        tone: 'critical',
-        title: 'Attendant pass overdue',
-        detail: `${pass.passId} (${pass.patientName}, ward ${pass.ward}) has not been returned.`,
-      })
-    }
-  }
-
-  return items
-}
-
-export function getActivityLog(state: AppState): ActivityLogEntry[] {
-  return [...state.activityLog].sort((a, b) => b.time - a.time)
-}
-
-export interface ActivityCategoryCount {
-  label: string
-  value: number
-  tone: Tone
-}
-
-// Every text value below is a literal string actually written by
-// domain/actions.ts and domain/admissionActions.ts (see withActivity call
-// sites) — this only re-groups real activity-log entries into the counts
-// the Dashboard's chart shows, it never invents a count. Entries whose text
-// isn't one of these (ABHA linking, attendant passes, MLC, doctor
-// registration/leave, estimates, queue/token events) aren't part of these
-// five categories and are left out of the chart, same as they were never
-// singled out in the list view either.
-const ACTIVITY_CATEGORY_TEXT: Record<string, string> = {
-  'Appointment booked': 'Appointments',
-  'Appointment confirmed': 'Appointments',
-  'Appointment rescheduled': 'Appointments',
-  'Consultation started': 'Appointments',
-  'Consultation completed': 'Appointments',
-  'New patient registered': 'Patients Registered',
-  'Payment bill created': 'Payments',
-  'Payment refunded': 'Payments',
-  'Patient admitted': 'Admissions',
-  'Admission billed': 'Admissions',
-  'Patient discharged': 'Admissions',
-  'Appointment cancelled': 'Cancellations',
-  'Admission cancelled': 'Cancellations',
-  'Payment bill cancelled': 'Cancellations',
-}
-
-const ACTIVITY_CATEGORY_TONE: Record<string, Tone> = {
-  Appointments: 'info',
-  'Patients Registered': 'teal',
-  Payments: 'warning',
-  Admissions: 'purple',
-  Cancellations: 'rose',
-}
-
-export function getActivitySummary(state: AppState): ActivityCategoryCount[] {
-  const counts = new Map<string, number>()
-  for (const entry of state.activityLog) {
-    const category = ACTIVITY_CATEGORY_TEXT[entry.text]
-    if (!category) continue
-    counts.set(category, (counts.get(category) ?? 0) + 1)
-  }
-  return [...counts.entries()]
-    .map(([label, value]) => ({ label, value, tone: ACTIVITY_CATEGORY_TONE[label] }))
-    .sort((a, b) => b.value - a.value)
+  return items.sort((a, b) => ATTENTION_ORDER[a.tone] - ATTENTION_ORDER[b.tone])
 }
 
 export function getConnectivity(state: AppState): Connectivity {
   return state.connectivity
 }
 
-const MIN_QUERY_LENGTH = 2
-
 function digitsOf(value: string): string {
   return value.replace(/[^0-9]/g, '')
 }
 
-/** Client-side patient index search — stands in for a real patient-index
- *  API. The alias list simulates transliteration matching; it is not a real
- *  identity-matching implementation. */
+// ------------------------------------------------------------ patient search
+// Client-side patient index search — stands in for a real patient-index API.
+// Every field is scored on the same scale and the best field wins:
+//   4 exact · 3 starts with · 2 every word of the query starts a word · 1 contains
+// "Contains" needs two or more characters, so a single keystroke only ever
+// shows names, numbers and IDs that START with it. The alias list simulates
+// transliteration matching; it is not a real identity-matching implementation.
+
+type MatchField = PatientSearchMatch['matchedOn']
+
+function normText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[.,'’_/\\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function textTier(value: string, query: string): number {
+  if (!value || !query) return 0
+  if (value === query) return 4
+  if (value.startsWith(query)) return 3
+  const words = value.split(' ')
+  if (query.split(' ').every((part) => words.some((word) => word.startsWith(part)))) return 2
+  if (query.length >= 2 && value.includes(query)) return 1
+  return 0
+}
+
+/** Mobile numbers match on their last ten digits, so "+91" never matches everyone. */
+function mobileTier(mobile: string, raw: string): number {
+  if (!/^[+\d\s()-]+$/.test(raw)) return 0
+  let digits = digitsOf(raw)
+  if (raw.startsWith('+91') && digits.startsWith('91')) digits = digits.slice(2)
+  if (digits.length > 10) digits = digits.slice(-10)
+  if (!digits) return 0
+  const number = digitsOf(mobile).slice(-10)
+  if (digits === number) return 4
+  if (number.startsWith(digits)) return 3
+  if (digits.length >= 4 && number.endsWith(digits)) return 2
+  if (digits.length >= 3 && number.includes(digits)) return 1
+  return 0
+}
+
+/** A UHID matches on its number — "SHRI" on its own, or "sh", matches nobody. */
+function uhidTier(uhid: string, raw: string): number {
+  const typed = raw.toLowerCase().replace(/^shri/, '').replace(/[\s-]/g, '')
+  if (!/^\d+$/.test(typed)) return 0
+  const full = digitsOf(uhid)
+  const typedCore = typed.replace(/^0+/, '')
+  const fullCore = full.replace(/^0+/, '')
+  if (!typedCore) return 0
+  if (typedCore === fullCore) return 4
+  if (fullCore.startsWith(typedCore) || full.startsWith(typed)) return 3
+  if (typedCore.length >= 3 && fullCore.includes(typedCore)) return 1
+  return 0
+}
+
+/** ABHA address ("name@abdm") on the part before "@"; ABHA number on its digits. */
+function abhaTier(abha: string | null, raw: string, query: string): number {
+  if (!abha) return 0
+  const value = abha.toLowerCase()
+  if (value.includes('@')) {
+    const typed = raw.toLowerCase()
+    if (value === typed) return 4
+    // Typing the address itself ("lakshmanan.r@ab…") matches it as it grows.
+    if (typed.includes('@')) return value.startsWith(typed) ? 3 : 0
+    return textTier(normText(value.split('@')[0]), query)
+  }
+  if (!/^[\d\s-]+$/.test(raw)) return 0
+  const digits = digitsOf(raw)
+  const number = digitsOf(value)
+  if (!digits) return 0
+  if (digits === number) return 4
+  if (number.startsWith(digits)) return 3
+  if (digits.length >= 4 && number.includes(digits)) return 1
+  return 0
+}
+
+/** Ranked patient search: best match first, then the patients the desk
+ *  opens most, then the newest registrations. */
 export function searchPatients(state: AppState, rawQuery: string): PatientSearchMatch[] {
-  const query = rawQuery.trim().toLowerCase()
-  if (query.length < MIN_QUERY_LENGTH) return []
-  const queryDigits = digitsOf(query)
+  const raw = rawQuery.trim()
+  if (!raw) return []
+  const query = normText(raw)
+  const opens = (patientId: string) => state.patientOpens[patientId]?.count ?? 0
 
   return state.patients
     .map((patient): PatientSearchMatch | null => {
-      if (patient.uhid.toLowerCase().includes(query)) return { patient, matchedOn: 'UHID' }
-      if (patient.name.toLowerCase().includes(query)) return { patient, matchedOn: 'Name' }
-      if (patient.nameNative && patient.nameNative.includes(rawQuery.trim())) {
-        return { patient, matchedOn: 'Name (native script)' }
-      }
-      if (patient.aliases?.some((alias) => alias.includes(query))) {
-        return { patient, matchedOn: 'Name (known alias)' }
-      }
-      if (queryDigits.length >= 3 && digitsOf(patient.mobile).includes(queryDigits)) {
-        return { patient, matchedOn: 'Phone' }
-      }
-      if (patient.abhaId && patient.abhaId.toLowerCase().includes(query)) return { patient, matchedOn: 'ABHA' }
-      return null
+      // Listed in tie-break order: on equal scores the earlier field is named.
+      const scores: [MatchField, number][] = [
+        ['UHID', uhidTier(patient.uhid, raw)],
+        ['Mobile', mobileTier(patient.mobile, raw)],
+        ['ABHA', abhaTier(patient.abhaId, raw, query)],
+        ['Name', textTier(normText(patient.name), query)],
+        ['Name (native script)', patient.nameNative ? textTier(normText(patient.nameNative), query) : 0],
+        ['Name (known alias)', Math.max(0, ...(patient.aliases ?? []).map((alias) => textTier(normText(alias), query)))],
+      ]
+      let best: [MatchField, number] | null = null
+      for (const entry of scores) if (entry[1] > (best?.[1] ?? 0)) best = entry
+      return best ? { patient, matchedOn: best[0], tier: best[1] } : null
     })
     .filter((result): result is PatientSearchMatch => result !== null)
+    .sort(
+      (a, b) =>
+        b.tier - a.tier ||
+        opens(b.patient.patientId) - opens(a.patient.patientId) ||
+        b.patient.createdAt - a.patient.createdAt ||
+        a.patient.patientId.localeCompare(b.patient.patientId),
+    )
 }
 
-export interface PatientSearchResult extends PatientSearchMatch {
-  appointmentToday: AppointmentRow | null
-  appointmentCount: number
+/** A bill typed into search — "BIL-000102", "RCT-102", "bil 102". */
+export function findBillByNumber(state: AppState, rawQuery: string): Payment | null {
+  const match = rawQuery.trim().toLowerCase().match(/^(bil|rct)[\s-]*0*(\d+)$/)
+  if (!match) return null
+  const wanted = Number(match[2])
+  return state.payments.find((p) => Number(digitsOf(p.receiptNo)) === wanted) ?? null
 }
 
-/** Search results with the operational context staff need to act on. */
-export function getPatientSearchResults(state: AppState, rawQuery: string): PatientSearchResult[] {
-  const appointments = getAppointmentsForDate(state)
-  return searchPatients(state, rawQuery).map((result) => {
-    const todays = appointments
-      .filter((a) => a.patientId === result.patient.patientId && a.status !== 'Cancelled')
-      .sort((a, b) => a.slot.localeCompare(b.slot))
-    return { ...result, appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
-  })
+export interface PatientSearchSuggestions {
+  recent: Patient[]
+  mostOpened: Patient[]
 }
 
-/** Every patient in the store, most recently registered first — the Patient
- *  List shown when nothing has been searched. Reads the same `state.patients`
- *  that registration writes to, so a newly registered patient appears at once. */
-export function getPatientList(state: AppState): PatientSearchResult[] {
-  const appointments = getAppointmentsForDate(state)
-  return [...state.patients]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map((patient) => {
-      const todays = appointments
-        .filter((a) => a.patientId === patient.patientId && a.status !== 'Cancelled')
-        .sort((a, b) => a.slot.localeCompare(b.slot))
-      return { patient, matchedOn: 'Name', appointmentToday: todays[0] ?? null, appointmentCount: todays.length }
+/** What the search box offers before anything is typed: the newest
+ *  registrations and the profiles the desk opens most (never both). */
+export function getPatientSearchSuggestions(state: AppState): PatientSearchSuggestions {
+  const recent = [...state.patients].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5)
+  const recentIds = new Set(recent.map((p) => p.patientId))
+  const mostOpened = state.patients
+    .filter((p) => !recentIds.has(p.patientId) && (state.patientOpens[p.patientId]?.count ?? 0) > 0)
+    .sort((a, b) => {
+      const sa = state.patientOpens[a.patientId]
+      const sb = state.patientOpens[b.patientId]
+      return sb.count - sa.count || sb.lastOpenedAt - sa.lastOpenedAt
     })
+    .slice(0, 5)
+  return { recent, mostOpened }
+}
+
+export interface PatientFlags {
+  /** Bed number while admitted. */
+  bed: string | null
+  /** Money still owed across the patient's bills. */
+  due: number
+  /** A collection on one of those bills failed and nothing has been paid since. */
+  failed: boolean
+}
+
+/** The small status marks shown beside a patient wherever they are listed. */
+export function getPatientFlags(state: AppState): Record<string, PatientFlags> {
+  const flags: Record<string, PatientFlags> = {}
+  const of = (patientId: string) => (flags[patientId] ??= { bed: null, due: 0, failed: false })
+  for (const admission of state.admissions) {
+    if (admission.status === 'Admitted') of(admission.patientId).bed = admission.bedNumber
+  }
+  for (const payment of state.payments) {
+    if (!isBillDue(payment)) continue
+    const entry = of(payment.patientId)
+    entry.due += payment.balance
+    if (billDisplayStatus(payment) === 'Failed') entry.failed = true
+  }
+  return flags
 }
 
 // -------------------------------------------------------------- payments
@@ -650,13 +824,67 @@ export function getPaymentsForPatient(state: AppState, patientId: string): Payme
   return getPayments(state).filter((p) => p.patientId === patientId)
 }
 
+/** A booking's live bills, oldest first: the consultation bill, then any
+ *  fee-difference bill from a move to a dearer doctor. */
+export function getBillsForAppointment(state: AppState, appointmentId: string): Payment[] {
+  return state.payments
+    .filter((p) => p.appointmentId === appointmentId && p.status !== 'Cancelled')
+    .sort((a, b) => a.createdAt - b.createdAt)
+}
+
+/** The bill line a move to a dearer doctor is charged under. */
+export const FEE_DIFFERENCE_CODE = 'FEE-DIFF'
+
+/** What has been paid towards a booking's consultation — its fee line and
+ *  any fee difference collected on a move. */
+export function consultationFeePaid(state: AppState, appointmentId: string): number {
+  return getBillsForAppointment(state, appointmentId)
+    .filter((bill) => bill.status === 'Paid' || bill.status === 'Partially Paid')
+    .flatMap((bill) => bill.items)
+    .filter((item) => item.code === 'CONS-FEE' || item.code === FEE_DIFFERENCE_CODE)
+    .reduce((sum, item) => sum + item.amount, 0)
+}
+
+const OPEN_BOOKING = ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in']
+const OPEN_STAY = ['Pending', 'Bed Reserved', 'Admitted']
+
+/** Why a bill can't be cancelled or refunded on its own — null when it can.
+ *  A booking's bills move only with the booking: cancelling it because the
+ *  doctor is unavailable refunds them, and once it has closed the fee is
+ *  kept. A current inpatient's bill is settled at discharge. */
+export function getBillLock(state: AppState, payment: Payment): string | null {
+  if (payment.appointmentId) {
+    const appointment = state.appointments.find((a) => a.appointmentId === payment.appointmentId)
+    if (appointment && OPEN_BOOKING.includes(appointment.status)) {
+      return 'This bill belongs to a booked appointment — cancel or reschedule the appointment instead.'
+    }
+    if (appointment && payment.paidAmount > 0) {
+      return 'A consultation fee is refunded only when the doctor is unavailable. This appointment has closed, so its fee is kept.'
+    }
+  }
+  if (payment.admissionId) {
+    const admission = state.admissions.find((a) => a.admissionId === payment.admissionId)
+    if (admission && OPEN_STAY.includes(admission.status)) {
+      return 'This is a current inpatient’s bill — it is settled at discharge or closed with the admission.'
+    }
+  }
+  return null
+}
+
 /** Everything a patient still owes money on — the front desk's worklist.
  *  Cancelled and Refunded bills carry no live balance, so they never appear
  *  here even if `balance` happens to be non-zero on the record. */
 export function getPendingPayments(state: AppState): Payment[] {
-  return getPayments(state).filter(
-    (p) => p.balance > 0 && p.status !== 'Cancelled' && p.status !== 'Refunded',
-  )
+  return getPayments(state).filter(isBillDue)
+}
+
+function dueFirst(bills: Payment[]): Payment[] {
+  const failed = (p: Payment) => (billDisplayStatus(p) === 'Failed' ? 0 : 1)
+  return [...bills].sort((a, b) => failed(a) - failed(b) || b.createdAt - a.createdAt)
+}
+
+function collectedToday(state: AppState, payment: Payment): boolean {
+  return payment.transactions.some((txn) => todayKey(new Date(txn.collectedAt)) === state.today)
 }
 
 /** Today's headline figures — the same derivation feeds the Payment
@@ -684,23 +912,40 @@ export function getPaymentSummary(state: AppState): PaymentSummary {
   return { collectedToday, pendingAmount, transactionsToday, refundsToday }
 }
 
-/** The Billing & Accounts dashboard's own headline figures — built on the
- *  same Payment records as getPaymentSummary, just counted from the bill's
- *  own side (how many were raised today) rather than the collection side. */
-export function getBillingSummary(state: AppState): {
-  billsToday: number
-  collectedToday: number
-  pendingPayments: number
-  outstandingAmount: number
-} {
-  const paymentSummary = getPaymentSummary(state)
-  const billsToday = state.payments.filter((p) => todayKey(new Date(p.createdAt)) === state.today).length
-  const pending = getPendingPayments(state)
+export type BillFilter = 'due' | 'failed' | 'collected-today' | 'all'
 
+export interface BillingOverview {
+  dueAmount: number
+  dueCount: number
+  failedCount: number
+  collectedToday: number
+  collectedTodayCount: number
+  allCount: number
+}
+
+/** The Billing page's figures — one per filter, from the same bills the
+ *  filtered list shows, so a number and its list can never disagree. */
+export function getBillingOverview(state: AppState): BillingOverview {
+  const due = getPendingPayments(state)
   return {
-    billsToday,
-    collectedToday: paymentSummary.collectedToday,
-    pendingPayments: pending.length,
-    outstandingAmount: paymentSummary.pendingAmount,
+    dueAmount: due.reduce((sum, p) => sum + p.balance, 0),
+    dueCount: due.length,
+    failedCount: due.filter((p) => billDisplayStatus(p) === 'Failed').length,
+    collectedToday: getPaymentSummary(state).collectedToday,
+    collectedTodayCount: state.payments.filter((p) => collectedToday(state, p)).length,
+    allCount: state.payments.length,
+  }
+}
+
+export function getBillsByFilter(state: AppState, filter: BillFilter): Payment[] {
+  switch (filter) {
+    case 'due':
+      return dueFirst(getPendingPayments(state))
+    case 'failed':
+      return getPendingPayments(state).filter((p) => billDisplayStatus(p) === 'Failed')
+    case 'collected-today':
+      return getPayments(state).filter((p) => collectedToday(state, p))
+    default:
+      return getPayments(state)
   }
 }

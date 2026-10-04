@@ -67,6 +67,28 @@ export function generateEncounterCode(): string {
   return 'ENC-' + stamp + '-' + suffix;
 }
 
+/** An Indian mobile: 10 digits starting with 6, 7, 8 or 9 — the same rule the front desk uses. */
+export const MOBILE_ERROR = 'Enter a 10-digit mobile number starting with 6, 7, 8 or 9.';
+export function isValidMobile(mobile: string): boolean {
+  return /^[6-9]\d{9}$/.test(mobile);
+}
+
+/** A real date of birth: not in the future and not more than 130 years ago. */
+export const MAX_AGE_YEARS = 130;
+export function dobBounds(): { min: string; max: string } {
+  const today = new Date();
+  const iso = (d: Date) => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  const oldest = new Date(today.getFullYear() - MAX_AGE_YEARS, today.getMonth(), today.getDate());
+  return { min: iso(oldest), max: iso(today) };
+}
+export function dobError(dob: string): string | null {
+  if (!dob) return null;
+  const { min, max } = dobBounds();
+  if (dob > max) return 'The date of birth cannot be in the future.';
+  if (dob < min) return 'Check the date of birth — that is more than ' + MAX_AGE_YEARS + ' years ago.';
+  return null;
+}
+
 export function maskMobile(mobile: string): string {
   if (!mobile || mobile.length < 4) return mobile || '';
   return '+91 ' + mobile.slice(0, 2) + '•• •••' + mobile.slice(-2);

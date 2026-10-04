@@ -11,23 +11,24 @@ export interface Notification {
   time: string
 }
 
+// Kept in step with the seed data: each one points at a record that exists.
 export const notifications: Notification[] = [
   {
     id: 'ntf-1',
-    tier: 'urgent',
-    text: 'Attendant pass limit reached — Ward 4B',
-    time: '8 min ago',
+    tier: 'critical',
+    text: 'MLC/0002 — police acknowledgement awaited · Mohan Raj',
+    time: '2 hr ago',
   },
   {
     id: 'ntf-2',
-    tier: 'routine',
-    text: 'Consultation started — Dr. Arun Kumar',
-    time: '15 min ago',
+    tier: 'urgent',
+    text: 'Guest pass overdue — GP/PRIVATE WARD/102 · Abdul Rahman',
+    time: '25 min ago',
   },
   {
     id: 'ntf-3',
-    tier: 'digest',
-    text: "6 counters opened for today's shift",
-    time: '1 hr ago',
+    tier: 'routine',
+    text: 'Patient called in — R. Lakshmanan · Dr. Arun Kumar',
+    time: '14 min ago',
   },
 ]

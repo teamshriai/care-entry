@@ -4,7 +4,6 @@
 // Doctor/Provider, Bill and Payment are the existing entities, referenced
 // by id — this module owns only Bed/Admission/Attendant.
 
-import type { PaymentMethod } from './payment'
 
 export type Ward = 'General Ward' | 'Private Ward' | 'Semi-Private Ward' | 'ICU' | 'Emergency'
 
@@ -32,9 +31,9 @@ export type AdmissionType = 'Emergency' | 'Elective' | 'Transfer'
 
 export const ADMISSION_TYPES: AdmissionType[] = ['Emergency', 'Elective', 'Transfer']
 
-export type ReferralSource = 'Walk-in' | 'OPD' | 'Emergency' | 'Referral' | 'Transfer'
+export type ReferralSource = 'Walk-in' | 'Outpatient' | 'Emergency' | 'Referral' | 'Transfer'
 
-export const REFERRAL_SOURCES: ReferralSource[] = ['Walk-in', 'OPD', 'Emergency', 'Referral', 'Transfer']
+export const REFERRAL_SOURCES: ReferralSource[] = ['Walk-in', 'Outpatient', 'Emergency', 'Referral', 'Transfer']
 
 export type AttendantRelationship =
   | 'Father'
@@ -87,8 +86,6 @@ export const DISCHARGE_TYPES: DischargeType[] = [
 ]
 
 export interface DischargeDetails {
-  /** When the patient left the bed. Defaults to now. */
-  dischargedAt?: number
   dischargeType: DischargeType
   remarks?: string
 }
@@ -128,16 +125,10 @@ export interface Admission {
   updatedAt: number
 }
 
-export interface AdmissionPaymentInput {
-  method: PaymentMethod
-  amount: number
-}
-
 export interface CreateAdmissionInput {
   patientId: string
-  patientName: string
+  /** The department comes from this doctor. */
   doctorId: string
-  department: string
   admissionType: AdmissionType
   reason: string
   referralSource: ReferralSource
@@ -146,6 +137,4 @@ export interface CreateAdmissionInput {
   paymentType: PaymentType
   insuranceProvider?: string | null
   policyNumber?: string | null
-  /** The initial charges collected at admission — required to admit. */
-  initialPayment: AdmissionPaymentInput
 }

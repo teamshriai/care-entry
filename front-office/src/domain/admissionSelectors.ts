@@ -2,19 +2,22 @@ import type { AppState } from '../types/store'
 import { todayKey } from './time'
 import { WARDS } from '../types/admission'
 import type { Admission, Bed, Ward } from '../types/admission'
-import type { PaymentItem } from '../types/payment'
-import { admissionBillItems, stayDays, sumItems } from '../utils/billing'
+import type { BillDisplayStatus, Payment, PaymentItem } from '../types/payment'
+import type { Patient } from '../types/patient'
+import { admissionBillItems, billDisplayStatus, isBillDue, stayDays, sumItems } from '../utils/billing'
 
 export function getBeds(state: AppState): Bed[] {
   return [...state.beds].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber))
 }
 
-export function getBedById(state: AppState, bedId: string): Bed | null {
-  return state.beds.find((b) => b.bedId === bedId) ?? null
+/** A ward's beds, in room order. */
+export function getBedsForWard(state: AppState, ward: Ward): Bed[] {
+  return getBeds(state).filter((b) => b.ward === ward)
 }
 
-export function getAvailableBeds(state: AppState): Bed[] {
-  return getBeds(state).filter((b) => b.status === 'Available')
+/** The bed the admit flow suggests for a ward — the first free one. */
+export function getFirstFreeBed(state: AppState, ward: Ward): Bed | null {
+  return getBeds(state).find((b) => b.ward === ward && b.status === 'Available') ?? null
 }
 
 export function getAdmissions(state: AppState): Admission[] {
@@ -25,11 +28,8 @@ export function getAdmissionById(state: AppState, admissionId: string): Admissio
   return state.admissions.find((a) => a.admissionId === admissionId) ?? null
 }
 
-export function getAdmissionsForPatient(state: AppState, patientId: string): Admission[] {
-  return getAdmissions(state).filter((a) => a.patientId === patientId)
-}
 
-// ------------------------------------------------- Ward Status
+// ------------------------------------------------- Inpatients
 
 export interface WardSummary {
   ward: Ward
@@ -45,7 +45,7 @@ const WARD_TYPE_LABEL: Record<Ward, string> = {
   'General Ward': 'General',
   'Private Ward': 'Private',
   'Semi-Private Ward': 'Semi-Private',
-  ICU: 'Critical Care',
+  ICU: 'ICU',
   Emergency: 'Emergency',
 }
 
@@ -66,30 +66,53 @@ export function getWardSummaries(state: AppState): WardSummary[] {
   }).filter((w) => w.total > 0)
 }
 
-export interface AdmissionOverview {
-  totalAdmitted: number
-  todaysAdmissions: number
-  pendingAdmissions: number
-  availableBeds: number
-  occupiedBeds: number
-}
-
-export function getAdmissionOverview(state: AppState): AdmissionOverview {
-  const today = todayKey()
-  return {
-    totalAdmitted: state.admissions.filter((a) => a.status === 'Admitted').length,
-    todaysAdmissions: state.admissions.filter(
-      (a) => a.status !== 'Cancelled' && todayKey(new Date(a.admittedAt ?? a.createdAt)) === today,
-    ).length,
-    pendingAdmissions: state.admissions.filter((a) => a.status === 'Pending' || a.status === 'Bed Reserved').length,
-    availableBeds: state.beds.filter((b) => b.status === 'Available').length,
-    occupiedBeds: state.beds.filter((b) => b.status === 'Occupied').length,
-  }
-}
-
 /** Patients who are in a bed right now. */
 export function getCurrentAdmissions(state: AppState): Admission[] {
   return getAdmissions(state).filter((a) => a.status === 'Admitted')
+}
+
+/** The patients in a bed right now, newest admission first. */
+export function getAdmittedPatients(state: AppState): Patient[] {
+  return getCurrentAdmissions(state)
+    .map((a) => state.patients.find((p) => p.patientId === a.patientId))
+    .filter((p): p is Patient => Boolean(p))
+}
+
+/** Admission requests still waiting for a bed. */
+export function getAwaitingBed(state: AppState): Admission[] {
+  return getAdmissions(state).filter((a) => a.status === 'Pending' || a.status === 'Bed Reserved')
+}
+
+export interface InpatientRow {
+  admission: Admission
+  /** The stay's running bill as of the moment asked. */
+  billing: AdmissionBilling
+  billStatus: BillDisplayStatus
+}
+
+/** Everyone in a bed, each with the running bill of their stay so far. */
+export function getInpatientRows(state: AppState, asOf: number): InpatientRow[] {
+  return getCurrentAdmissions(state).map((admission) => {
+    const billing = computeAdmissionBilling(state, admission, asOf)
+    return { admission, billing, billStatus: liveBillStatus(state, billing) }
+  })
+}
+
+export interface DischargedRow {
+  admission: Admission
+  bill: Payment | null
+}
+
+/** Discharged on the day `asOf` falls on, latest first, each with its final bill. */
+export function getDischargedOn(state: AppState, asOf: number): DischargedRow[] {
+  const day = todayKey(new Date(asOf))
+  return state.admissions
+    .filter((a) => a.status === 'Discharged' && a.dischargedAt !== null && todayKey(new Date(a.dischargedAt)) === day)
+    .sort((a, b) => (b.dischargedAt ?? 0) - (a.dischargedAt ?? 0))
+    .map((admission) => ({
+      admission,
+      bill: admission.paymentId ? (state.payments.find((p) => p.paymentId === admission.paymentId) ?? null) : null,
+    }))
 }
 
 // --------------------------------------------------------- admission billing
@@ -132,11 +155,47 @@ export function getAdmissionBilling(state: AppState, admissionId: string, asOf: 
   return admission ? computeAdmissionBilling(state, admission, asOf) : null
 }
 
-/** Patients discharged today — counted from the admission records the Discharge
- *  workflow writes to. */
-export function getDischargesToday(state: AppState): number {
-  const today = todayKey()
-  return state.admissions.filter(
-    (a) => a.status === 'Discharged' && a.dischargedAt !== null && todayKey(new Date(a.dischargedAt)) === today,
-  ).length
+/** How the stay's bill reads once it carries the stay so far — a bill paid
+ *  in full on day 1 reads Partial on day 2. */
+function liveBillStatus(state: AppState, billing: AdmissionBilling): BillDisplayStatus {
+  const bill = billing.paymentId ? state.payments.find((p) => p.paymentId === billing.paymentId) : undefined
+  return bill ? billDisplayStatus({ ...bill, balance: billing.pending }) : 'Pending'
+}
+
+export interface DischargePreview {
+  admission: Admission
+  bill: Payment | null
+  items: PaymentItem[]
+  days: number
+  total: number
+  paid: number
+  /** Still to collect on the stay's bill before the patient can leave. */
+  balance: number
+  billStatus: BillDisplayStatus
+  /** The patient's other unpaid bills — shown, but they never hold up a discharge. */
+  otherDues: Payment[]
+  canDischarge: boolean
+}
+
+/** The final bill if the patient left at `asOf`: the stay re-priced by days,
+ *  what has been paid against it and what is left. Nothing is saved — the
+ *  bill itself is re-priced only when money is taken or the patient leaves. */
+export function previewDischargeBill(state: AppState, admissionId: string, asOf: number): DischargePreview | null {
+  const admission = state.admissions.find((a) => a.admissionId === admissionId)
+  if (!admission || admission.status !== 'Admitted') return null
+  const billing = computeAdmissionBilling(state, admission, asOf)
+  return {
+    admission,
+    bill: billing.paymentId ? (state.payments.find((p) => p.paymentId === billing.paymentId) ?? null) : null,
+    items: billing.items,
+    days: billing.days,
+    total: billing.total,
+    paid: billing.paid,
+    balance: billing.pending,
+    billStatus: liveBillStatus(state, billing),
+    otherDues: state.payments.filter(
+      (p) => p.patientId === admission.patientId && p.paymentId !== billing.paymentId && isBillDue(p),
+    ),
+    canDischarge: billing.pending === 0,
+  }
 }

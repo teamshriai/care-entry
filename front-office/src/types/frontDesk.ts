@@ -1,22 +1,62 @@
-// Front Desk services — Attendant Pass, Enquiry & Estimate, MLC — plus the
+// Front Desk services — Guest Pass, Enquiry & Estimate, MLC — plus the
 // small pieces of state (the registration log) that belong to no single
 // screen.
 
-export interface AttendantPass {
+/** Who a guest pass is for. Nobody moves about the hospital without either
+ *  a hospital ID or a pass, and every pass is confirmed before it is printed. */
+export type GuestPassType = 'Patient visitor' | 'Visiting doctor' | 'Staff / service'
+
+export const GUEST_PASS_TYPES: GuestPassType[] = ['Patient visitor', 'Visiting doctor', 'Staff / service']
+
+export interface GuestPass {
   passId: string
-  patientId: string
-  patientName: string
+  type: GuestPassType
+  /** The person carrying the pass. */
+  holderName: string
+  holderMobile: string
+  /** The ID proof seen at the desk — its kind and only its last four characters. */
+  idProof: string
+  /** A patient visitor: whose visitor they are. */
+  patientId: string | null
+  patientName: string | null
+  /** A visiting doctor or staff: the doctor or person they are here for. */
+  hostName: string | null
+  /** Where the pass lets them go — the patient's ward, or a department. */
   ward: string
+  /** Their relationship to the patient, or their role. */
   relationship: string
+  purpose: string
+  /** Who confirmed the visit before the pass was printed. */
+  verifiedWith: string
+  /** The desk member who printed it. */
+  issuedBy: string
+  /** After this the pass is overdue for return. */
+  validUntil: number
   issuedAt: number
   returnedAt: number | null
   returned: boolean
 }
 
-export interface IssueAttendantPassInput {
-  patientId: string
-  ward: string
-  relationship?: string
+/** actions.issueGuestPass's input — the desk's checks travel with it. */
+export interface IssueGuestPassInput {
+  type: GuestPassType
+  holderName: string
+  holderMobile: string
+  idType: string
+  idLast4: string
+  /** Patient visitor: the admitted patient. */
+  patientId?: string
+  /** Visiting doctor: the hospital doctor they are visiting. */
+  hostProviderId?: string
+  /** Staff / service: the department or area, and who authorised them. */
+  area?: string
+  relationship: string
+  purpose: string
+  /** Who confirmed the visit (patient visitor, staff); a visiting doctor's host confirms it. */
+  verifiedWith?: string
+  /** The desk confirmed the ID and the visit. */
+  confirmed: boolean
+  issuedBy: string
 }
 
 /** The hospital's own rate card — rates are read, never estimated. */

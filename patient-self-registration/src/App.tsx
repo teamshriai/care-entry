@@ -165,7 +165,7 @@ function App() {
             <Icon name="idCard" size={15} />
             New registration
           </button>
-          <a className="side-action" href="/demo.html">
+          <a className="side-action" href="./demo.html">
             <Icon name="shieldCheck" size={15} />
             Identity demonstration
           </a>
