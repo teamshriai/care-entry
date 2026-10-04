@@ -4,7 +4,6 @@
 // Doctor/Provider, Bill and Payment are the existing entities, referenced
 // by id — this module owns only Bed/Admission/Attendant.
 
-import type { PaymentMethod } from './payment'
 
 export type Ward = 'General Ward' | 'Private Ward' | 'Semi-Private Ward' | 'ICU' | 'Emergency'
 
@@ -138,7 +137,4 @@ export interface CreateAdmissionInput {
   paymentType: PaymentType
   insuranceProvider?: string | null
   policyNumber?: string | null
-  /** How a self-pay patient pays the first-day bill — required for Self Pay
-   *  (no pay-later); insured, TPA and corporate payers settle at discharge. */
-  paymentMethod?: PaymentMethod
 }

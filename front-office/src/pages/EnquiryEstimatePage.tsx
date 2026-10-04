@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Receipt, Plus, Minus, Trash2, Search, IndianRupee } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Receipt, Plus, Minus, Trash2, Search, Send } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -9,9 +8,10 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { useFlow } from '../flows/useFlow'
+import { BillAtCounter } from '../components/payment/BillAtCounter'
+import { sendToBillingCounter } from '../domain/billingCounter'
 import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate, getPatientById } from '../domain/selectors'
-import { addEstimateItem, updateEstimateItemQuantity, removeEstimateItem } from '../domain/actions'
+import { addEstimateItem, createPaymentBill, updateEstimateItemQuantity, removeEstimateItem } from '../domain/actions'
 import { billNumberFor, formatRupees } from '../utils/billing'
 import type { Tariff } from '../types/frontDesk'
 
@@ -20,9 +20,7 @@ import type { Tariff } from '../types/frontDesk'
  *  here gates every "Add", so there is no anonymous/global estimate to
  *  accidentally add a service into. */
 export function EnquiryEstimatePage() {
-  const navigate = useNavigate()
   const { notify } = useToast()
-  const { openFlow } = useFlow()
   const [patientId, setPatientId] = useState('')
   const patient = useStoreValue(getPatientById, patientId)
 
@@ -73,15 +71,25 @@ export function EnquiryEstimatePage() {
     removeEstimateItem({ estimateId: estimate.estimateId, code })
   }
 
-  // No pay-later: the estimate becomes a bill only as it is paid, in the
-  // billing flow, so there is never an unpaid estimate bill.
-  function handleCollect() {
+  // Care Entry takes no money: the estimate is raised as a bill and the
+  // patient pays it at the billing counter.
+  function sendToCounter() {
     if (!estimate || !patient) return
-    openFlow('billing', { uhid: patient.uhid, estimate: estimate.estimateId })
+    try {
+      const bill = createPaymentBill({
+        patientId: patient.patientId,
+        items: estimate.items.map((item) => ({ code: item.code, description: item.name, amount: item.rate * (item.quantity ?? 1) })),
+        estimateId: estimate.estimateId,
+      })
+      sendToBillingCounter(bill.paymentId)
+      notify('Bill sent to the billing counter', { detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}` })
+    } catch (err) {
+      notify('Could not raise the bill', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
+    }
   }
 
   const hasItems = Boolean(estimate && estimate.items.length > 0)
-  const canCollect = Boolean(estimate && estimate.status !== 'Cancelled' && hasItems && !estimateBill)
+  const canBill = Boolean(estimate && estimate.status !== 'Cancelled' && hasItems && !estimateBill)
 
   return (
     <div>
@@ -249,7 +257,7 @@ export function EnquiryEstimatePage() {
                 ) : null}
 
                 <p className="text-xs text-ink-faint">
-                  An estimate is not an invoice — Collect raises the bill as it is paid.
+                  An estimate is not an invoice — sending it raises the bill, paid at the billing counter.
                 </p>
 
                 {patient ? (
@@ -259,17 +267,13 @@ export function EnquiryEstimatePage() {
                         <Button size="sm" variant="secondary" onClick={() => window.print()}>
                           Print Estimate
                         </Button>
-                        {canCollect && estimate ? (
-                          <Button size="sm" onClick={handleCollect}>
-                            <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            Collect {formatRupees(estimate.total)}
-                          </Button>
-                        ) : estimateBill ? (
-                          <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${estimateBill.paymentId}`)}>
-                            <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            Paid · {billNumberFor(estimateBill)}
+                        {canBill && estimate ? (
+                          <Button size="sm" onClick={sendToCounter}>
+                            <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
+                            Send {formatRupees(estimate.total)} to the billing counter
                           </Button>
                         ) : null}
+                        {estimateBill ? <BillAtCounter paymentId={estimateBill.paymentId} className="w-full" /> : null}
                       </>
                     ) : null}
                   </div>

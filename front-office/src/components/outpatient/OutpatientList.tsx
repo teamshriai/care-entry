@@ -18,7 +18,7 @@ function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string
     case 'upcoming':
       return { label: appointmentStatusLabel(row.appointment!.status), tone: 'info', note: null }
     case 'to-check-in':
-      if (row.appointment && row.appointment.status !== 'Confirmed') return { label: 'Pending payment', tone: 'warning', note: null }
+      if (row.appointment && row.appointment.status !== 'Confirmed') return { label: 'Payment pending', tone: 'warning', note: null }
       return {
         label: tele ? 'To join' : 'To check in',
         tone: row.lateMinutes ? 'warning' : 'neutral',
@@ -26,7 +26,7 @@ function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string
       }
     case 'waiting':
       return {
-        label: 'Waiting',
+        label: 'Waiting for consultation',
         tone: 'info',
         note: token?.waitingMinutes != null ? `${token.waitingMinutes} min${token.position ? ` · ${ordinal(token.position)} in line` : ''}` : null,
       }

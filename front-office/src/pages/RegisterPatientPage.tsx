@@ -11,6 +11,8 @@ import { Avatar } from '../components/ui/Avatar'
 import { AckCard } from '../components/flow/AckCard'
 import { AgeConfirm, FieldError } from '../components/patient/AgeConfirm'
 import { CreateAbhaLink } from '../components/patient/CreateAbhaLink'
+import { BillAtCounter } from '../components/payment/BillAtCounter'
+import { sendToBillingCounter } from '../domain/billingCounter'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
@@ -27,7 +29,7 @@ interface RegisterPatientLocationState {
   prefillName?: string
 }
 
-/** What the desk typed into the search box before pressing Register. */
+/** What the desk typed into the search box before pressing Create Patient. */
 function prefillFrom(search: string, state: RegisterPatientLocationState | null): { name: string; mobile: string } {
   const query = new URLSearchParams(search)
   return {
@@ -62,7 +64,8 @@ export function RegisterPatientPage() {
   // never while the desk is still typing its first character.
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [error, setError] = useState<string | null>(null)
-  const [registered, setRegistered] = useState<Patient | null>(null)
+  const [created, setCreated] = useState<{ patient: Patient; billId: string } | null>(null)
+  const registered = created?.patient ?? null
 
   const duplicateQuery = useMemo(() => ({ name: form.name, mobile: form.mobile, abhaId: form.abhaId }), [form.name, form.mobile, form.abhaId])
   const duplicates = useStoreValue(findPossibleDuplicatesFor, duplicateQuery)
@@ -97,7 +100,10 @@ export function RegisterPatientPage() {
     setTouched({ name: true, age: true, sex: true, mobile: true, abhaId: true })
     if (!ready) return
     try {
-      setRegistered(registerPatient(form))
+      const result = registerPatient(form)
+      // The registration fee is paid at the billing counter, not here.
+      sendToBillingCounter(result.bill.paymentId)
+      setCreated({ patient: result.patient, billId: result.bill.paymentId })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -117,9 +123,9 @@ export function RegisterPatientPage() {
       <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6 py-10">
         <Card accentTone="teal" className="w-full max-w-md">
           <AckCard
-            title="Patient Registered"
+            title="Patient Created"
             icon={UserRoundCheck}
-            durationMs={5000}
+            durationMs={9000}
             onDone={() => navigate(`/patients/${registered.uhid}`, { replace: true })}
             action={
               <div className="flex flex-wrap justify-center gap-2">
@@ -128,7 +134,7 @@ export function RegisterPatientPage() {
                   onClick={() => navigate(`/patients/${registered.uhid}?flow=schedule&uhid=${registered.uhid}`, { replace: true })}
                 >
                   <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Schedule appointment
+                  Schedule Appointment
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => navigate(`/patients/${registered.uhid}`, { replace: true })}>
                   Open profile
@@ -142,6 +148,7 @@ export function RegisterPatientPage() {
               {registered.age} yrs · {registered.sex} · {registered.mobile}
             </p>
             {registered.abhaId ? <p>ABHA {registered.abhaId}</p> : null}
+            {created ? <BillAtCounter paymentId={created.billId} className="mt-1 w-full" /> : null}
           </AckCard>
         </Card>
       </div>
@@ -150,7 +157,7 @@ export function RegisterPatientPage() {
 
   return (
     <div>
-      <PageHeader title="Register Patient" subtitle="Create a new patient record and allocate a UHID." />
+      <PageHeader title="Create Patient" subtitle="Create a new patient record and allocate a UHID. The registration fee is billed to the billing counter." />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
         <Card accentTone="teal" className="min-w-0">
@@ -261,13 +268,13 @@ export function RegisterPatientPage() {
                 {!ready ? (
                   <p className="text-xs text-ink-muted sm:mr-auto">
                     {invalid.length
-                      ? `To register: check the ${invalid.map((key) => FIELD_LABEL[key]).join(', ')}.`
-                      : 'To register: confirm the age with the patient.'}
+                      ? `To create the patient: check the ${invalid.map((key) => FIELD_LABEL[key]).join(', ')}.`
+                      : 'To create the patient: confirm the age with the patient.'}
                   </p>
                 ) : null}
                 <Button type="submit" disabled={!ready}>
                   <UserPlus className="h-4 w-4" strokeWidth={1.75} />
-                  Register
+                  Create Patient
                 </Button>
               </div>
             </form>

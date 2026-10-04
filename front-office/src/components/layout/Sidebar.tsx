@@ -65,8 +65,8 @@ export function Sidebar() {
     <aside className="flex h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-border-soft bg-bg">
       {/* The SHRI Health mark leads back to the SHRI apps home. */}
       <a
-        href="https://shri-ai.org/dev/"
-        aria-label="SHRI Health — all apps (shri-ai.org/dev)"
+        href="https://shri-ai.org"
+        aria-label="SHRI Health — shri-ai.org"
         className="focus-ring flex h-16 items-center gap-2.5 border-b border-border-soft px-5 transition-colors hover:bg-surface-2"
       >
         <img src={logo} alt="" className="h-9 w-auto" />

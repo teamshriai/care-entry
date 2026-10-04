@@ -266,6 +266,50 @@ export function createSeedState(): AppState {
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionStart + 240 * MINUTE), slotMinutes: 30, breaks: [] },
       createdAt: minutesAgo(700 * 24 * 60),
     },
+    {
+      providerId: 'dr-raj-srinivas',
+      name: 'Dr. Raj Srinivas',
+      gender: 'Male',
+      dateOfBirth: '1971-08-21',
+      mobile: '+91 98451 30418',
+      email: 'raj.srinivas@shrimedical.mock',
+      department: 'Neurosurgery',
+      specialty: 'Neurosurgeon',
+      qualification: 'MBBS, MS, MCh (Neurosurgery)',
+      registrationNumber: 'TNMC-61307',
+      experienceYears: 22,
+      employeeId: 'SHRI-DOC-031',
+      consultationType: 'Outpatient',
+      consultationFee: 1200,
+      room: 'Room 16, Block B',
+      loginEmail: 'raj.srinivas@shrimedical.mock',
+      role: 'Senior Consultant',
+      status: 'Active',
+      schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 20, breaks: [] },
+      createdAt: minutesAgo(600 * 24 * 60),
+    },
+    {
+      providerId: 'dr-logesh',
+      name: 'Dr. Logesh',
+      gender: 'Male',
+      dateOfBirth: '1986-01-09',
+      mobile: '+91 97890 44126',
+      email: 'logesh@shrimedical.mock',
+      department: 'Emergency Medicine',
+      specialty: 'Emergency Care Specialist',
+      qualification: 'MBBS, MD (Emergency Medicine)',
+      registrationNumber: 'TNMC-88214',
+      experienceYears: 11,
+      employeeId: 'SHRI-DOC-036',
+      consultationType: 'Outpatient',
+      consultationFee: 700,
+      room: 'Emergency Block, Bay 2',
+      loginEmail: 'logesh@shrimedical.mock',
+      role: 'Consultant',
+      status: 'Active',
+      schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 15, breaks: [] },
+      createdAt: minutesAgo(250 * 24 * 60),
+    },
   ]
 
   // Dr. Meera Shah is on approved leave today — drives the "On leave" status.
@@ -386,16 +430,18 @@ export function createSeedState(): AppState {
     return bill
   }
 
-  // Everyone registered before today paid the registration fee when they
-  // registered; today's registrations pay it with their first consultation.
+  // Registering raises the registration fee's bill, and the patient pays it
+  // at the billing counter a few minutes later. The newest registration is
+  // still on its way to the counter — its payment is pending.
   const registrationPaid = new Set<string>()
+  const newestRegistration = [...patients].sort((a, b) => b.createdAt - a.createdAt)[0]?.patientId
   patients.forEach((p, index) => {
-    if (p.createdAt >= dayStart) return
+    const pending = p.patientId === newestRegistration && now - p.createdAt < 30 * MINUTE
     pushBill({
       patientId: p.patientId,
       items: [REGISTRATION_FEE],
-      createdAt: p.createdAt + 2 * MINUTE,
-      collections: [{ amount: REGISTRATION_FEE.amount, method: index % 3 === 0 ? 'Card' : 'UPI', at: p.createdAt + 3 * MINUTE }],
+      createdAt: p.createdAt,
+      collections: pending ? [] : [{ amount: REGISTRATION_FEE.amount, method: index % 3 === 0 ? 'Card' : 'UPI', at: p.createdAt + 3 * MINUTE }],
     })
     registrationPaid.add(p.patientId)
   })
@@ -734,28 +780,85 @@ export function createSeedState(): AppState {
   billStay('SHRI-0102234')
   billStay('SHRI-0129901', { collections: [{ amount: firstDay('SHRI-0129901'), method: 'UPI', at: afterAdmission('SHRI-0129901', 10) }] })
 
-  // One pass per patient, for the attendant — returned at discharge, one
-  // kept two days and now overdue.
-  const passFor = (passNo: number, patientId: string, relationship: string, issuedAt: number, returnedAt: number | null): GuestPass => {
-    const ward = stayOf(patientId).wardLabel ?? ''
-    logAt(issuedAt, 'Guest pass issued', `GP/${ward.toUpperCase()}/${passNo} · ${patientOf(patientId).name}`)
-    if (returnedAt) logAt(returnedAt, 'Guest pass returned', `GP/${ward.toUpperCase()}/${passNo}`)
+  // Every pass is checked before it is printed. One visitor pass per
+  // inpatient, held by the attendant recorded at admission — returned at
+  // discharge, one kept two days and now overdue — plus today's visiting
+  // doctor and a service engineer, each confirmed with their host.
+  const visitorPass = (passNo: number, patientId: string, issuedAt: number, returnedAt: number | null): GuestPass => {
+    const stay = stayOf(patientId)
+    const ward = stay.wardLabel ?? ''
+    const passId = `GP/${ward.toUpperCase()}/${passNo}`
+    logAt(issuedAt, 'Guest pass printed', `${passId} · ${stay.attendant.name} · visiting ${patientOf(patientId).name} · confirmed with the patient`)
+    if (returnedAt) logAt(returnedAt, 'Guest pass returned', passId)
     return {
-      passId: `GP/${ward.toUpperCase()}/${passNo}`,
+      passId,
+      type: 'Patient visitor',
+      holderName: stay.attendant.name,
+      holderMobile: stay.attendant.phone,
+      idProof: `Aadhaar ••${String(4100 + passNo * 37).slice(-4)}`,
       patientId,
       patientName: patientOf(patientId).name,
+      hostName: null,
       ward,
-      relationship,
+      relationship: stay.attendant.relationship,
+      purpose: 'Attendant for the stay',
+      verifiedWith: patientOf(patientId).name,
+      issuedBy: 'Meera Iyer',
+      validUntil: issuedAt + DAY,
       issuedAt,
       returnedAt,
       returned: returnedAt !== null,
     }
   }
+  // Today's other visitors arrive after the day starts, whatever the hour.
+  const todayAt = (minutesBack: number) => Math.max(dayStart + 5 * MINUTE, minutesAgo(minutesBack))
+  const visitingDoctorAt = todayAt(110)
+  const engineerAt = todayAt(45)
+  logAt(visitingDoctorAt, 'Guest pass printed', 'GP/VDR/105 · Anand Krishnan · for Dr. Arun Kumar · confirmed with Dr. Arun Kumar')
+  logAt(engineerAt, 'Guest pass printed', 'GP/STF/106 · Suresh Babu · for Prakash Natarajan · confirmed with Prakash Natarajan')
   const guestPasses: GuestPass[] = [
-    passFor(101, 'SHRI-0052719', 'Son', afterAdmission('SHRI-0052719', 30), stayOf('SHRI-0052719').dischargedAt),
-    passFor(102, 'SHRI-0069958', 'Son', daysAgo(2) - 2 * HOUR, null),
-    passFor(103, 'SHRI-0044120', 'Son', hoursAgo(5), null),
-    passFor(104, 'SHRI-0125590', 'Spouse', hoursAgo(3), null),
+    visitorPass(101, 'SHRI-0052719', afterAdmission('SHRI-0052719', 30), stayOf('SHRI-0052719').dischargedAt),
+    visitorPass(102, 'SHRI-0069958', daysAgo(2) - 2 * HOUR, null),
+    visitorPass(103, 'SHRI-0044120', hoursAgo(5), null),
+    visitorPass(104, 'SHRI-0125590', hoursAgo(3), null),
+    {
+      passId: 'GP/VDR/105',
+      type: 'Visiting doctor',
+      holderName: 'Anand Krishnan',
+      holderMobile: '+91 98840 21673',
+      idProof: 'Medical council ID ••7731',
+      patientId: null,
+      patientName: null,
+      hostName: 'Dr. Arun Kumar',
+      ward: 'Neurology',
+      relationship: 'Visiting doctor',
+      purpose: 'Joint review of a stroke patient',
+      verifiedWith: 'Dr. Arun Kumar',
+      issuedBy: 'Meera Iyer',
+      validUntil: dayStart + DAY - 1,
+      issuedAt: visitingDoctorAt,
+      returnedAt: null,
+      returned: false,
+    },
+    {
+      passId: 'GP/STF/106',
+      type: 'Staff / service',
+      holderName: 'Suresh Babu',
+      holderMobile: '+91 96290 58114',
+      idProof: 'Company ID ••4412',
+      patientId: null,
+      patientName: null,
+      hostName: 'Prakash Natarajan',
+      ward: 'Biomedical engineering',
+      relationship: 'Vendor',
+      purpose: 'Service the MRI chiller',
+      verifiedWith: 'Prakash Natarajan',
+      issuedBy: 'Meera Iyer',
+      validUntil: dayStart + DAY - 1,
+      issuedAt: engineerAt,
+      returnedAt: null,
+      returned: false,
+    },
   ]
 
   // Two road accidents: last night's, acknowledged by the police and
@@ -878,6 +981,8 @@ export function createSeedState(): AppState {
     { code: 'CONS-NEU', name: 'Neurology consultation', department: 'Neurology', rate: 800 },
     { code: 'CONS-CAR', name: 'Cardiology consultation', department: 'Cardiology', rate: 900 },
     { code: 'CONS-ORT', name: 'Orthopedics consultation', department: 'Orthopedics', rate: 750 },
+    { code: 'CONS-NSG', name: 'Neurosurgery consultation', department: 'Neurosurgery', rate: 1200 },
+    { code: 'CONS-EMG', name: 'Emergency medicine consultation', department: 'Emergency Medicine', rate: 700 },
     { code: 'INV-ECG', name: 'ECG', department: 'Cardiology', rate: 350 },
     { code: 'INV-ECHO', name: '2D Echocardiogram', department: 'Cardiology', rate: 2400 },
     { code: 'INV-MRI-B', name: 'MRI Brain (plain)', department: 'Neurology', rate: 7500 },

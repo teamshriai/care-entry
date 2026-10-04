@@ -78,7 +78,6 @@ export function PatientProfilePage() {
           <PatientTimeline
             timeline={timeline}
             today={today}
-            onCollect={(paymentId) => openFlow('billing', { uhid: patient.uhid, bill: paymentId })}
             onChangeBooking={setChangingBooking}
           />
         </div>

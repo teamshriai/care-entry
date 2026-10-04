@@ -114,14 +114,14 @@ export function PatientHeader({
               )}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={actions.billing} title="Open billing" className="rounded-lg">
+              <button type="button" onClick={actions.billing} title="Open the patient's bills" className="rounded-lg">
                 <Badge tone={PAYMENT_TONE[payment.status]}>
                   <IndianRupee className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
                   {payment.status === 'Paid'
-                    ? 'Paid'
+                    ? 'Payment received'
                     : payment.status === 'No bills'
                       ? 'No bills'
-                      : `${payment.status} · ${formatRupees(payment.due)} due`}
+                      : `${payment.status === 'Failed' ? 'Payment failed' : 'Payment pending'} · ${formatRupees(payment.due)}`}
                 </Badge>
               </button>
               {inpatient ? (
@@ -145,7 +145,7 @@ export function PatientHeader({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Action icon={CalendarPlus} label="Schedule" onClick={actions.schedule} />
+          <Action icon={CalendarPlus} label="Schedule Appointment" onClick={actions.schedule} />
           {inpatient ? (
             <Action icon={LogOut} label="Discharge" onClick={actions.discharge} />
           ) : (
@@ -153,7 +153,7 @@ export function PatientHeader({
           )}
           <Action
             icon={IndianRupee}
-            label="Billing"
+            label="Bills"
             onClick={actions.billing}
             badge={payment.due > 0 ? formatRupees(payment.due) : undefined}
             primary={payment.due > 0}

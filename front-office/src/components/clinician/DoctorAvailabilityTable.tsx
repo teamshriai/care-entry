@@ -110,7 +110,7 @@ export function DoctorAvailabilityTable({
                       disabled={!canBook}
                       onClick={() => onBook(row.provider)}
                     >
-                      Schedule
+                      Schedule Appointment
                     </Button>
                   </td>
                 ) : null}

@@ -5,8 +5,9 @@
 // refund. No real payment gateway, no card/bank/UPI credentials are ever
 // held here — only the simulated RESULT of a collection.
 
-/** A cashless hospital: patients pay by UPI or card; an insured inpatient's
- *  bill is settled by the insurer or TPA. No cash, and no pay-later. */
+/** How the billing counter recorded a payment — UPI or card; an insured
+ *  inpatient's bill is settled by the insurer or TPA. Care Entry raises
+ *  bills and shows their status; it never takes the money itself. */
 export type PaymentMethod = 'UPI' | 'Card' | 'Insurance/TPA'
 
 export type PaymentStatus = 'Pending' | 'Partially Paid' | 'Paid' | 'Cancelled' | 'Refunded'

@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Building2, CalendarCheck2, CalendarClock, Printer, Video } from 'lucide-react'
+import { ArrowRight, Building2, CalendarCheck2, CalendarClock, Video } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { StepSection } from '../../components/flow/StepSection'
 import type { StepStatus } from '../../components/flow/StepSection'
-import { PaymentPanel } from '../../components/payment/PaymentPanel'
+import { BillAtCounter } from '../../components/payment/BillAtCounter'
+import { sendToBillingCounter } from '../../domain/billingCounter'
 import { SlotBoard } from '../../components/clinician/SlotBoard'
 import { DateStrip } from '../../components/clinician/DateStrip'
 import { DoctorChoiceList } from '../../components/clinician/DoctorChoiceList'
@@ -27,13 +27,13 @@ import {
   getToday,
 } from '../../domain/selectors'
 import { rescheduleAppointment } from '../../domain/actions'
-import { billNumberFor, formatRupees } from '../../utils/billing'
+import { formatRupees } from '../../utils/billing'
 import { dayWithDate, relativeDayLabel } from '../../utils/dates'
 import { appointmentStatusLabel, modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
 import type { FlowProps } from '../registry'
 import type { Appointment, BookingPlace, ConsultMode, UnavailableParty } from '../../types/appointment'
-import type { Payment, PaymentMethod } from '../../types/payment'
+import type { Payment } from '../../types/payment'
 
 type StepKey = 'doctor' | 'time'
 
@@ -50,7 +50,6 @@ function placeLine(place: BookingPlace, doctorName: string, today: string): stri
  * absorbs it.
  */
 export function RescheduleFlow({ params, onClose }: FlowProps) {
-  const navigate = useNavigate()
   const now = useNow(15000)
   const today = useStoreValue(getToday)
   const live = useStoreValue(getAppointmentById, params.appointment ?? '')
@@ -68,7 +67,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
   const [note, setNote] = useState('')
   const [editing, setEditing] = useState<StepKey | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<{ appointment: Appointment; differenceBill: Payment | null; method: PaymentMethod | null } | null>(null)
+  const [done, setDone] = useState<{ appointment: Appointment; differenceBill: Payment | null } | null>(null)
 
   const suggestions = useStoreValue(getDoctorSuggestions, was?.department ?? '', now)
   const provider = useStoreValue(getProviderById, providerId ?? '')
@@ -96,18 +95,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
         title="Appointment Rescheduled"
         icon={CalendarCheck2}
         onDone={onClose}
-        action={
-          done.differenceBill ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/payments/${done.differenceBill!.paymentId}/receipt`, { replace: true, state: { autoPrint: true } })}
-            >
-              <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Print receipt
-            </Button>
-          ) : undefined
-        }
+        durationMs={done.differenceBill ? 9000 : undefined}
       >
         <p className="text-base font-semibold text-ink">{movedDoctor}</p>
         <p>
@@ -120,10 +108,9 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
         <p className="text-xs">Was {placeLine(wasPlace, wasProvider.name, today)}</p>
         <p>
           {moved.appointmentId.toUpperCase()}
-          {done.differenceBill
-            ? ` · ${formatRupees(done.differenceBill.paidAmount)} difference paid · ${done.method} · ${billNumberFor(done.differenceBill)}`
-            : ' · nothing to pay'}
+          {done.differenceBill ? ' · confirmed once the fee difference is received' : ' · nothing to pay'}
         </p>
+        {done.differenceBill ? <BillAtCounter paymentId={done.differenceBill.paymentId} className="mt-1 w-full" /> : null}
       </AckCard>,
     )
   }
@@ -159,12 +146,14 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     setEditing(null)
   }
 
-  function move(method?: PaymentMethod) {
+  function move() {
     if (!providerId || !date || !slot || !by) return
     setError(null)
     try {
-      const result = rescheduleAppointment({ appointmentId: was!.appointmentId, providerId, date, slot, mode, by, note, method })
-      setDone({ ...result, method: method ?? null })
+      const result = rescheduleAppointment({ appointmentId: was!.appointmentId, providerId, date, slot, mode, by, note })
+      // A fee difference is paid at the billing counter, not here.
+      if (result.differenceBill) sendToBillingCounter(result.differenceBill.paymentId)
+      setDone(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -181,7 +170,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     if (difference < 0) return `${name}'s fee is ${formatRupees(-difference)} less than the ${formatRupees(feePaid)} paid — a move is not refunded.`
     if (difference === 0) return 'Same fee — nothing to pay.'
     if (by === 'Doctor') return `${name}'s fee is ${formatRupees(difference)} more — the hospital absorbs it, as the doctor is unavailable.`
-    if (by === 'Patient') return `${name}'s fee is ${formatRupees(difference)} more than the ${formatRupees(feePaid)} paid — collect the difference.`
+    if (by === 'Patient') return `${name}'s fee is ${formatRupees(difference)} more than the ${formatRupees(feePaid)} paid — the difference is billed to the billing counter.`
     return `${name}'s fee is ${formatRupees(difference)} more — it is charged only if the patient asked for the move.`
   }
 
@@ -329,18 +318,9 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
           />
           {provider ? <p className={cn('text-sm', charge > 0 ? 'font-medium text-warning' : 'text-ink-muted')}>{moneyLine()}</p> : null}
 
-          {charge > 0 ? (
-            <PaymentPanel
-              key={`${providerId}|${date}|${slot}|${charge}`}
-              amount={charge}
-              status={<Badge tone="warning">Fee difference</Badge>}
-              onPay={(method) => move(method)}
-            />
-          ) : (
-            <Button size="lg" disabled={!ready} onClick={() => move()}>
-              Reschedule
-            </Button>
-          )}
+          <Button size="lg" disabled={!ready} onClick={move}>
+            {charge > 0 ? `Reschedule & send ${formatRupees(charge)} bill to the billing counter` : 'Reschedule'}
+          </Button>
         </div>
       </StepSection>
     </div>,

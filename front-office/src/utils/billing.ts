@@ -43,6 +43,17 @@ export function billDisplayStatus(payment: Payment): BillDisplayStatus {
   return payment.paidAmount > 0 ? 'Partial' : 'Pending'
 }
 
+/** What each bill status reads as. Care Entry never takes money, so a bill
+ *  only ever reads as where the billing counter has it. */
+export const BILL_STATUS_LABEL: Record<BillDisplayStatus, string> = {
+  Paid: 'Payment received',
+  Partial: 'Payment pending',
+  Pending: 'Payment pending',
+  Failed: 'Payment failed',
+  Cancelled: 'Cancelled',
+  Refunded: 'Refunded',
+}
+
 /** Green paid, yellow pending/partial, red failed; closed bills are quiet. */
 export const BILL_STATUS_TONE: Record<BillDisplayStatus, Tone> = {
   Paid: 'stable',

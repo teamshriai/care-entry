@@ -12,6 +12,7 @@ import { RegisterDoctorPage } from './pages/RegisterDoctorPage'
 import { DoctorProfilePage } from './pages/DoctorProfilePage'
 import { OutpatientsPage } from './pages/OutpatientsPage'
 import { GuestPassPage } from './pages/GuestPassPage'
+import { GuestPassPrintPage } from './pages/GuestPassPrintPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
 import { BillingPage } from './pages/BillingPage'
@@ -119,6 +120,7 @@ function App() {
 
             {/* Services */}
             <Route path="/services/guest-pass" element={<GuestPassPage />} />
+            <Route path="/services/guest-pass/print" element={<GuestPassPrintPage />} />
             <Route path="/services/enquiry" element={<EnquiryEstimatePage />} />
             <Route path="/services/mlc" element={<MlcPage />} />
 
@@ -141,7 +143,7 @@ function App() {
             <Route path="/payments" element={<Navigate to="/billing" replace />} />
             <Route path="/payments/pending" element={<Navigate to="/billing?filter=due" replace />} />
             <Route path="/payments/history" element={<Navigate to="/billing?filter=all" replace />} />
-            <Route path="/payments/collect" element={<Navigate to="/billing?filter=due&flow=billing" replace />} />
+            <Route path="/payments/collect" element={<Navigate to="/billing?filter=due" replace />} />
             <Route path="/payments/:paymentId" element={<PaymentDetailPage />} />
             <Route path="/payments/:paymentId/receipt" element={<PaymentReceiptPage />} />
 

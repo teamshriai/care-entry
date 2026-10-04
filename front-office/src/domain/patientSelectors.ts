@@ -271,7 +271,7 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
       at: pass.issuedAt,
       kind: 'guest-pass',
       title: `Guest pass · ${pass.passId}`,
-      detail: `Ward ${pass.ward} · ${pass.relationship}`,
+      detail: `${pass.ward} · ${pass.holderName} (${pass.relationship})`,
       status: pass.returned ? 'Returned' : 'Issued',
     })
   }

@@ -3,7 +3,7 @@
 // createBillForAdmission calls the existing createPaymentBill and only
 // stores the resulting paymentId back onto the Admission.
 import { getState, setState } from './store'
-import { withActivity, createPaymentBill, collectPayment } from './actions'
+import { withActivity, createPaymentBill } from './actions'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, isValidMobile } from '../utils/phone'
 import type { AppState } from '../types/store'
@@ -40,11 +40,10 @@ function setBedStatus(current: AppState, bedId: string, status: Bed['status'], a
 }
 
 /**
- * Admits a patient to a bed, raises the admission's bill and — for a
- * self-pay patient — takes the first-day payment, as one step. The hospital
- * has no pay-later, so a self-pay admission is saved only with its payment;
- * an insured, TPA or corporate patient is billed to the payer and settled at
- * discharge. A request already waiting for a bed is admitted rather than
+ * Admits a patient to a bed and raises the admission's bill, as one step.
+ * Care Entry takes no money: a self-pay patient pays the first day at the
+ * billing counter; an insured, TPA or corporate patient is billed to the
+ * payer and settled at discharge. A request already waiting for a bed is admitted rather than
  * duplicated. Everything is checked before anything is saved.
  */
 export function admitPatient(input: CreateAdmissionInput): { admission: Admission; bill: Payment } {
@@ -72,9 +71,6 @@ export function admitPatient(input: CreateAdmissionInput): { admission: Admissio
   }
 
   const selfPay = input.paymentType === 'Self Pay'
-  if (selfPay && !input.paymentMethod) {
-    throw new DomainError('VALIDATION', 'A self-pay admission is paid when admitted — take the first-day payment.')
-  }
   const billItems = admissionBillItems(bed.roomType, 1)
 
   // A request already waiting for a bed (Pending / Bed Reserved) becomes this admission.
@@ -135,12 +131,10 @@ export function admitPatient(input: CreateAdmissionInput): { admission: Admissio
     }
   })
 
-  // The admission's bill, linked both ways; a self-pay patient pays the first day now.
+  // The admission's bill, linked both ways. A self-pay patient pays the first
+  // day at the billing counter; an insured stay is settled by its payer.
   const billed = createBillForAdmission(admissionId, billItems)
-  let bill = getState().payments.find((p) => p.paymentId === billed.paymentId)!
-  if (selfPay && input.paymentMethod) {
-    bill = collectPayment({ paymentId: bill.paymentId, amount: bill.balance, method: input.paymentMethod })
-  }
+  const bill = getState().payments.find((p) => p.paymentId === billed.paymentId)!
 
   return { admission: requireAdmission(getState(), admissionId), bill }
 }
@@ -215,8 +209,7 @@ export function cancelAdmission(admissionId: string, reason: string): Admission 
 }
 
 /** Discharges an admitted patient once the stay's final bill — re-priced to
- *  the day they leave — has nothing left to collect. There is no pay-later:
- *  the desk collects the balance (or the insurer settles it) first. The
+ *  the day they leave — is paid: at the billing counter, or by the insurer. The
  *  patient's other bills never hold up a discharge. The bed is free the same
  *  moment. */
 export function dischargeAdmission(admissionId: string, details: DischargeDetails): Admission {
@@ -232,7 +225,7 @@ export function dischargeAdmission(admissionId: string, details: DischargeDetail
   const now = Date.now()
   const preview = previewDischargeBill(state, admissionId, now)
   if (preview && preview.balance > 0) {
-    throw new DomainError('BALANCE_DUE', `Collect ${formatRupees(preview.balance)} on the final bill before discharging.`)
+    throw new DomainError('BALANCE_DUE', `${formatRupees(preview.balance)} on the final bill is still to be paid at the billing counter.`)
   }
   // The stored bill becomes the final bill.
   repriceAdmissionBill(admissionId, now)

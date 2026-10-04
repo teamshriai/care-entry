@@ -146,7 +146,7 @@ export function PatientsPage() {
                             {isToday(row) ? <Badge tone="stable">Registered today</Badge> : null}
                             {row.due > 0 ? (
                               <Badge tone={row.failed ? 'critical' : 'warning'}>
-                                {row.failed ? 'Failed' : 'Due'} · {formatRupees(row.due)}
+                                {row.failed ? 'Payment failed' : 'Payment pending'} · {formatRupees(row.due)}
                               </Badge>
                             ) : null}
                             {row.duplicate ? <Badge tone="warning">Possible duplicate</Badge> : null}

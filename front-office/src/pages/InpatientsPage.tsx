@@ -17,7 +17,7 @@ import { useNow } from '../hooks/useNow'
 import { useFlow } from '../flows/useFlow'
 import { getAwaitingBed, getDischargedOn, getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
 import { todayKey } from '../domain/time'
-import { BILL_STATUS_TONE, formatRupees } from '../utils/billing'
+import { BILL_STATUS_LABEL, BILL_STATUS_TONE, formatRupees } from '../utils/billing'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { cn } from '../utils/cn'
@@ -126,7 +126,7 @@ export function InpatientsPage() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-3">
                       <Badge tone={BILL_STATUS_TONE[billStatus]}>
-                        {billing.pending > 0 ? `${billStatus} · ${formatRupees(billing.pending)}` : billStatus}
+                        {billing.pending > 0 ? `${BILL_STATUS_LABEL[billStatus]} · ${formatRupees(billing.pending)}` : BILL_STATUS_LABEL[billStatus]}
                       </Badge>
                       <span className="mt-1 block text-xs text-ink-subtle">{payerOf(a)}</span>
                     </td>

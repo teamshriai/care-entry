@@ -1,66 +1,146 @@
 import { useState } from 'react'
-import { IdCard, Undo2 } from 'lucide-react'
+import type { FormEvent, ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { BriefcaseMedical, IdCard, Printer, ShieldCheck, Stethoscope, Undo2, Users, Wrench } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
+import { MobileInput } from '../components/ui/MobileInput'
 import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
-import { getGuestPasses, getPatientById } from '../domain/selectors'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { getDepartments, getGuestPasses, getPatientById, getProviders } from '../domain/selectors'
 import { getCurrentAdmissionForPatient } from '../domain/patientSelectors'
 import { issueGuestPass, returnGuestPass } from '../domain/actions'
 import { todayKey } from '../domain/time'
 import { formatClock, formatRelativeTime } from '../utils/format'
+import { isValidMobile } from '../utils/phone'
+import { nameError, nextNameInput } from '../utils/validation'
 import { cn } from '../utils/cn'
-import type { GuestPass } from '../types/frontDesk'
+import { GUEST_PASS_TYPES } from '../types/frontDesk'
+import type { GuestPass, GuestPassType } from '../types/frontDesk'
 
-const DAY_MS = 24 * 60 * 60 * 1000
-const RELATIONSHIPS = ['Spouse', 'Son', 'Daughter', 'Parent', 'Sibling', 'Other']
-const NAMED_WARD = /ward|icu|emergency/i
+const RELATIONSHIPS = ['Spouse', 'Son', 'Daughter', 'Parent', 'Sibling', 'Other relative', 'Friend']
+const STAFF_ROLES = ['Staff without ID card', 'Trainee', 'Vendor', 'Contractor']
+const SERVICE_AREAS = ['Administration', 'Pharmacy', 'Laboratory', 'Radiology', 'Biomedical engineering', 'Housekeeping', 'Maintenance']
+const ID_TYPES = ['Aadhaar', 'Driving licence', 'Voter ID', 'PAN', 'Passport', 'Medical council ID', 'Company ID']
 
-/** Display text for a stored ward value: short codes read 'Ward 2A', names
- *  that already say what they are ('ICU', 'General Ward') are left alone. */
-function wardLabel(ward: string): string {
-  return NAMED_WARD.test(ward) ? ward : `Ward ${ward}`
+const TYPE_ICON: Record<GuestPassType, typeof Users> = {
+  'Patient visitor': Users,
+  'Visiting doctor': Stethoscope,
+  'Staff / service': Wrench,
 }
 
+const TYPE_HINT: Record<GuestPassType, string> = {
+  'Patient visitor': 'For an admitted patient’s visitor — confirmed with the patient or their attendant.',
+  'Visiting doctor': 'For a doctor from outside — confirmed with the hospital doctor they are here to see.',
+  'Staff / service': 'For staff without an ID card, vendors and contractors — confirmed with whoever authorised them.',
+}
+
+const inputClass =
+  'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
+
+/**
+ * Guest Pass — nobody moves about the hospital without a hospital ID or a
+ * pass. A pass is printed only after the desk has seen the holder's ID and
+ * confirmed the visit: with the patient or attendant for a visitor, with the
+ * host doctor for a visiting doctor, with whoever authorised staff and
+ * service people. Every pass is returned when its holder leaves.
+ */
 export function GuestPassPage() {
   const now = useNow(30000)
+  const navigate = useNavigate()
   const { notify } = useToast()
+  const user = useCurrentUser()
   const passes = useStoreValue(getGuestPasses)
+  const providers = useStoreValue(getProviders)
+  const departments = useStoreValue(getDepartments)
 
-  // A pass is for an admitted patient's companion; the ward is the one
-  // they are in.
+  const [type, setType] = useState<GuestPassType>('Patient visitor')
   const [patientId, setPatientId] = useState('')
   const patient = useStoreValue(getPatientById, patientId)
   const stay = useStoreValue(getCurrentAdmissionForPatient, patientId)
+  const [hostProviderId, setHostProviderId] = useState('')
+  const [area, setArea] = useState('')
   const [relationship, setRelationship] = useState('')
+  const [holderName, setHolderName] = useState('')
+  const [holderMobile, setHolderMobile] = useState('')
+  const [idType, setIdType] = useState('')
+  const [idLast4, setIdLast4] = useState('')
+  const [purpose, setPurpose] = useState('')
+  const [verifiedWith, setVerifiedWith] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const host = providers.find((p) => p.providerId === hostProviderId) ?? null
   const active = passes.filter((pass) => !pass.returned)
   const returned = passes.filter(
     (pass) => pass.returned && pass.returnedAt !== null && todayKey(new Date(pass.returnedAt)) === todayKey(new Date(now)),
   )
 
-  function handleIssue(event: React.FormEvent) {
+  // Who confirms the visit, as the checkbox says it.
+  const confirmer =
+    type === 'Visiting doctor' ? (host?.name ?? 'the host doctor') : verifiedWith.trim() || (type === 'Patient visitor' ? 'the patient or attendant' : 'the authorising staff member')
+
+  const ready =
+    !nameError(holderName) &&
+    isValidMobile(holderMobile) &&
+    Boolean(idType) &&
+    /^[A-Za-z0-9]{4}$/.test(idLast4) &&
+    confirmed &&
+    (type === 'Patient visitor'
+      ? Boolean(patient && stay?.status === 'Admitted' && relationship && verifiedWith.trim())
+      : type === 'Visiting doctor'
+        ? Boolean(host && purpose.trim())
+        : Boolean(area && relationship && purpose.trim() && verifiedWith.trim()))
+
+  function reset(nextType: GuestPassType) {
+    setType(nextType)
+    setPatientId('')
+    setHostProviderId('')
+    setArea('')
+    setRelationship('')
+    setPurpose('')
+    setVerifiedWith('')
+    setConfirmed(false)
+    setError(null)
+  }
+
+  function handlePrint(event: FormEvent) {
     event.preventDefault()
     setError(null)
     try {
-      // The submit button is disabled without a patient, so this only runs
-      // once one is selected; the '' fallback just satisfies the type and
-      // fails the same server-side validation an undefined id would.
-      const pass = issueGuestPass({ patientId: patient?.patientId ?? '', relationship })
-      notify('Guest pass issued', { detail: `${pass.passId} · ${pass.patientName}` })
-      setRelationship('')
-      setPatientId('')
+      const pass = issueGuestPass({
+        type,
+        holderName,
+        holderMobile,
+        idType,
+        idLast4,
+        patientId: patient?.patientId,
+        hostProviderId: hostProviderId || undefined,
+        area: area || undefined,
+        relationship,
+        purpose,
+        verifiedWith,
+        confirmed,
+        issuedBy: user.name,
+      })
+      notify('Guest pass printed', { detail: `${pass.passId} · ${pass.holderName}` })
+      setHolderName('')
+      setHolderMobile('')
+      setIdType('')
+      setIdLast4('')
+      reset(type)
+      navigate(`/services/guest-pass/print?pass=${encodeURIComponent(pass.passId)}`, { state: { autoPrint: true } })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
-      notify('Could not issue pass', { tone: 'error', detail: message })
+      notify('Could not print the pass', { tone: 'error', detail: message })
     }
   }
 
@@ -77,57 +157,151 @@ export function GuestPassPage() {
     <div>
       <PageHeader
         title="Guest Pass"
-        subtitle="A pass for an inpatient's companion — one per patient, for the ward they are in, returned at discharge."
+        subtitle="Nobody moves about the hospital without a hospital ID or a pass — printed only after the ID is seen and the visit confirmed."
       />
 
-      <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:px-8 2xl:grid-cols-[400px_minmax(0,1fr)]">
         <Card accentTone="brand" className="min-w-0">
-          <CardHeader icon={IdCard} iconTone="brand" title="Issue a pass" />
+          <CardHeader icon={IdCard} iconTone="brand" title="Print a pass" subtitle={TYPE_HINT[type]} />
           <CardBody>
-            <form onSubmit={handleIssue} className="flex flex-col gap-4">
+            <form onSubmit={handlePrint} className="flex flex-col gap-4" noValidate>
               {error ? <Alert tone="critical">{error}</Alert> : null}
 
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-ink-muted">
-                  Inpatient <span className="text-critical">*</span>
-                </p>
-                <PatientPickField
-                  patient={patient}
-                  onChange={(next) => {
-                    setPatientId(next.patientId)
-                    setError(null)
-                  }}
-                  scope="inpatients"
-                  placeholder="Search an admitted patient by name, mobile or UHID"
-                  detail={stay?.wardLabel ? `${stay.wardLabel} · ${stay.bedNumber}` : undefined}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-ink-muted">
-                  Relationship to patient <span className="text-critical">*</span>
-                </label>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {RELATIONSHIPS.map((option) => (
+              <div role="radiogroup" aria-label="Pass for" className="grid grid-cols-3 gap-1.5">
+                {GUEST_PASS_TYPES.map((option) => {
+                  const Icon = TYPE_ICON[option]
+                  return (
                     <button
                       key={option}
                       type="button"
-                      onClick={() => setRelationship(option)}
+                      role="radio"
+                      aria-checked={type === option}
+                      onClick={() => reset(option)}
                       className={cn(
-                        'rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
-                        relationship === option
-                          ? 'border-brand-600 bg-brand-600 text-white'
-                          : 'border-border bg-surface text-ink hover:bg-surface-muted',
+                        'flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center text-xs font-semibold transition-colors',
+                        type === option ? 'border-brand-600 bg-brand-50 text-primary-text' : 'border-border bg-surface text-ink-muted hover:bg-surface-muted',
                       )}
                     >
+                      <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                       {option}
                     </button>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
 
-              <Button type="submit" disabled={!patient || stay?.status !== 'Admitted' || !relationship}>
-                Issue pass{stay?.wardLabel ? ` · ${wardLabel(stay.wardLabel)}` : ''}
+              {/* Who or what the visit is for */}
+              {type === 'Patient visitor' ? (
+                <>
+                  <Field label="Visiting the inpatient" required>
+                    <PatientPickField
+                      patient={patient}
+                      onChange={(next) => {
+                        setPatientId(next.patientId)
+                        setError(null)
+                      }}
+                      scope="inpatients"
+                      placeholder="Search an admitted patient by name, mobile or UHID"
+                      detail={stay?.wardLabel ? `${stay.wardLabel} · ${stay.bedNumber}` : undefined}
+                    />
+                  </Field>
+                  <Field label="Relationship to the patient" required>
+                    <Chips options={RELATIONSHIPS} value={relationship} onChange={setRelationship} />
+                  </Field>
+                </>
+              ) : type === 'Visiting doctor' ? (
+                <>
+                  <Field label="Visiting doctor of" required>
+                    <select value={hostProviderId} onChange={(e) => setHostProviderId(e.target.value)} className={inputClass} aria-label="Hospital doctor they are visiting">
+                      <option value="">Choose the hospital doctor</option>
+                      {providers
+                        .filter((p) => p.status === 'Active')
+                        .map((p) => (
+                          <option key={p.providerId} value={p.providerId}>
+                            {p.name} · {p.department}
+                          </option>
+                        ))}
+                    </select>
+                  </Field>
+                  <Field label="Purpose of the visit" required>
+                    <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} placeholder="e.g. Joint review of a patient" className={inputClass} aria-label="Purpose of the visit" />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="Department or area" required>
+                    <select value={area} onChange={(e) => setArea(e.target.value)} className={inputClass} aria-label="Department or area">
+                      <option value="">Choose where they need to go</option>
+                      {[...departments, ...SERVICE_AREAS].map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Role" required>
+                    <Chips options={STAFF_ROLES} value={relationship} onChange={setRelationship} />
+                  </Field>
+                  <Field label="Purpose of the visit" required>
+                    <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} placeholder="e.g. Service the MRI chiller" className={inputClass} aria-label="Purpose of the visit" />
+                  </Field>
+                </>
+              )}
+
+              {/* The holder and their ID */}
+              <Field label={type === 'Visiting doctor' ? 'Visiting doctor’s name' : 'Pass holder’s name'} required>
+                <input value={holderName} onChange={(e) => setHolderName(nextNameInput(e.target.value))} maxLength={60} placeholder="As on their ID" className={inputClass} aria-label="Pass holder's name" />
+              </Field>
+              <Field label="Mobile" required>
+                <MobileInput value={holderMobile} onValueChange={setHolderMobile} placeholder="10-digit mobile" className={inputClass} aria-label="Pass holder's mobile" />
+              </Field>
+              <Field label="ID proof seen" required>
+                <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
+                  <select value={idType} onChange={(e) => setIdType(e.target.value)} className={inputClass} aria-label="Kind of ID proof">
+                    <option value="">Kind of ID</option>
+                    {ID_TYPES.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={idLast4}
+                    onChange={(e) => setIdLast4(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 4))}
+                    placeholder="Last 4"
+                    className={inputClass}
+                    aria-label="Last four characters of the ID"
+                  />
+                </div>
+              </Field>
+
+              {/* Verification — nothing is printed unchecked */}
+              <div className="flex flex-col gap-2 rounded-xl border border-warning-border bg-warning-bg/40 px-3.5 py-3">
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
+                  <ShieldCheck className="h-4 w-4 text-warning" strokeWidth={1.75} aria-hidden="true" />
+                  Verification
+                </p>
+                {type === 'Visiting doctor' ? null : (
+                  <input
+                    value={verifiedWith}
+                    onChange={(e) => setVerifiedWith(e.target.value)}
+                    maxLength={60}
+                    placeholder={type === 'Patient visitor' ? 'Confirmed with — the patient or attendant’s name' : 'Authorised by — staff name and role'}
+                    className={inputClass}
+                    aria-label={type === 'Patient visitor' ? 'Confirmed with the patient or attendant' : 'Authorised by'}
+                  />
+                )}
+                <label className="flex items-start gap-2 text-xs text-ink">
+                  <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-primary-600)]" />
+                  <span>
+                    I have seen the ID and confirmed this visit with <strong>{confirmer}</strong>
+                    {type === 'Patient visitor' ? ' — they know and want this visitor.' : ' — they expect this person.'}
+                  </span>
+                </label>
+              </div>
+
+              <Button type="submit" disabled={!ready}>
+                <Printer className="h-4 w-4" strokeWidth={1.75} />
+                Print pass
               </Button>
             </form>
           </CardBody>
@@ -136,31 +310,38 @@ export function GuestPassPage() {
         <div className="flex min-w-0 flex-col gap-6">
           <Card accentTone="brand">
             <CardHeader
-              title="Active passes"
-              subtitle="Outstanding passes, oldest first"
+              icon={BriefcaseMedical}
+              iconTone="brand"
+              title="Passes out"
+              subtitle="Everyone holding a pass now, newest first"
               action={<span className="text-xs tabular-nums text-ink-faint">{active.length}</span>}
             />
             {active.length === 0 ? (
-              <EmptyState icon={IdCard} title="No active passes" description="Issued passes appear here until returned." />
+              <EmptyState icon={IdCard} title="No passes out" description="Printed passes appear here until they are returned." />
             ) : (
               <div className="divide-y divide-border-soft">
                 {active.map((pass) => {
-                  const overdue = now - pass.issuedAt > DAY_MS
+                  const overdue = now > pass.validUntil
                   return (
-                    <div
-                      key={pass.passId}
-                      className="flex flex-col gap-2 px-5 py-3 transition-colors hover:bg-surface-subtle sm:flex-row sm:items-center sm:justify-between"
-                    >
+                    <div key={pass.passId} className="flex flex-col gap-2 px-5 py-3 transition-colors hover:bg-surface-subtle sm:flex-row sm:items-center sm:justify-between">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-ink">
-                          {pass.passId} · {pass.patientName}
+                        <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                          <span className="truncate">
+                            {pass.holderName} · {pass.passId}
+                          </span>
+                          <Badge tone={pass.type === 'Patient visitor' ? 'info' : pass.type === 'Visiting doctor' ? 'indigo' : 'neutral'}>{pass.type}</Badge>
                         </p>
                         <p className="truncate text-xs text-ink-muted">
-                          {wardLabel(pass.ward)} · {pass.relationship} · issued {formatRelativeTime(pass.issuedAt, now)}
+                          {pass.patientName ? `Visiting ${pass.patientName} (${pass.relationship})` : `${pass.relationship} · for ${pass.hostName}`} · {pass.ward} · confirmed
+                          with {pass.verifiedWith} · printed {formatRelativeTime(pass.issuedAt, now)}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <Badge status={overdue ? 'Overdue' : 'Issued'} />
+                        <Button size="sm" variant="ghost" onClick={() => navigate(`/services/guest-pass/print?pass=${encodeURIComponent(pass.passId)}`)}>
+                          <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          Reprint
+                        </Button>
                         <Button size="sm" variant="secondary" onClick={() => handleReturn(pass)}>
                           <Undo2 className="h-3.5 w-3.5 text-primary-text" strokeWidth={1.75} />
                           Return
@@ -183,9 +364,11 @@ export function GuestPassPage() {
                   <div key={pass.passId} className="flex items-center justify-between gap-3 px-5 py-2.5">
                     <div className="min-w-0">
                       <p className="truncate text-sm text-ink">
-                        {pass.passId} · {pass.patientName}
+                        {pass.holderName} · {pass.passId}
                       </p>
-                      <p className="text-xs text-ink-muted">{wardLabel(pass.ward)}</p>
+                      <p className="truncate text-xs text-ink-muted">
+                        {pass.type} · {pass.ward}
+                      </p>
                     </div>
                     <span className="shrink-0 text-xs tabular-nums text-ink-muted">
                       {/* A returned pass always has returnedAt set, by construction of returnGuestPass. */}
@@ -198,6 +381,39 @@ export function GuestPassPage() {
           </Card>
         </div>
       </div>
+    </div>
+  )
+}
+
+function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-ink-muted">
+        {label} {required ? <span className="text-critical">*</span> : null}
+      </p>
+      {children}
+    </div>
+  )
+}
+
+function Chips({ options, value, onChange }: { options: string[]; value: string; onChange: (next: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="radiogroup">
+      {options.map((option) => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          aria-checked={value === option}
+          onClick={() => onChange(option)}
+          className={cn(
+            'rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+            value === option ? 'border-brand-600 bg-brand-600 text-white' : 'border-border bg-surface text-ink hover:bg-surface-muted',
+          )}
+        >
+          {option}
+        </button>
+      ))}
     </div>
   )
 }

@@ -5,14 +5,14 @@ import { ModeBadge } from '../appointment/ModeBadge'
 import { cn } from '../../utils/cn'
 import { formatRupees } from '../../utils/billing'
 import { relativeDayLabel } from '../../utils/dates'
-import { doctorStatusLabel, modesFor } from '../../utils/appointment'
+import { modesFor } from '../../utils/appointment'
 import { initialsOf } from '../../utils/format'
 import type { DoctorSuggestion } from '../../domain/selectors'
 
 /**
- * A department's doctors to choose from — fee, how they stand today, and
- * when they are next free, as information only: nothing is chosen until the
- * desk taps a doctor. A doctor with no open slot is shown, greyed, with why.
+ * A department's doctors to choose from — fee and when they are next free,
+ * as information only: nothing is chosen until the desk taps a doctor. A
+ * doctor with no open slot is shown, greyed, with why.
  */
 export function DoctorChoiceList({
   suggestions,
@@ -69,9 +69,6 @@ export function DoctorChoiceList({
                 </span>
                 {note?.(s)}
               </span>
-              <Badge status={s.status} className="shrink-0">
-                {doctorStatusLabel(s.status)} today
-              </Badge>
             </button>
           </li>
         )

@@ -4,10 +4,10 @@ import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { StepSection } from '../../components/flow/StepSection'
 import type { StepStatus } from '../../components/flow/StepSection'
-import { PaymentPanel } from '../../components/payment/PaymentPanel'
+import { BillAtCounter } from '../../components/payment/BillAtCounter'
+import { sendToBillingCounter } from '../../domain/billingCounter'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { MobileInput } from '../../components/ui/MobileInput'
-import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { WardIcon } from '../../components/ui/WardIcon'
@@ -17,12 +17,12 @@ import { getPatientById, getProviders } from '../../domain/selectors'
 import { getBedsForWard, getFirstFreeBed, getWardSummaries } from '../../domain/admissionSelectors'
 import { getCurrentAdmissionForPatient, getTodaysEncounterDoctor } from '../../domain/patientSelectors'
 import { admitPatient } from '../../domain/admissionActions'
-import { DAILY_BED_CHARGE, admissionBillItems, formatRupees, sumItems } from '../../utils/billing'
+import { DAILY_BED_CHARGE, admissionBillItems, formatRupees } from '../../utils/billing'
 import { isValidMobile } from '../../utils/phone'
 import { cn } from '../../utils/cn'
 import { ADMISSION_TYPES, ATTENDANT_RELATIONSHIPS, PAYMENT_TYPES, REFERRAL_SOURCES } from '../../types/admission'
 import type { Admission, AdmissionType, AttendantRelationship, PaymentType, ReferralSource, Ward } from '../../types/admission'
-import type { Payment, PaymentMethod } from '../../types/payment'
+import type { Payment } from '../../types/payment'
 import type { Patient } from '../../types/patient'
 import type { FlowProps } from '../registry'
 
@@ -94,7 +94,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
   const [details, setDetails] = useState<Details>(() => startingDetails(params.uhid ?? ''))
   const [detailsDone, setDetailsDone] = useState(false)
   const [editing, setEditing] = useState<'patient' | 'ward' | 'details' | null>(null)
-  const [done, setDone] = useState<{ admission: Admission; bill: Payment; method: PaymentMethod | null } | null>(null)
+  const [done, setDone] = useState<{ admission: Admission; bill: Payment } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const doctor = providers.find((p) => p.providerId === details.doctorId) ?? null
@@ -130,7 +130,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
     setDetails((d) => ({ ...d, ...patch }))
   }
 
-  function admit(method: PaymentMethod | null) {
+  function admit() {
     if (!patient || !bed) return
     setError(null)
     try {
@@ -150,14 +150,13 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
         paymentType: details.paymentType,
         insuranceProvider: details.insuranceProvider,
         policyNumber: details.policyNumber,
-        paymentMethod: method ?? undefined,
       })
-      setDone({ ...result, method })
+      // A self-pay patient pays the first day at the billing counter; an
+      // insured stay's bill goes to its payer at discharge.
+      if (result.admission.paymentType === 'Self Pay') sendToBillingCounter(result.bill.paymentId)
+      setDone(result)
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      // Thrown inside the payment panel it shows there; outside, show it here.
-      if (method) throw err
-      setError(message)
+      setError(err instanceof Error ? err.message : String(err))
     }
   }
 
@@ -166,21 +165,21 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
     : 'Choose the patient'
 
   if (done) {
-    const { admission, bill, method } = done
+    const { admission, bill } = done
     return (
       <FlowSheet title="Admit" subtitle={subtitle} icon={BedDouble} iconTone="info" onClose={onClose}>
-        <AckCard title="Patient Admitted" icon={BedDouble} onDone={onClose}>
+        <AckCard title="Patient Admitted" icon={BedDouble} onDone={onClose} durationMs={9000}>
           <p className="text-base font-semibold text-ink">
             {admission.wardLabel} · {admission.bedNumber}
           </p>
           <p>
             {admission.admissionNumber} · {admission.doctorName} · Day 1
           </p>
-          <p>
-            {method
-              ? `${formatRupees(bill.paidAmount)} paid · ${method}`
-              : `Billed to ${admission.insuranceProvider ?? admission.paymentType} — settled at discharge`}
-          </p>
+          {admission.paymentType === 'Self Pay' ? (
+            <BillAtCounter paymentId={bill.paymentId} className="mt-1 w-full" />
+          ) : (
+            <p>Billed to {admission.insuranceProvider ?? admission.paymentType} — settled at discharge</p>
+          )}
         </AckCard>
       </FlowSheet>
     )
@@ -396,7 +395,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
         </StepSection>
 
         {/* 4 · Bill — paid now by a self-pay patient, billed to the payer otherwise */}
-        <StepSection step={4} title={selfPay ? 'Bill & payment' : 'Bill'} status={detailsStepDone ? 'active' : 'locked'}>
+        <StepSection step={4} title="Bill" status={detailsStepDone ? 'active' : 'locked'}>
           <div className="flex flex-col gap-4">
             {error ? <Alert tone="critical">{error}</Alert> : null}
             <div className="divide-y divide-border-soft rounded-xl border border-border">
@@ -407,19 +406,10 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                 </div>
               ))}
             </div>
-            {selfPay ? (
-              <PaymentPanel
-                key={`${bedId}|${details.paymentType}`}
-                amount={sumItems(billItems)}
-                status={<Badge tone="warning">First day</Badge>}
-                onPay={(method) => admit(method)}
-              />
-            ) : (
-              <Button size="lg" onClick={() => admit(null)}>
-                <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
-                Admit — bill {details.insuranceProvider || details.paymentType}
-              </Button>
-            )}
+            <Button size="lg" onClick={admit}>
+              {selfPay ? <BedDouble className="h-4 w-4" strokeWidth={1.75} /> : <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />}
+              {selfPay ? 'Admit & send first-day bill to the billing counter' : `Admit — bill ${details.insuranceProvider || details.paymentType}`}
+            </Button>
             <p className="text-xs text-ink-muted">The bed charge accrues daily; the final bill is settled at discharge.</p>
           </div>
         </StepSection>

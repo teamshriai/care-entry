@@ -6,7 +6,6 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { useStoreValue } from '../../hooks/useStore'
 import { hasOpenLayer } from '../../hooks/useLayer'
-import { useFlow } from '../../flows/useFlow'
 import { findBillByNumber, getPatientFlags, getPatientSearchSuggestions, searchPatients } from '../../domain/selectors'
 import { getAdmittedPatients } from '../../domain/admissionSelectors'
 import type { PatientFlags } from '../../domain/selectors'
@@ -51,7 +50,6 @@ function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function PatientSearch(props: PatientSearchProps) {
   const navigate = useNavigate()
-  const { openFlow } = useFlow()
   const listId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -118,7 +116,7 @@ export function PatientSearch(props: PatientSearchProps) {
     setQuery('')
     setActive(0)
     if (option.kind === 'bill') {
-      openFlow('billing', { uhid: option.bill.patientId, bill: option.bill.paymentId })
+      navigate(`/payments/${option.bill.paymentId}`)
       return
     }
     if (props.mode === 'pick') props.onPick(option.patient)
@@ -239,9 +237,9 @@ export function PatientSearch(props: PatientSearchProps) {
       </div>
 
       {navigateMode ? (
-        <Button onClick={register} className="shrink-0" aria-label="Register Patient">
+        <Button onClick={register} className="shrink-0" aria-label="Create Patient">
           <UserPlus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-          <span className="hidden sm:inline">Register Patient</span>
+          <span className="hidden sm:inline">Create Patient</span>
         </Button>
       ) : null}
 
@@ -252,7 +250,7 @@ export function PatientSearch(props: PatientSearchProps) {
           </ul>
           {options.length === 0 ? (
             <p className="px-4 py-3 text-sm text-ink-muted">
-              No patient found{navigateMode ? ' — Register Patient adds a new one, with what you typed filled in.' : '.'}
+              No patient found{navigateMode ? ' — Create Patient adds a new one, with what you typed filled in.' : '.'}
             </p>
           ) : null}
         </div>
@@ -305,7 +303,7 @@ function PatientRow({
             title={flags.failed ? 'Payment failed' : 'Payment due'}
           >
             <IndianRupee className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-            <span className="sr-only">{flags.failed ? 'Payment failed, due' : 'Due'}</span>
+            <span className="sr-only">{flags.failed ? 'Payment failed,' : 'Payment pending,'}</span>
             {formatRupees(flags.due).replace('₹', '')}
           </span>
         ) : null}

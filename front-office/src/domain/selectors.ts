@@ -525,7 +525,7 @@ export function findPossibleDuplicatesFor(
 /** The one thing the desk does about an item — the dashboard turns it into
  *  a single button. */
 export type AttentionAction =
-  | { kind: 'collect'; patientId: string; paymentId: string }
+  | { kind: 'bill'; patientId: string; paymentId: string }
   | { kind: 'admit'; patientId: string }
   | { kind: 'return-pass'; passId: string }
   | { kind: 'open'; label: string; to: string }
@@ -544,14 +544,13 @@ const ATTENTION_ORDER: Record<NeedsAttentionItem['tone'], number> = { critical: 
 export function getNeedsAttention(state: AppState, now: number = Date.now()): NeedsAttentionItem[] {
   const items: NeedsAttentionItem[] = []
 
-  const dayMs = 24 * 60 * 60 * 1000
   for (const pass of state.guestPasses) {
-    if (!pass.returned && now - pass.issuedAt > dayMs) {
+    if (!pass.returned && now > pass.validUntil) {
       items.push({
         id: `na-pass-${pass.passId}`,
         tone: 'critical',
         title: 'Guest pass overdue',
-        detail: `${pass.passId} (${pass.patientName}, ${pass.ward}) has not been returned.`,
+        detail: `${pass.passId} · ${pass.holderName} (${pass.patientName ? `visiting ${pass.patientName}` : pass.relationship}, ${pass.ward}) has not been returned.`,
         action: { kind: 'return-pass', passId: pass.passId },
       })
     }
@@ -564,7 +563,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         tone: 'critical',
         title: 'Payment failed',
         detail: `${bill.patientName} · ${billNumberFor(bill)} · ${formatRupees(bill.balance)} still due — the last attempt failed.`,
-        action: { kind: 'collect', patientId: bill.patientId, paymentId: bill.paymentId },
+        action: { kind: 'bill', patientId: bill.patientId, paymentId: bill.paymentId },
       })
     }
   }

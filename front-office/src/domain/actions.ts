@@ -18,7 +18,7 @@ import {
   getBillsForAppointment,
   getConsultationBillItems,
 } from './selectors'
-import { slotToTimestamp, todayKey } from './time'
+import { dayStartTimestamp, slotToTimestamp, todayKey } from './time'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, formatMobile, isValidMobile } from '../utils/phone'
 import {
@@ -33,7 +33,7 @@ import {
   normalizeName,
   sexError,
 } from '../utils/validation'
-import { formatRupees } from '../utils/billing'
+import { REGISTRATION_FEE, formatRupees } from '../utils/billing'
 import { formatDateKey } from '../utils/dates'
 import { NO_SHOW_GRACE_MINUTES, appointmentStatusLabel, modesFor } from '../utils/appointment'
 import type { AppState } from '../types/store'
@@ -57,7 +57,6 @@ import type {
   CollectPaymentInput,
   CreatePaymentInput,
   Payment,
-  PaymentMethod,
   RecordFailedPaymentInput,
   RefundPaymentInput,
 } from '../types/payment'
@@ -67,6 +66,8 @@ const DEPARTMENT_PREFIX: Record<string, string> = {
   Cardiology: 'CAR',
   'General Medicine': 'MED',
   Orthopedics: 'ORT',
+  Neurosurgery: 'NSG',
+  'Emergency Medicine': 'EMG',
 }
 
 interface ActivityInput {
@@ -156,7 +157,7 @@ function assertAbhaFree(state: AppState, abhaId: string, exceptPatientId?: strin
   }
 }
 
-export function registerPatient(input: RegisterPatientInput): Patient {
+export function registerPatient(input: RegisterPatientInput): { patient: Patient; bill: Payment } {
   assertPatientFields(input)
   const { name, age, sex, mobile } = input
   const abhaId = input.abhaId?.trim() ? normalizeAbha(input.abhaId) : null
@@ -180,20 +181,20 @@ export function registerPatient(input: RegisterPatientInput): Patient {
     createdAt: Date.now(),
   }
 
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'New patient registered', meta: `${patient.name} · ${uhid}` },
-    ])
-    return {
-      ...current,
-      patients: [...current.patients, patient],
-      registrationLog: [...current.registrationLog, { patientId: uhid, registeredAt: Date.now() }],
-      activityLog,
-      nextIds: { ...current.nextIds, patient: seq + 1, activity: activitySeq },
-    }
-  })
-
-  return patient
+  const registered = logged(
+    {
+      ...state,
+      patients: [...state.patients, patient],
+      registrationLog: [...state.registrationLog, { patientId: uhid, registeredAt: patient.createdAt }],
+      nextIds: { ...state.nextIds, patient: seq + 1 },
+    },
+    [{ text: 'New patient registered', meta: `${patient.name} · ${uhid}` }],
+  )
+  // The one-time registration fee is billed as the record is made; the
+  // patient pays it at the billing counter.
+  const billed = applyNewBill(registered, { patientId: uhid, items: [REGISTRATION_FEE] }, patient.createdAt)
+  setState(billed.state)
+  return { patient, bill: billed.value }
 }
 
 // ------------------------------------------------------------ appointments
@@ -250,17 +251,17 @@ function applyConsultationBill(
   return applyNewBill(state, { patientId, items, appointmentId }, now)
 }
 
-/** Books a slot, raises its bill and takes the payment, saved together. The
- *  hospital has no pay-later: if any part fails nothing is saved, so an
- *  abandoned or failed payment leaves no booking behind. */
-export function bookAndPayAppointment({
+/** Books a slot and raises its bill, saved together. Care Entry takes no
+ *  money: the bill goes to the billing counter, and the booking stays
+ *  "payment pending" (its slot held) until the counter records the payment,
+ *  which confirms it. */
+export function bookAppointment({
   patientId,
   providerId,
   date,
   slot,
   reason,
   mode,
-  method,
 }: {
   patientId: string
   providerId: string
@@ -268,7 +269,6 @@ export function bookAndPayAppointment({
   slot: string
   reason?: string
   mode?: ConsultMode
-  method: PaymentMethod
 }): { appointment: Appointment; bill: Payment } {
   const state = getState()
   const now = Date.now()
@@ -285,10 +285,8 @@ export function bookAndPayAppointment({
     now,
   )
   const billed = applyConsultationBill(booked.state, { patientId, providerId, appointmentId: booked.value.appointmentId }, now)
-  // Fully paid → the collection confirms the booking it belongs to.
-  const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: billed.value.balance, method }, now)
-  setState(paid.state)
-  return { appointment: requireAppointment(paid.state, booked.value.appointmentId), bill: paid.value }
+  setState(billed.state)
+  return { appointment: booked.value, bill: billed.value }
 }
 
 // ------------------------------------------------- cancel, move, no-show
@@ -381,13 +379,11 @@ export interface RescheduleInput {
   mode: ConsultMode
   by: UnavailableParty
   note?: string
-  /** How the patient pays the difference, when they move to a dearer doctor. */
-  method?: PaymentMethod
 }
 
 /** Moves a booking to another time, or another doctor in the same
  *  department. The booking keeps its id and records the move. */
-export function rescheduleAppointment({ appointmentId, providerId, date, slot, mode, by, note = '', method }: RescheduleInput): {
+export function rescheduleAppointment({ appointmentId, providerId, date, slot, mode, by, note = '' }: RescheduleInput): {
   appointment: Appointment
   differenceBill: Payment | null
 } {
@@ -416,25 +412,24 @@ export function rescheduleAppointment({ appointmentId, providerId, date, slot, m
   // Only a patient's own move to a dearer doctor is charged; when the
   // doctor is the reason, the hospital absorbs the difference.
   const charge = difference > 0 && by === 'Patient' ? difference : 0
-  if (charge > 0 && !method) throw new DomainError('VALIDATION', 'Collect the fee difference to move the booking.')
-
   let next = state
   let differenceBill: Payment | null = null
-  if (charge > 0 && method) {
+  // The difference goes to the billing counter; the booking waits on it.
+  if (charge > 0) {
     const billed = applyNewBill(
       next,
       { patientId: appointment.patientId, items: [{ code: FEE_DIFFERENCE_CODE, description: `Fee difference — ${provider.name}`, amount: charge }], appointmentId },
       now,
     )
-    const paid = applyCollection(billed.state, { paymentId: billed.value.paymentId, amount: charge, method }, now)
-    next = paid.state
-    differenceBill = paid.value
+    next = billed.state
+    differenceBill = billed.value
   }
 
   const from = { providerId: appointment.providerId, date: appointment.date, slot: appointment.slot, mode: appointment.mode }
   const to = { providerId, date, slot, mode }
   const moved: Appointment = {
     ...appointment,
+    status: differenceBill ? 'Payment Pending' : appointment.status,
     providerId,
     date,
     slot,
@@ -484,9 +479,9 @@ export function rescheduleAppointment({ appointmentId, providerId, date, slot, m
 export function checkInAppointment(appointmentId: string): CheckInResult {
   const state = getState()
   const appointment = requireAppointment(state, appointmentId)
-  // No pay-later: only a paid (Confirmed) booking joins the queue.
+  // Only a booking paid at the billing counter (Confirmed) joins the queue.
   if (appointment.status === 'Scheduled' || appointment.status === 'Payment Pending') {
-    throw new DomainError('INVALID_TRANSITION', 'This booking is not paid yet — collect the payment first.')
+    throw new DomainError('INVALID_TRANSITION', 'Payment is pending at the billing counter — check in once it is received.')
   }
   if (appointment.status !== 'Confirmed') {
     throw new DomainError('INVALID_TRANSITION', `Cannot queue an appointment that is ${appointment.status}.`)
@@ -964,48 +959,89 @@ export function linkAbha(patientId: string, abhaId: string): void {
 
 // -------------------------------------------------------- front desk services
 
-export function issueGuestPass({ patientId, relationship }: IssueGuestPassInput): GuestPass {
+/** Prints a pass — for a patient's visitor, a visiting doctor, or staff and
+ *  service people without a hospital ID. Every pass names its holder, the
+ *  ID proof seen, and who confirmed the visit; nothing is printed unchecked. */
+export function issueGuestPass(input: IssueGuestPassInput): GuestPass {
   const state = getState()
-  const patient = state.patients.find((p) => p.patientId === patientId)
-  if (!patient) throw new DomainError('VALIDATION', 'Select a patient first.')
-  // A guest pass is for an admitted patient's companion, for the ward they are in.
-  const stay = state.admissions.find((a) => a.patientId === patientId && a.status === 'Admitted')
-  if (!stay?.wardLabel) throw new DomainError('VALIDATION', `${patient.name} is not admitted — guest passes are for inpatients.`)
-  const ward = stay.wardLabel
+  const now = Date.now()
+  const holderName = input.holderName?.trim() ?? ''
+  const nameProblem = nameError(holderName)
+  if (nameProblem) throw new DomainError('VALIDATION', `Visitor's name: ${nameProblem}`)
+  if (!isValidMobile(input.holderMobile)) throw new DomainError('VALIDATION', MOBILE_ERROR)
+  if (!input.idType?.trim() || !/^[A-Za-z0-9]{4}$/.test(input.idLast4?.trim() ?? '')) {
+    throw new DomainError('VALIDATION', 'Record the ID proof seen — its kind and last four characters.')
+  }
+  if (!input.purpose?.trim() && input.type !== 'Patient visitor') throw new DomainError('VALIDATION', 'Say why they are visiting.')
+  if (!input.confirmed) throw new DomainError('VALIDATION', 'Confirm the visit before printing the pass — nobody is let in unchecked.')
 
-  const openForPatient = state.guestPasses.filter((p) => p.patientId === patientId && !p.returned).length
-  if (openForPatient >= 1) {
-    throw new DomainError(
-      'PASS_LIMIT',
-      `${patient.name} already has an active guest pass. One guest per patient — return the existing pass first.`,
-    )
+  let patientId: string | null = null
+  let patientName: string | null = null
+  let hostName: string | null = null
+  let ward: string
+  let code: string
+  let verifiedWith = input.verifiedWith?.trim() ?? ''
+  const endOfDay = dayStartTimestamp(todayKey(new Date(now))) + 24 * 60 * 60 * 1000 - 1
+
+  if (input.type === 'Patient visitor') {
+    const patient = state.patients.find((p) => p.patientId === input.patientId)
+    if (!patient) throw new DomainError('VALIDATION', 'Select the patient they are visiting.')
+    const stay = state.admissions.find((a) => a.patientId === patient.patientId && a.status === 'Admitted')
+    if (!stay?.wardLabel) throw new DomainError('VALIDATION', `${patient.name} is not admitted — visitor passes are for inpatients.`)
+    if (state.guestPasses.some((p) => p.patientId === patient.patientId && !p.returned)) {
+      throw new DomainError('PASS_LIMIT', `${patient.name} already has a visitor pass out. One visitor at a time — return that pass first.`)
+    }
+    if (!input.relationship?.trim()) throw new DomainError('VALIDATION', 'Choose how they are related to the patient.')
+    if (!verifiedWith) throw new DomainError('VALIDATION', 'Name the patient or attendant who confirmed this visitor.')
+    patientId = patient.patientId
+    patientName = patient.name
+    ward = stay.wardLabel
+    code = ward.toUpperCase()
+  } else if (input.type === 'Visiting doctor') {
+    const host = state.providers.find((p) => p.providerId === input.hostProviderId)
+    if (!host || host.status !== 'Active') throw new DomainError('VALIDATION', 'Choose the hospital doctor they are visiting.')
+    hostName = host.name
+    ward = host.department
+    verifiedWith = host.name
+    code = 'VDR'
+  } else {
+    if (!input.area?.trim()) throw new DomainError('VALIDATION', 'Choose the department or area they need.')
+    if (!verifiedWith) throw new DomainError('VALIDATION', 'Name the staff member who authorised this visit.')
+    hostName = verifiedWith
+    ward = input.area.trim()
+    code = 'STF'
   }
 
   const seq = state.nextIds.pass
-  const passId = `GP/${ward.trim().toUpperCase()}/${String(1000 + seq).slice(1)}`
   const pass: GuestPass = {
-    passId,
+    passId: `GP/${code}/${String(1000 + seq).slice(1)}`,
+    type: input.type,
+    holderName: normalizeName(holderName),
+    holderMobile: formatMobile(input.holderMobile),
+    idProof: `${input.idType.trim()} ••${input.idLast4.trim().toUpperCase()}`,
     patientId,
-    patientName: patient.name,
-    ward: ward.trim(),
-    relationship: relationship?.trim() || 'Guest',
-    issuedAt: Date.now(),
+    patientName,
+    hostName,
+    ward,
+    relationship: input.type === 'Visiting doctor' ? 'Visiting doctor' : input.relationship.trim(),
+    purpose: input.purpose?.trim() || (input.type === 'Patient visitor' ? 'Visiting the patient' : ''),
+    verifiedWith,
+    issuedBy: input.issuedBy,
+    // A visitor's pass runs a day at a time; others end with the day.
+    validUntil: input.type === 'Patient visitor' ? now + 24 * 60 * 60 * 1000 : endOfDay,
+    issuedAt: now,
     returnedAt: null,
     returned: false,
   }
 
-  setState((current) => {
-    const { activityLog, activitySeq } = withActivity(current, [
-      { text: 'Guest pass issued', meta: `${passId} · ${patient.name}` },
-    ])
-    return {
-      ...current,
-      guestPasses: [...current.guestPasses, pass],
-      activityLog,
-      nextIds: { ...current.nextIds, pass: seq + 1, activity: activitySeq },
-    }
-  })
-
+  setState(
+    logged({ ...state, guestPasses: [...state.guestPasses, pass], nextIds: { ...state.nextIds, pass: seq + 1 } }, [
+      {
+        text: 'Guest pass printed',
+        meta: `${pass.passId} · ${pass.holderName} · ${patientName ? `visiting ${patientName}` : `for ${hostName}`} · confirmed with ${verifiedWith}`,
+      },
+    ]),
+  )
   return pass
 }
 
@@ -1345,7 +1381,7 @@ function applyCollection(state: AppState, { paymentId, amount, method }: Collect
     },
     [
       {
-        text: status === 'Paid' ? 'Payment collected' : 'Partial payment recorded',
+        text: status === 'Paid' ? 'Payment received at the billing counter' : 'Part payment received at the billing counter',
         meta:
           status === 'Paid'
             ? `${payment.patientName} · ${formatRupees(amount)} · ${method}`

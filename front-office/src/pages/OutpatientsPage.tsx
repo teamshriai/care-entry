@@ -114,10 +114,11 @@ export function OutpatientsPage() {
         const appointment = row.appointment!
         if (appointment.status !== 'Confirmed') {
           const bill = getBillsForAppointment(getState(), appointment.appointmentId)[0]
-          return bill && row.patient ? (
-            <Button size="sm" onClick={() => openFlow('billing', { uhid: row.patient!.uhid, bill: bill.paymentId })}>
+          // Paid at the billing counter; check-in opens once it is received.
+          return bill ? (
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${bill.paymentId}`)}>
               <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Collect
+              View bill
             </Button>
           ) : null
         }
@@ -200,7 +201,7 @@ export function OutpatientsPage() {
   const items: StatFilterItem<OutpatientFilter>[] = [
     { key: 'today', label: 'Today', value: counts.today, context: 'Booked for today', tone: 'info', icon: CalendarClock },
     { key: 'check-in', label: 'To check in', value: counts['check-in'], context: 'Booked, not here yet', tone: 'warning', icon: LogIn },
-    { key: 'waiting', label: 'Waiting', value: counts.waiting, context: 'Checked in', tone: 'purple', icon: UserCheck },
+    { key: 'waiting', label: 'Waiting for consultation', value: counts.waiting, context: 'Checked in', tone: 'purple', icon: UserCheck },
     { key: 'with-doctor', label: 'With doctor', value: counts['with-doctor'], context: 'Called or in the room', tone: 'teal', icon: DoorOpen },
     { key: 'done', label: 'Done today', value: counts.done, context: 'Seen or closed', tone: 'stable', icon: CheckCircle2 },
     { key: 'upcoming', label: 'Upcoming', value: counts.upcoming, context: 'Booked for later days', tone: 'indigo', icon: CalendarDays },
@@ -217,7 +218,7 @@ export function OutpatientsPage() {
         actions={
           <Button size="sm" onClick={() => openFlow('schedule')}>
             <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Schedule
+            Schedule Appointment
           </Button>
         }
       />

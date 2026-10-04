@@ -95,11 +95,11 @@ export function FrontOfficeHomePage() {
     const action = item.action
     if (!action) return null
     switch (action.kind) {
-      case 'collect':
+      case 'bill':
         return (
-          <Button size="sm" onClick={() => openFlow('billing', { uhid: action.patientId, bill: action.paymentId })}>
+          <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${action.paymentId}`)}>
             <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Collect
+            View bill
           </Button>
         )
       case 'admit':
@@ -145,10 +145,10 @@ export function FrontOfficeHomePage() {
             hue="orange"
             icon={UserCheck}
             value={queue.waiting.length}
-            label="Waiting"
+            label="Waiting for consultation"
             hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
             to="/patients/outpatients?filter=waiting"
-            title="Show who is waiting for a doctor"
+            title="Show who is waiting for consultation"
           />
           <StatCard
             hue="purple"
@@ -163,10 +163,10 @@ export function FrontOfficeHomePage() {
             hue="red"
             icon={IndianRupee}
             value={formatRupees(billing.dueAmount)}
-            label="Due"
+            label="Payment pending"
             hint={`${billing.dueCount} bills${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
             to="/billing?filter=due"
-            title="Show the bills still to collect"
+            title="Show the bills with payment pending at the billing counter"
           />
           <StatCard
             hue="teal"
@@ -186,7 +186,7 @@ export function FrontOfficeHomePage() {
               icon={Stethoscope}
               iconTone="indigo"
               title="Doctors now"
-              subtitle="From today's schedule, leave and break · Schedule books with that doctor"
+              subtitle="From today's schedule, leave and break · Schedule Appointment books with that doctor"
               action={
                 <Button size="sm" variant="ghost" onClick={() => navigate('/doctors')}>
                   View all
@@ -227,7 +227,7 @@ export function FrontOfficeHomePage() {
                 // doctor; then how the visit ended.
                 renderStatus={(appointment) =>
                   appointment.status === 'Confirmed' || (appointment.status === 'Checked-in' && appointment.token?.status === 'Waiting') ? (
-                    <CheckInToggle appointment={appointment} patientName={appointment.patient?.name} pressedLabel="Waiting" />
+                    <CheckInToggle appointment={appointment} patientName={appointment.patient?.name} pressedLabel="Waiting for consultation" />
                   ) : appointment.status === 'Checked-in' && (appointment.token?.status === 'Called' || appointment.token?.status === 'In consultation') ? (
                     <Badge tone="teal" className="px-2">
                       With doctor

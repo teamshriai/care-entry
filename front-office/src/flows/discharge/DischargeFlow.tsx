@@ -4,7 +4,6 @@ import { IdCard, LogOut, Printer } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { StepSection } from '../../components/flow/StepSection'
-import { PaymentPanel } from '../../components/payment/PaymentPanel'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
@@ -17,15 +16,15 @@ import { getActiveGuestPasses, getPatientById, getPaymentById } from '../../doma
 import { getAdmissionById, previewDischargeBill } from '../../domain/admissionSelectors'
 import { getCurrentAdmissionForPatient } from '../../domain/patientSelectors'
 import { dischargeAdmission, repriceAdmissionBill } from '../../domain/admissionActions'
-import { collectPayment, recordFailedPayment } from '../../domain/actions'
+import { sendToBillingCounter } from '../../domain/billingCounter'
 import { todayKey } from '../../domain/time'
-import { BILL_STATUS_TONE, billNumberFor, billServicesSummary, formatRupees } from '../../utils/billing'
+import { BILL_STATUS_LABEL, BILL_STATUS_TONE, billNumberFor, billServicesSummary, formatRupees } from '../../utils/billing'
 import { formatClock } from '../../utils/format'
 import { formatDateKey } from '../../utils/dates'
 import { cn } from '../../utils/cn'
 import { DISCHARGE_TYPES } from '../../types/admission'
 import type { Admission, DischargeType } from '../../types/admission'
-import type { Payment, PaymentMethod } from '../../types/payment'
+import type { Payment } from '../../types/payment'
 import type { Patient } from '../../types/patient'
 import type { FlowProps } from '../registry'
 
@@ -57,7 +56,7 @@ interface Discharged {
 
 /**
  * Discharge, over the page it was opened from: the stay, its final bill
- * re-priced to today, the payment until nothing is left (an insured stay is
+ * re-priced to today and sent to the billing counter until it is paid (an insured stay is
  * settled by the insurer), how the patient is leaving — then "Patient
  * Discharged" and the bed is free.
  */
@@ -91,18 +90,15 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
     setError(null)
   }
 
-  // The stay is re-priced to this moment before money is taken, so what is
-  // paid is the bill the patient leaves with.
-  function pay(method: PaymentMethod, amount: number) {
+  // The stay is re-priced to this moment, then the final bill goes to the
+  // billing counter (or the insurer) — Care Entry takes no money. Discharge
+  // opens once the counter records the payment.
+  const [sentBillId, setSentBillId] = useState<string | null>(null)
+  function sendFinalBill() {
     if (!admission) return
     const bill = repriceAdmissionBill(admission.admissionId, now)
-    collectPayment({ paymentId: bill.paymentId, amount, method })
-  }
-
-  function fail(method: PaymentMethod, amount: number, reason: string) {
-    if (!admission) return
-    const bill = repriceAdmissionBill(admission.admissionId, now)
-    recordFailedPayment({ paymentId: bill.paymentId, amount, method, reason })
+    sendToBillingCounter(bill.paymentId)
+    setSentBillId(bill.paymentId)
   }
 
   function discharge() {
@@ -192,7 +188,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
               step={2}
               title="Final bill"
               status={preview.canDischarge && !reviewingBill ? 'done' : 'active'}
-              summary={`${formatRupees(preview.total)} · paid in full`}
+              summary={`${formatRupees(preview.total)} · payment received`}
               onEdit={() => setReviewingBill(true)}
             >
               <div className="flex flex-col gap-4">
@@ -205,18 +201,24 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                 </div>
 
                 {preview.canDischarge ? (
-                  <p className="text-sm font-medium text-stable">Paid in full — nothing is due on this stay.</p>
+                  <p className="text-sm font-medium text-stable">Payment received — nothing is due on this stay.</p>
                 ) : (
-                  <PaymentPanel
-                    key={preview.balance}
-                    amount={preview.balance}
-                    status={<Badge tone={BILL_STATUS_TONE[preview.billStatus]}>{preview.billStatus}</Badge>}
-                    allowPartial
-                    methods={selfPay ? ['UPI', 'Card'] : ['Insurance/TPA', 'UPI', 'Card']}
-                    payer={selfPay ? undefined : (admission.insuranceProvider ?? admission.paymentType)}
-                    onPay={pay}
-                    onFail={fail}
-                  />
+                  <div className="flex flex-col gap-3 rounded-xl border border-warning-border bg-warning-bg/40 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-ink">{formatRupees(preview.balance)} still due</span>
+                      <Badge tone={BILL_STATUS_TONE[preview.billStatus]}>{BILL_STATUS_LABEL[preview.billStatus]}</Badge>
+                    </div>
+                    {sentBillId ? (
+                      <p className="text-sm text-ink-muted">
+                        Final bill sent to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)} — discharge opens once the
+                        payment is received.
+                      </p>
+                    ) : (
+                      <Button onClick={sendFinalBill}>
+                        Send final bill to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)}
+                      </Button>
+                    )}
+                  </div>
                 )}
 
                 {preview.otherDues.length > 0 ? (
@@ -232,7 +234,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                         </li>
                       ))}
                     </ul>
-                    <p className="mt-1.5 text-xs text-ink-subtle">They don’t hold up the discharge — collect them from Billing.</p>
+                    <p className="mt-1.5 text-xs text-ink-subtle">They don’t hold up the discharge — the patient pays them at the billing counter.</p>
                   </div>
                 ) : null}
               </div>
@@ -277,7 +279,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                 {error ? <Alert tone="critical">{error}</Alert> : null}
                 <Button size="lg" disabled={!preview.canDischarge} onClick={discharge}>
                   <LogOut className="h-4 w-4" strokeWidth={1.75} />
-                  {preview.canDischarge ? 'Discharge' : `Collect ${formatRupees(preview.balance)} to discharge`}
+                  {preview.canDischarge ? 'Discharge' : 'Discharge — once the final bill is paid'}
                 </Button>
               </div>
             </StepSection>

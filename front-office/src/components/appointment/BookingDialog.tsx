@@ -120,7 +120,7 @@ export function BookingDialog({
               {paid === 0
                 ? 'Nothing was paid on this booking.'
                 : by === 'Doctor'
-                  ? `${formatRupees(paid)} paid by ${methods} will be refunded in full (${billNumbers}).`
+                  ? `The billing counter refunds the ${formatRupees(paid)} paid by ${methods} in full (${billNumbers}).`
                   : `The patient cancelled — the ${formatRupees(paid)} fee is kept. Refunds are made only when the doctor is unavailable.`}
             </p>
           ) : null}

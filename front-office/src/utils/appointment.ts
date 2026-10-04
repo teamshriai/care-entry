@@ -11,8 +11,8 @@ import type { DoctorStatus, Provider } from '../types/doctor'
  * bill in the same step, so it reads the same as 'Payment Pending'.
  */
 const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
-  Scheduled: 'Pending payment',
-  'Payment Pending': 'Pending payment',
+  Scheduled: 'Payment pending',
+  'Payment Pending': 'Payment pending',
   Confirmed: 'Confirmed',
   'Checked-in': 'Checked in',
   Completed: 'Completed',

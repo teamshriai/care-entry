@@ -1,50 +1,35 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { IndianRupee, Receipt as ReceiptIcon, Undo2, XCircle } from 'lucide-react'
+import { Receipt as ReceiptIcon, Send } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Alert } from '../components/ui/Alert'
-import { Modal } from '../components/ui/Modal'
 import { EmptyState } from '../components/ui/EmptyState'
 import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { useFlow } from '../flows/useFlow'
-import { getBillLock, getPaymentById } from '../domain/selectors'
-import { cancelPayment, refundPayment } from '../domain/actions'
+import { getPaymentById } from '../domain/selectors'
+import { isAtBillingCounter, sendToBillingCounter } from '../domain/billingCounter'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
 import { billNumberFor, formatRupees, isBillDue } from '../utils/billing'
-import type { AppState } from '../types/store'
-
-/** Why this bill can't be refunded or cancelled on its own, if it can't. */
-function billLockOf(state: AppState, paymentId: string): string | null {
-  const payment = getPaymentById(state, paymentId)
-  return payment ? getBillLock(state, payment) : null
-}
 
 function timestampLabel(ts: number): string {
   return `${formatDateKey(todayKey(new Date(ts)))} · ${formatClock(ts)}`
 }
 
-/** One bill's full picture: its items, every collection and failed attempt
- *  against it, and what can happen next — collect, refund or cancel. */
+/** One bill's full picture, to view: its items, every payment the billing
+ *  counter recorded against it, and its status. Care Entry takes no money —
+ *  a bill with payment pending can only be sent to the billing counter. */
 export function PaymentDetailPage() {
   const { paymentId } = useParams<{ paymentId: string }>()
   const navigate = useNavigate()
   const { notify } = useToast()
-  const { openFlow } = useFlow()
 
   const payment = useStoreValue(getPaymentById, paymentId ?? '')
-  const lock = useStoreValue(billLockOf, paymentId ?? '')
 
-  const [cancelling, setCancelling] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
-  const [refunding, setRefunding] = useState(false)
-  const [refundReason, setRefundReason] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState(false)
 
   if (!payment) {
     return (
@@ -66,42 +51,16 @@ export function PaymentDetailPage() {
     )
   }
 
-  function handleCancel(event: React.FormEvent) {
-    event.preventDefault()
+  const due = isBillDue(payment)
+  const atCounter = sent || isAtBillingCounter(payment.paymentId)
+
+  function send() {
     if (!payment) return
-    setError(null)
-    try {
-      cancelPayment({ paymentId: payment.paymentId, reason: cancelReason })
-      notify('Bill cancelled', { detail: billNumberFor(payment) })
-      setCancelling(false)
-      setCancelReason('')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-      setCancelling(false)
-    }
+    sendToBillingCounter(payment.paymentId)
+    setSent(true)
+    notify('Sent to the billing counter', { detail: `${billNumberFor(payment)} · ${formatRupees(payment.balance)}` })
   }
 
-  function handleRefund(event: React.FormEvent) {
-    event.preventDefault()
-    if (!payment) return
-    setError(null)
-    try {
-      refundPayment({ paymentId: payment.paymentId, reason: refundReason })
-      notify('Payment refunded', { detail: `${billNumberFor(payment)} · ${formatRupees(payment.paidAmount)}` })
-      setRefunding(false)
-      setRefundReason('')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      setError(message)
-      setRefunding(false)
-    }
-  }
-
-  const canCollect = isBillDue(payment)
-  const canCancel = !lock && payment.status === 'Pending' && payment.paidAmount === 0
-  const canRefund = !lock && (payment.status === 'Paid' || payment.status === 'Partially Paid')
-  const collectedBy = [...new Set(payment.transactions.map((t) => t.method))].join(' + ')
   const linkedTo = payment.admissionId
     ? 'Inpatient admission'
     : payment.appointmentId
@@ -134,7 +93,6 @@ export function PaymentDetailPage() {
       />
 
       <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
-        {error ? <Alert tone="critical">{error}</Alert> : null}
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_340px]">
           <Card accentTone="stable" className="min-w-0">
@@ -152,9 +110,9 @@ export function PaymentDetailPage() {
               </div>
             </div>
 
-            <CardHeader title="Collections" subtitle="Every payment and attempt against this bill" />
+            <CardHeader title="Payments at the billing counter" subtitle="Every payment and attempt recorded against this bill" />
             {payment.transactions.length === 0 && payment.failedAttempts.length === 0 ? (
-              <EmptyState title="Nothing collected yet" description="Collections appear here as they are taken." />
+              <EmptyState title="No payment recorded yet" description="Payments taken at the billing counter appear here." />
             ) : (
               <div className="divide-y divide-border-soft">
                 {[
@@ -221,29 +179,23 @@ export function PaymentDetailPage() {
                   <Row label="Raised" value={timestampLabel(payment.createdAt)} />
                 </dl>
                 <div className="flex flex-col gap-2 border-t border-border-soft pt-3">
-                  {canCollect ? (
-                    <Button onClick={() => openFlow('billing', { uhid: payment.patientId, bill: payment.paymentId })}>
-                      <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Collect {formatRupees(payment.balance)}
-                    </Button>
-                  ) : null}
-                  {canRefund ? (
-                    <Button variant="secondary" onClick={() => setRefunding(true)}>
-                      <Undo2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Refund
-                    </Button>
-                  ) : null}
-                  {canCancel ? (
-                    <Button variant="ghost" onClick={() => setCancelling(true)}>
-                      <XCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
-                      Cancel bill
-                    </Button>
-                  ) : null}
-                  {lock && payment.status !== 'Cancelled' && payment.status !== 'Refunded' ? (
-                    <p className="text-xs text-ink-muted">{lock}</p>
-                  ) : !canCollect && !canRefund && !canCancel ? (
-                    <p className="text-xs text-ink-subtle">Nothing further can be done on this bill.</p>
-                  ) : null}
+                  {due ? (
+                    <>
+                      <p className="text-sm text-ink-muted">
+                        {atCounter ? 'With the billing counter — the status updates when the payment is received.' : 'The patient pays this at the billing counter.'}
+                      </p>
+                      {atCounter ? null : (
+                        <Button variant="secondary" onClick={send}>
+                          <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          Send to billing counter
+                        </Button>
+                      )}
+                    </>
+                  ) : payment.status === 'Paid' || payment.status === 'Partially Paid' ? (
+                    <p className="text-sm font-medium text-stable">Payment received at the billing counter.</p>
+                  ) : (
+                    <p className="text-xs text-ink-subtle">This bill is {payment.status.toLowerCase()}.</p>
+                  )}
                 </div>
               </CardBody>
             </Card>
@@ -251,55 +203,6 @@ export function PaymentDetailPage() {
         </div>
       </div>
 
-      <Modal
-        open={cancelling}
-        onClose={() => setCancelling(false)}
-        title="Cancel this bill"
-        description="Nothing has been collected against it — this cannot be undone."
-      >
-        <form onSubmit={handleCancel} className="flex flex-col gap-3">
-          <label className="text-xs font-medium text-ink-muted" htmlFor="cancel-reason">
-            Reason
-          </label>
-          <input
-            id="cancel-reason"
-            value={cancelReason}
-            onChange={(event) => setCancelReason(event.target.value)}
-            placeholder="e.g. Patient left without registering"
-            className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
-          />
-          <div className="flex justify-end pt-2">
-            <Button type="submit" variant="danger" disabled={!cancelReason.trim()}>
-              Cancel bill
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={refunding}
-        onClose={() => setRefunding(false)}
-        title="Refund this payment"
-        description={`The full ${formatRupees(payment.paidAmount)} collected goes back by ${collectedBy || 'the method it came in'}.`}
-      >
-        <form onSubmit={handleRefund} className="flex flex-col gap-3">
-          <label className="text-xs font-medium text-ink-muted" htmlFor="refund-reason">
-            Reason
-          </label>
-          <input
-            id="refund-reason"
-            value={refundReason}
-            onChange={(event) => setRefundReason(event.target.value)}
-            placeholder="e.g. Charged twice for the same service"
-            className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
-          />
-          <div className="flex justify-end pt-2">
-            <Button type="submit" variant="danger" disabled={!refundReason.trim()}>
-              Refund {formatRupees(payment.paidAmount)}
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   )
 }

@@ -1,17 +1,15 @@
 import { useState } from 'react'
 import type { ElementType } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Bone, Brain, Building2, CalendarCheck2, CalendarPlus, HeartPulse, Printer, Stethoscope, Video } from 'lucide-react'
+import { Bone, Brain, Building2, CalendarCheck2, CalendarPlus, HeartPulse, Siren, Stethoscope, Video } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { StepSection } from '../../components/flow/StepSection'
 import type { StepStatus } from '../../components/flow/StepSection'
-import { PaymentPanel } from '../../components/payment/PaymentPanel'
+import { BillAtCounter } from '../../components/payment/BillAtCounter'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { SlotBoard } from '../../components/clinician/SlotBoard'
 import { DateStrip } from '../../components/clinician/DateStrip'
 import { DoctorChoiceList } from '../../components/clinician/DoctorChoiceList'
-import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { useStoreValue } from '../../hooks/useStore'
@@ -29,8 +27,9 @@ import {
   getSlotBoard,
   getToday,
 } from '../../domain/selectors'
-import { bookAndPayAppointment } from '../../domain/actions'
-import { billNumberFor, formatRupees, sumItems } from '../../utils/billing'
+import { bookAppointment } from '../../domain/actions'
+import { sendToBillingCounter } from '../../domain/billingCounter'
+import { formatRupees, sumItems } from '../../utils/billing'
 import { dayWithDate, relativeDayLabel } from '../../utils/dates'
 import { modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
@@ -38,7 +37,7 @@ import type { FlowProps } from '../registry'
 import type { Patient } from '../../types/patient'
 import type { ConsultMode } from '../../types/appointment'
 import type { AppState } from '../../types/store'
-import type { Payment, PaymentMethod } from '../../types/payment'
+import type { Payment } from '../../types/payment'
 
 type StepKey = 'patient' | 'department' | 'doctor' | 'time'
 
@@ -47,6 +46,8 @@ const DEPARTMENT_ICON: Record<string, ElementType> = {
   Cardiology: HeartPulse,
   'General Medicine': Stethoscope,
   Orthopedics: Bone,
+  Neurosurgery: Brain,
+  'Emergency Medicine': Siren,
 }
 
 /** What the acknowledgement shows once the payment has gone through. */
@@ -57,7 +58,6 @@ interface Done {
   date: string
   slot: string
   mode: ConsultMode
-  method: PaymentMethod
   bill: Payment
 }
 
@@ -104,7 +104,6 @@ function startFrom(params: FlowProps['params'], now: number): Start {
 }
 
 function AppointmentFlow({ params, onClose }: FlowProps) {
-  const navigate = useNavigate()
   const now = useNow(15000)
   const today = useStoreValue(getToday)
 
@@ -187,22 +186,22 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
     setEditing(null)
   }
 
-  // The booking is saved only once the payment has gone through — there is
-  // no pay-later, so a failed or abandoned payment leaves nothing.
-  function pay(method: PaymentMethod) {
+  // Booking raises the bill and sends it to the billing counter — Care Entry
+  // takes no money. The booking is confirmed once the counter records it.
+  function book() {
     if (!patient || !provider) return
     setError(null)
     try {
       if (!date || !slot) return
-      const result = bookAndPayAppointment({
+      const result = bookAppointment({
         patientId: patient.patientId,
         providerId: provider.providerId,
         date,
         slot,
         mode: consultMode,
         reason: reason.trim() || undefined,
-        method,
       })
+      sendToBillingCounter(result.bill.paymentId)
       setDone({
         doctorName: provider.name,
         room: provider.room,
@@ -210,7 +209,6 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         date,
         slot,
         mode: consultMode,
-        method,
         bill: result.bill,
       })
     } catch (err) {
@@ -232,22 +230,8 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   if (done) {
     const teleconsult = done.mode === 'Teleconsult'
     return (
-      <FlowSheet title="Schedule" subtitle={subtitle} icon={CalendarPlus} onClose={onClose}>
-        <AckCard
-          title="Appointment Confirmed"
-          icon={CalendarCheck2}
-          onDone={onClose}
-          action={
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/payments/${done.bill.paymentId}/receipt`, { replace: true, state: { autoPrint: true } })}
-            >
-              <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Print receipt
-            </Button>
-          }
-        >
+      <FlowSheet title="Schedule Appointment" subtitle={subtitle} icon={CalendarPlus} onClose={onClose}>
+        <AckCard title="Appointment Booked" icon={CalendarCheck2} onDone={onClose} durationMs={9000}>
           <p className="text-base font-semibold text-ink">{done.doctorName}</p>
           <p>
             {dayWithDate(done.date, today)} · {done.slot}
@@ -256,9 +240,8 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
             {teleconsult ? <Video className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" /> : <Building2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />}
             {teleconsult ? 'Teleconsult — the patient joins by video' : `In person${done.room ? ` · ${done.room}` : ''}`}
           </p>
-          <p>
-            {done.appointmentId.toUpperCase()} · {formatRupees(done.bill.paidAmount)} paid · {done.method} · {billNumberFor(done.bill)}
-          </p>
+          <p>{done.appointmentId.toUpperCase()} · confirmed once the payment is received</p>
+          <BillAtCounter paymentId={done.bill.paymentId} className="mt-1 w-full" />
         </AckCard>
       </FlowSheet>
     )
@@ -269,7 +252,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   const timeSummary = date && slot ? `${relativeDayLabel(date, today)} ${slot}${consultMode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined
 
   return (
-    <FlowSheet title="Schedule" subtitle={subtitle} icon={CalendarPlus} onClose={onClose}>
+    <FlowSheet title="Schedule Appointment" subtitle={subtitle} icon={CalendarPlus} onClose={onClose}>
       <div className="flex flex-col gap-3">
         {/* 1 · Patient */}
         <StepSection
@@ -375,7 +358,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         </StepSection>
 
         {/* 5 · Confirm and pay — saved when the payment goes through */}
-        <StepSection step={5} title="Confirm & pay" status={ready ? 'active' : 'locked'}>
+        <StepSection step={5} title="Confirm & send bill" status={ready ? 'active' : 'locked'}>
           <div className="flex flex-col gap-4">
             {error ? <Alert tone="critical">{error}</Alert> : null}
             {patient && provider ? (
@@ -414,12 +397,15 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
                 </div>
               ))}
             </div>
-            <PaymentPanel
-              key={`${providerId}|${date}|${slot}|${consultMode}|${total}`}
-              amount={total}
-              status={<Badge tone="warning">Pending</Badge>}
-              onPay={pay}
-            />
+            <div className="flex items-baseline justify-between px-1 text-sm">
+              <span className="text-ink-muted">Bill total</span>
+              <span className="text-lg font-semibold tabular-nums text-ink">{formatRupees(total)}</span>
+            </div>
+            <Button size="lg" onClick={book}>
+              <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} />
+              Book & send bill to the billing counter
+            </Button>
+            <p className="text-xs text-ink-muted">The patient pays at the billing counter; the booking is confirmed once the payment is received.</p>
           </div>
         </StepSection>
       </div>

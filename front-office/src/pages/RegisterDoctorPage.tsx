@@ -173,7 +173,7 @@ export function RegisterDoctorPage() {
                 </Button>
                 {bookable ? (
                   <Button variant="secondary" onClick={() => openFlow('schedule', { doctor: created.providerId })}>
-                    Schedule
+                    Schedule Appointment
                   </Button>
                 ) : null}
                 <Button
