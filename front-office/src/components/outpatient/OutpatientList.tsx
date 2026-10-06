@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { Video } from 'lucide-react'
 import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
 import { AppointmentIllustration } from '../ui/illustrations/AppointmentIllustration'
@@ -12,7 +11,6 @@ import type { Tone } from '../../utils/tone'
 
 /** What the row's status reads as, and the time beside it. */
 function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string | null } {
-  const tele = row.mode === 'Teleconsult'
   const token = row.token
   switch (row.stage) {
     case 'upcoming':
@@ -20,7 +18,7 @@ function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string
     case 'to-check-in':
       if (row.appointment && row.appointment.status !== 'Confirmed') return { label: 'Payment pending', tone: 'warning', note: null }
       return {
-        label: tele ? 'To join' : 'To check in',
+        label: 'To check in',
         tone: row.lateMinutes ? 'warning' : 'neutral',
         note: row.lateMinutes ? `${row.lateMinutes} min late` : null,
       }
@@ -33,7 +31,7 @@ function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string
     case 'called':
       return { label: 'Called', tone: 'info', note: token?.calledMinutes != null ? `${token.calledMinutes} min ago` : null }
     case 'in-room':
-      return { label: tele ? 'On call' : 'In room', tone: 'stable', note: token?.consultingMinutes != null ? `${token.consultingMinutes} min` : null }
+      return { label: 'In room', tone: 'stable', note: token?.consultingMinutes != null ? `${token.consultingMinutes} min` : null }
     case 'done': {
       const word = token?.status === 'No-show' ? 'No-show' : token ? 'Completed' : row.appointment ? appointmentStatusLabel(row.appointment.status) : 'Completed'
       return { label: word, tone: word === 'Completed' ? 'stable' : word === 'Cancelled' || word === 'No-show' ? 'neutral' : 'info', note: null }
@@ -48,7 +46,7 @@ function ordinal(n: number): string {
 
 /**
  * Outpatients, one row each — booked time or walk-in token, the patient,
- * the doctor and where (room, or video for a teleconsult), the stage, and
+ * the doctor and where (room), the stage, and
  * that stage's actions. Rows wrap on a phone rather than scroll sideways.
  */
 export function OutpatientList({
@@ -74,7 +72,6 @@ export function OutpatientList({
     <ul className="divide-y divide-border-soft">
       {rows.map((row) => {
         const status = statusOf(row)
-        const tele = row.mode === 'Teleconsult'
         return (
           <li key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-surface-2 sm:px-5">
             <div className="w-24 shrink-0">
@@ -100,23 +97,17 @@ export function OutpatientList({
               </p>
               <p className="truncate text-xs text-ink-muted">
                 {row.provider?.name ?? '—'} ·{' '}
-                {tele ? (
-                  <span className="font-medium text-purple">
-                    <Video className="-mt-0.5 inline h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" /> Teleconsult
-                  </span>
-                ) : (
-                  (row.provider?.room ?? 'In person')
-                )}{' '}
+                {row.provider?.room ?? 'In person'}{' '}
                 · {row.patient?.uhid}
               </p>
             </div>
-            <div className="flex shrink-0 flex-col items-start gap-0.5">
+            <div className="flex shrink-0 flex-col items-start gap-0.5 sm:w-56">
               <Badge tone={status.tone}>{status.label}</Badge>
               {status.note ? (
                 <span className={row.lateMinutes ? 'text-2xs font-medium text-warning' : 'text-2xs tabular-nums text-ink-muted'}>{status.note}</span>
               ) : null}
             </div>
-            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">{renderActions(row)}</div>
+            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 sm:w-[21rem]">{renderActions(row)}</div>
           </li>
         )
       })}

@@ -10,10 +10,8 @@ import {
   IndianRupee,
   LogIn,
   MoreHorizontal,
-  PhoneCall,
   UserCheck,
   UserX,
-  Video,
   X,
 } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -34,11 +32,10 @@ import { getState } from '../domain/store'
 import { getBillsForAppointment, getProviderById } from '../domain/selectors'
 import { OUTPATIENT_FILTERS, getOutpatients } from '../domain/outpatientSelectors'
 import type { OutpatientFilter, OutpatientRow } from '../domain/outpatientSelectors'
-import { callToken, completeConsultation, markNoShow, recallToken, startConsultation } from '../domain/actions'
+import { markNoShow } from '../domain/actions'
 import { CheckInToggle } from '../components/appointment/CheckInToggle'
 import { todayKey } from '../domain/time'
 import { formatClock } from '../utils/format'
-import { cn } from '../utils/cn'
 
 function readFilter(value: string | null): OutpatientFilter {
   return OUTPATIENT_FILTERS.includes(value as OutpatientFilter) ? (value as OutpatientFilter) : 'today'
@@ -56,7 +53,7 @@ const EMPTY: Record<OutpatientFilter, { title: string; description: string }> = 
 /**
  * Patients › Outpatients — from booking to the doctor's room: today's bookings
  * at their stage, and the bookings ahead. Each figure is also
- * the filter for the list under it; Teleconsult narrows every figure.
+ * the filter for the list under it.
  *
  * Call / In room / Complete are the doctor's room's steps — they live here
  * because the desk has to see them; the desk's own step is Check in.
@@ -73,11 +70,10 @@ export function OutpatientsPage() {
 
   const query = new URLSearchParams(location.search)
   const filter = readFilter(query.get('filter'))
-  const teleconsultOnly = query.get('teleconsult') === '1'
   const providerId = query.get('provider') ?? ''
   const provider = useStoreValue(getProviderById, providerId)
   const today = todayKey(new Date(now))
-  const { rows, counts, teleconsults } = useStoreValue(getOutpatients, now, filter, teleconsultOnly, providerId)
+  const { rows, counts } = useStoreValue(getOutpatients, now, filter, false, providerId)
 
   // Filters are views of this page, not places — they don't fill history.
   function setParam(key: string, value: string | null) {
@@ -101,7 +97,6 @@ export function OutpatientsPage() {
 
   function actionsFor(row: OutpatientRow) {
     const name = row.patient?.name
-    const tele = row.mode === 'Teleconsult'
     const admit = row.patient ? (
       <Button size="sm" variant="secondary" onClick={() => openFlow('admit', { uhid: row.patient!.uhid })}>
         <BedDouble className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -115,15 +110,21 @@ export function OutpatientsPage() {
         if (appointment.status !== 'Confirmed') {
           const bill = getBillsForAppointment(getState(), appointment.appointmentId)[0]
           // Paid at the billing counter; check-in opens once it is received.
-          return bill ? (
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${bill.paymentId}`)}>
-              <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-              View bill
-            </Button>
-          ) : null
+          return (
+            <>
+              {admit}
+              {bill ? (
+                <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${bill.paymentId}`)}>
+                  <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
+                  View bill
+                </Button>
+              ) : null}
+            </>
+          )
         }
         return (
           <>
+            {admit}
             {row.canMarkNoShow ? (
               <Button size="sm" variant="secondary" onClick={() => run(() => markNoShow(appointment.appointmentId), 'Marked as no-show', `${name} · fee kept`)}>
                 <UserX className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -146,40 +147,15 @@ export function OutpatientsPage() {
       case 'waiting':
         return token ? (
           <>
+            {admit}
             {/* A mistaken check-in can be taken back until the patient is called. */}
             {row.appointment ? <CheckInToggle appointment={row.appointment} patientName={name} /> : null}
-            <Button size="sm" onClick={() => run(() => callToken(token.tokenId), 'Patient called', `${token.tokenNumber} · ${name}`)}>
-              <PhoneCall className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Call
-            </Button>
           </>
         ) : null
       case 'called':
-        return token ? (
-          <>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => run(() => recallToken(token.tokenId), token.recalled ? 'Marked as no-show' : 'Called again', token.tokenNumber)}
-            >
-              {token.recalled ? 'Mark no-show' : 'Call again'}
-            </Button>
-            <Button size="sm" onClick={() => run(() => startConsultation(token.tokenId), tele ? 'On call' : 'In room', token.tokenNumber)}>
-              <DoorOpen className="h-3.5 w-3.5" strokeWidth={1.75} />
-              {tele ? 'On call' : 'In room'}
-            </Button>
-          </>
-        ) : null
+        return admit
       case 'in-room':
-        return token ? (
-          <>
-            {admit}
-            <Button size="sm" onClick={() => run(() => completeConsultation(token.tokenId), 'Visit completed', token.tokenNumber)}>
-              <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.75} />
-              Complete
-            </Button>
-          </>
-        ) : null
+        return token ? <>{admit}</> : null
       case 'done':
         // Admission is usually advised in the doctor's room.
         return token?.status === 'Completed' || row.appointment?.status === 'Completed' ? admit : null
@@ -233,19 +209,6 @@ export function OutpatientsPage() {
         />
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            aria-pressed={teleconsultOnly}
-            onClick={() => setParam('teleconsult', teleconsultOnly ? null : '1')}
-            className={cn(
-              'inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors',
-              teleconsultOnly ? 'border-purple-border bg-purple-bg text-purple' : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2 hover:text-ink',
-            )}
-          >
-            <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-            Teleconsult only
-            <span className="tabular-nums">{teleconsults}</span>
-          </button>
           {provider ? (
             <span className="inline-flex h-9 items-center gap-1 rounded-full border border-primary-600 bg-primary-50 pl-3 pr-1 text-xs font-semibold text-primary-text">
               {provider.name}
@@ -269,7 +232,7 @@ export function OutpatientsPage() {
             today={today}
             onOpenPatient={(patientId) => navigate(`/patients/${patientId}`)}
             renderActions={actionsFor}
-            emptyTitle={teleconsultOnly ? 'No teleconsults here' : EMPTY[filter].title}
+            emptyTitle={EMPTY[filter].title}
             emptyDescription={EMPTY[filter].description}
           />
         </Card>
