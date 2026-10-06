@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IdCard, LogOut, Printer } from 'lucide-react'
+import { IdCard, LogOut, Pencil, Printer } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
-import { StepSection } from '../../components/flow/StepSection'
+import { Quadrant, Waiting } from '../../components/flow/Quadrant'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { Alert } from '../../components/ui/Alert'
 import { Badge } from '../../components/ui/Badge'
@@ -55,10 +55,12 @@ interface Discharged {
 }
 
 /**
- * Discharge, over the page it was opened from: the stay, its final bill
- * re-priced to today and sent to the billing counter until it is paid (an insured stay is
- * settled by the insurer), how the patient is leaving — then "Patient
- * Discharged" and the bed is free.
+ * Discharge, over the page it was opened from, laid out like Schedule
+ * Appointment: one full-screen page — the patient (and their stay) top-left,
+ * the final bill top-right, how the patient is leaving along the bottom. The
+ * bill is re-priced to today and sent to the billing counter until it is paid
+ * (an insured stay is settled by the insurer); then "Patient Discharged" and
+ * the bed is free.
  */
 export function DischargeFlow({ params, onClose }: FlowProps) {
   const navigate = useNavigate()
@@ -74,17 +76,15 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
 
   const [dischargeType, setDischargeType] = useState<DischargeType>('Normal Discharge')
   const [remarks, setRemarks] = useState('')
-  const [reviewingBill, setReviewingBill] = useState(false)
   const [done, setDone] = useState<Discharged | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const patientDone = Boolean(patient) && !picking
+  const showPatientSearch = !patient || picking
   const selfPay = admission?.paymentType === 'Self Pay'
 
   function choosePatient(next: Patient) {
     setPatientId(next.patientId)
     setPicking(false)
-    setReviewingBill(false)
     setDischargeType('Normal Discharge')
     setRemarks('')
     setError(null)
@@ -120,7 +120,10 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
   if (done) {
     const { admission: left, bill, days, passIds } = done
     return (
-      <FlowSheet title="Discharge" subtitle={subtitle} icon={LogOut} iconTone="info" onClose={onClose}>
+      <FlowSheet title="Discharge" subtitle={subtitle} icon={LogOut} iconTone="info" onClose={onClose} size="full">
+        {/* Full screen like the discharge page itself, with the confirmation centred. */}
+        <div className="flex min-h-full items-center justify-center py-6">
+          <div className="w-full max-w-xl rounded-2xl border border-border bg-surface-1 px-6 shadow-card">
         <AckCard
           title="Patient Discharged"
           icon={LogOut}
@@ -147,129 +150,163 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
           {bill ? <p>Final bill {formatRupees(bill.totalAmount)} · settled</p> : null}
           {passIds.length > 0 ? <p>Guest pass {passIds.join(', ')} returned</p> : null}
         </AckCard>
+          </div>
+        </div>
       </FlowSheet>
     )
   }
 
+  const canDischarge = Boolean(admission && preview?.canDischarge)
+
   return (
-    <FlowSheet title="Discharge" subtitle={subtitle} icon={LogOut} iconTone="info" onClose={onClose}>
-      <div className="flex flex-col gap-3">
-        {/* 1 · Patient */}
-        <StepSection
-          step={1}
-          title="Patient"
-          status={patientDone ? 'done' : 'active'}
-          summary={patient ? `${patient.name} · ${patient.uhid}` : undefined}
-          onEdit={() => setPicking(true)}
-        >
-          <PatientSearch
-            mode="pick"
-            scope="inpatients"
-            onPick={choosePatient}
-            autoFocus
-            placeholder="Search an admitted patient by name, mobile or UHID"
-          />
-        </StepSection>
-
-        {patientDone && !admission ? (
-          <Alert tone="warning">
-            {current
-              ? `${patient?.name}’s admission is still waiting for a bed — there is nothing to discharge.`
-              : `${patient?.name} is not admitted — there is nothing to discharge.`}
-          </Alert>
-        ) : null}
-
-        {patientDone && admission && preview ? (
-          <>
-            <StaySummary admission={admission} days={preview.days} />
-
-            {/* 2 · Final bill — paid down to nothing before the patient leaves */}
-            <StepSection
-              step={2}
-              title="Final bill"
-              status={preview.canDischarge && !reviewingBill ? 'done' : 'active'}
-              summary={`${formatRupees(preview.total)} · payment received`}
-              onEdit={() => setReviewingBill(true)}
-            >
-              <div className="flex flex-col gap-4">
-                <div className="divide-y divide-border-soft rounded-xl border border-border">
-                  {preview.items.map((item) => (
-                    <BillLine key={item.code} label={item.description} value={formatRupees(item.amount)} />
-                  ))}
-                  <BillLine label="Total" value={formatRupees(preview.total)} strong />
-                  {preview.paid > 0 ? <BillLine label="Paid so far" value={`− ${formatRupees(preview.paid)}`} /> : null}
-                </div>
-
-                {preview.canDischarge ? (
-                  <p className="text-sm font-medium text-stable">Payment received — nothing is due on this stay.</p>
-                ) : (
-                  <div className="flex flex-col gap-3 rounded-xl border border-warning-border bg-warning-bg/40 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-ink">{formatRupees(preview.balance)} still due</span>
-                      <Badge tone={BILL_STATUS_TONE[preview.billStatus]}>{BILL_STATUS_LABEL[preview.billStatus]}</Badge>
-                    </div>
-                    {sentBillId ? (
-                      <p className="text-sm text-ink-muted">
-                        Final bill sent to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)} — discharge opens once the
-                        payment is received.
-                      </p>
-                    ) : (
-                      <Button onClick={sendFinalBill}>
-                        Send final bill to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)}
-                      </Button>
-                    )}
-                  </div>
-                )}
-
-                {preview.otherDues.length > 0 ? (
-                  <div className="rounded-xl bg-surface-2 px-4 py-3">
-                    <p className="text-xs font-semibold text-ink-muted">Other bills due — not part of this stay</p>
-                    <ul className="mt-1.5 space-y-1 text-sm">
-                      {preview.otherDues.map((bill) => (
-                        <li key={bill.paymentId} className="flex justify-between gap-3">
-                          <span className="min-w-0 truncate text-ink">
-                            {billNumberFor(bill)} · {billServicesSummary(bill)}
-                          </span>
-                          <span className="shrink-0 tabular-nums text-ink">{formatRupees(bill.balance)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1.5 text-xs text-ink-subtle">They don’t hold up the discharge — the patient pays them at the billing counter.</p>
-                  </div>
+    <FlowSheet title="Discharge" subtitle={subtitle} icon={LogOut} iconTone="info" onClose={onClose} size="full">
+      <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)_auto]">
+        {/* Top-left · Patient, with the stay */}
+        <Quadrant step={1} title="Patient" done={Boolean(patient)} summary={patient ? `${patient.name} · ${patient.uhid}` : undefined} allowOverflow>
+          <div className="flex flex-col gap-3">
+            {showPatientSearch ? (
+              <div className="flex flex-col gap-2">
+                <PatientSearch
+                  mode="pick"
+                  scope="inpatients"
+                  onPick={choosePatient}
+                  autoFocus
+                  placeholder="Search an admitted patient by name, mobile or UHID"
+                />
+                {patient ? (
+                  <button type="button" onClick={() => setPicking(false)} className="self-start text-xs font-semibold text-primary-text hover:underline">
+                    Keep {patient.name}
+                  </button>
                 ) : null}
               </div>
-            </StepSection>
-
-            {/* 3 · How the patient is leaving */}
-            <StepSection step={3} title="Discharge" status="active">
-              <div className="flex flex-col gap-3">
-                <div role="radiogroup" aria-label="Discharge type" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {DISCHARGE_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      role="radio"
-                      aria-checked={dischargeType === type}
-                      title={type}
-                      onClick={() => setDischargeType(type)}
-                      className={cn(
-                        'rounded-lg border py-2 text-sm font-medium transition-colors',
-                        dischargeType === type
-                          ? 'border-primary-600 bg-primary-50 text-primary-text'
-                          : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
-                      )}
-                    >
-                      {TYPE_LABEL[type]}
-                    </button>
-                  ))}
+            ) : patient ? (
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-ink">{patient.name}</p>
+                  <p className="mt-0.5 text-sm text-ink-muted">
+                    {patient.uhid}
+                    {patient.age ? ` · ${patient.age} ${patient.sex}` : ''}
+                    {patient.mobile ? ` · ${patient.mobile}` : ''}
+                  </p>
                 </div>
-                <input
-                  value={remarks}
-                  onChange={(event) => setRemarks(event.target.value)}
-                  placeholder="Remarks (optional)"
-                  aria-label="Discharge remarks"
-                  className={inputClass}
-                />
+                <Button size="sm" variant="secondary" onClick={() => setPicking(true)}>
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                  Change
+                </Button>
+              </div>
+            ) : null}
+
+            {patient && !showPatientSearch && !admission ? (
+              <Alert tone="warning">
+                {current
+                  ? `${patient.name}’s admission is still waiting for a bed — there is nothing to discharge.`
+                  : `${patient.name} is not admitted — there is nothing to discharge.`}
+              </Alert>
+            ) : null}
+            {patient && admission && preview ? <StaySummary admission={admission} days={preview.days} /> : null}
+          </div>
+        </Quadrant>
+
+        {/* Top-right · Final bill — paid down to nothing before the patient leaves */}
+        <Quadrant
+          step={2}
+          title="Final bill"
+          done={Boolean(preview?.canDischarge)}
+          summary={preview ? (preview.canDischarge ? `${formatRupees(preview.total)} · payment received` : `${formatRupees(preview.balance)} due`) : undefined}
+        >
+          {!admission || !preview ? (
+            <Waiting>Choose an admitted patient to see the final bill.</Waiting>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="divide-y divide-border-soft rounded-xl border border-border">
+                {preview.items.map((item) => (
+                  <BillLine key={item.code} label={item.description} value={formatRupees(item.amount)} />
+                ))}
+                <BillLine label="Total" value={formatRupees(preview.total)} strong />
+                {preview.paid > 0 ? <BillLine label="Paid so far" value={`− ${formatRupees(preview.paid)}`} /> : null}
+              </div>
+
+              {preview.canDischarge ? (
+                <p className="text-sm font-medium text-stable">Payment received — nothing is due on this stay.</p>
+              ) : (
+                <div className="flex flex-col gap-3 rounded-xl border border-warning-border bg-warning-bg/40 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-ink">{formatRupees(preview.balance)} still due</span>
+                    <Badge tone={BILL_STATUS_TONE[preview.billStatus]}>{BILL_STATUS_LABEL[preview.billStatus]}</Badge>
+                  </div>
+                  {sentBillId ? (
+                    <p className="text-sm text-ink-muted">
+                      Final bill sent to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)} — discharge opens once the
+                      payment is received.
+                    </p>
+                  ) : (
+                    <Button onClick={sendFinalBill}>
+                      Send final bill to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)}
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {preview.otherDues.length > 0 ? (
+                <div className="rounded-xl bg-surface-2 px-4 py-3">
+                  <p className="text-xs font-semibold text-ink-muted">Other bills due — not part of this stay</p>
+                  <ul className="mt-1.5 space-y-1 text-sm">
+                    {preview.otherDues.map((bill) => (
+                      <li key={bill.paymentId} className="flex justify-between gap-3">
+                        <span className="min-w-0 truncate text-ink">
+                          {billNumberFor(bill)} · {billServicesSummary(bill)}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-ink">{formatRupees(bill.balance)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-xs text-ink-subtle">They don’t hold up the discharge — the patient pays them at the billing counter.</p>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </Quadrant>
+
+        {/* Bottom · Discharge — how the patient is leaving, across the full width */}
+        <div className="lg:col-span-2 lg:flex lg:flex-col">
+          <Quadrant step={3} title="Discharge" done={false} summary={admission ? TYPE_LABEL[dischargeType] : undefined}>
+            {!admission || !preview ? (
+              <Waiting>Choose an admitted patient to discharge.</Waiting>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-1 items-center gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto]">
+                  <div role="radiogroup" aria-label="Discharge type" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {DISCHARGE_TYPES.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        role="radio"
+                        aria-checked={dischargeType === type}
+                        title={type}
+                        onClick={() => setDischargeType(type)}
+                        className={cn(
+                          'rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
+                          dischargeType === type
+                            ? 'border-primary-600 bg-primary-50 text-primary-text'
+                            : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
+                        )}
+                      >
+                        {TYPE_LABEL[type]}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    value={remarks}
+                    onChange={(event) => setRemarks(event.target.value)}
+                    placeholder="Remarks (optional)"
+                    aria-label="Discharge remarks"
+                    className={inputClass}
+                  />
+                  <Button size="lg" disabled={!canDischarge} onClick={discharge}>
+                    <LogOut className="h-4 w-4" strokeWidth={1.75} />
+                    {canDischarge ? 'Discharge' : 'Discharge — once the final bill is paid'}
+                  </Button>
+                </div>
                 {passes.length > 0 ? (
                   <p className="flex items-center gap-2 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-muted">
                     <IdCard className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -277,19 +314,10 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                   </p>
                 ) : null}
                 {error ? <Alert tone="critical">{error}</Alert> : null}
-                <Button size="lg" disabled={!preview.canDischarge} onClick={discharge}>
-                  <LogOut className="h-4 w-4" strokeWidth={1.75} />
-                  {preview.canDischarge ? 'Discharge' : 'Discharge — once the final bill is paid'}
-                </Button>
               </div>
-            </StepSection>
-          </>
-        ) : (
-          <>
-            <StepSection step={2} title="Final bill" status="locked" />
-            <StepSection step={3} title="Discharge" status="locked" />
-          </>
-        )}
+            )}
+          </Quadrant>
+        </div>
       </div>
     </FlowSheet>
   )

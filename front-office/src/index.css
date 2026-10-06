@@ -127,6 +127,16 @@
   --color-stat-slate: #64748b;
   --color-stat-slate-ink: #334155;
 
+  /* Sidebar icons — bright solid colours, one per module. */
+  --color-nav-blue: #2f7bff;
+  --color-nav-cyan: #00b4d8;
+  --color-nav-amber: #ffb000;
+  --color-nav-green: #22c55e;
+  --color-nav-violet: #8b5cf6;
+  --color-nav-pink: #ff3d9a;
+  --color-nav-orange: #ff7a1a;
+  --color-nav-red: #ff3b3b;
+
   /* Operational Summary bars — vivid solid fills. */
   --color-bar-blue: #2563eb;
   --color-bar-indigo: #4f46e5;
@@ -354,6 +364,15 @@
   --color-stat-slate-bg: #2b3442;
   --color-stat-slate: #64748b;
   --color-stat-slate-ink: #cbd5e1;
+
+  --color-nav-blue: #6aa6ff;
+  --color-nav-cyan: #35d6f5;
+  --color-nav-amber: #ffc833;
+  --color-nav-green: #4ade80;
+  --color-nav-violet: #a78bfa;
+  --color-nav-pink: #ff6fb5;
+  --color-nav-orange: #ff9a4d;
+  --color-nav-red: #ff6b6b;
 
   --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
   --shadow-card-md: 0 2px 8px 0 rgba(0, 0, 0, 0.45), 0 1px 3px 0 rgba(0, 0, 0, 0.3);

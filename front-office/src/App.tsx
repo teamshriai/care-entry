@@ -12,6 +12,7 @@ import { RegisterDoctorPage } from './pages/RegisterDoctorPage'
 import { DoctorProfilePage } from './pages/DoctorProfilePage'
 import { OutpatientsPage } from './pages/OutpatientsPage'
 import { GuestPassPage } from './pages/GuestPassPage'
+import { ActivityAnalyticsPage } from './pages/ActivityAnalyticsPage'
 import { GuestPassPrintPage } from './pages/GuestPassPrintPage'
 import { EnquiryEstimatePage } from './pages/EnquiryEstimatePage'
 import { MlcPage } from './pages/MlcPage'
@@ -126,6 +127,8 @@ function App() {
 
             {/* Billing — one page; collecting happens in the billing flow */}
             <Route path="/billing" element={<BillingPage />} />
+            <Route path="/activity-analytics" element={<ActivityAnalyticsPage />} />
+            <Route path="/reports" element={<Navigate to="/activity-analytics" replace />} />
             <Route path="/billing/bills" element={<Navigate to="/billing?filter=all" replace />} />
 
             {/* Old Inpatients addresses lead to Patients › Inpatients; admit and

@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowRight, Building2, CalendarCheck2, CalendarClock, Video } from 'lucide-react'
+import { Building2, CalendarCheck2, CalendarClock, Stethoscope, Video } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
-import { StepSection } from '../../components/flow/StepSection'
-import type { StepStatus } from '../../components/flow/StepSection'
+import { Quadrant, SummaryItem, Waiting } from '../../components/flow/Quadrant'
 import { BillAtCounter } from '../../components/payment/BillAtCounter'
 import { sendToBillingCounter } from '../../domain/billingCounter'
 import { SlotBoard } from '../../components/clinician/SlotBoard'
@@ -35,8 +34,6 @@ import type { FlowProps } from '../registry'
 import type { Appointment, BookingPlace, ConsultMode, UnavailableParty } from '../../types/appointment'
 import type { Payment } from '../../types/payment'
 
-type StepKey = 'doctor' | 'time'
-
 /** One line for a booking's place: doctor · day date · time · mode. */
 function placeLine(place: BookingPlace, doctorName: string, today: string): string {
   return `${doctorName} · ${dayWithDate(place.date, today)} · ${place.slot}${place.mode === 'Teleconsult' ? ' · Teleconsult' : ''}`
@@ -44,8 +41,11 @@ function placeLine(place: BookingPlace, doctorName: string, today: string): stri
 
 /**
  * Reschedule: a confirmed booking moves to another time, or to another
- * doctor in the same department. Doctor → time → who can't make it, then
- * confirm. Moving never refunds; a patient who asks for a dearer doctor
+ * doctor in the same department. It is the Schedule Appointment page again —
+ * patient top-left, department top-right, doctor bottom-left, time
+ * bottom-right, the confirmation along the bottom — with the patient and
+ * department fixed by the booking, and "who can't make it" added to the
+ * confirmation. Moving never refunds; a patient who asks for a dearer doctor
  * pays the difference, and when the doctor is the reason the hospital
  * absorbs it.
  */
@@ -65,7 +65,6 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
   const [mode, setMode] = useState<ConsultMode>(was?.mode ?? 'In person')
   const [by, setBy] = useState<UnavailableParty | null>(null)
   const [note, setNote] = useState('')
-  const [editing, setEditing] = useState<StepKey | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<{ appointment: Appointment; differenceBill: Payment | null } | null>(null)
 
@@ -76,8 +75,8 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
   const modes = provider ? modesFor(provider) : (['In person'] as ConsultMode[])
 
   const subtitle = patient ? `${patient.name} · ${patient.uhid}` : 'Booking'
-  const sheet = (body: ReactNode) => (
-    <FlowSheet title="Reschedule" subtitle={subtitle} icon={CalendarClock} onClose={onClose}>
+  const sheet = (body: ReactNode, footer?: ReactNode) => (
+    <FlowSheet title="Reschedule" subtitle={subtitle} icon={CalendarClock} onClose={onClose} size="full" footer={footer}>
       {body}
     </FlowSheet>
   )
@@ -91,6 +90,8 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     const moved = done.appointment
     const movedDoctor = getProviderById(getState(), moved.providerId)?.name ?? 'Doctor'
     return sheet(
+      <div className="flex min-h-full items-center justify-center py-6">
+        <div className="w-full max-w-xl rounded-2xl border border-border bg-surface-1 px-6 shadow-card">
       <AckCard
         title="Appointment Rescheduled"
         icon={CalendarCheck2}
@@ -111,7 +112,9 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
           {done.differenceBill ? ' · confirmed once the fee difference is received' : ' · nothing to pay'}
         </p>
         {done.differenceBill ? <BillAtCounter paymentId={done.differenceBill.paymentId} className="mt-1 w-full" /> : null}
-      </AckCard>,
+      </AckCard>
+        </div>
+      </div>,
     )
   }
 
@@ -124,13 +127,12 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     )
   }
 
-  const doctorDone = Boolean(provider) && editing !== 'doctor'
-  const timeDone = doctorDone && Boolean(date && slot) && editing !== 'time'
-  const statusOf = (finished: boolean, reachable: boolean): StepStatus => (finished ? 'done' : reachable ? 'active' : 'locked')
+  const timeDone = Boolean(provider && date && slot)
 
   const difference = provider ? provider.consultationFee - feePaid : 0
   const charge = difference > 0 && by === 'Patient' ? difference : 0
   const ready = timeDone && by !== null
+  const nowPlace = provider && date && slot ? placeLine({ providerId: provider.providerId, date, slot, mode }, provider.name, today) : null
 
   function chooseDoctor(next: string) {
     setError(null)
@@ -143,7 +145,6 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
       const offered = chosen ? modesFor(chosen) : (['In person'] as ConsultMode[])
       setMode(offered.includes(was!.mode) ? was!.mode : offered[0])
     }
-    setEditing(null)
   }
 
   function move() {
@@ -159,7 +160,6 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
       setError(message)
       if (/slot/i.test(message)) {
         setSlot(null)
-        setEditing('time')
       }
     }
   }
@@ -174,25 +174,95 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     return `${name}'s fee is ${formatRupees(difference)} more — it is charged only if the patient asked for the move.`
   }
 
-  return sheet(
+  const confirmBar = (
     <div className="flex flex-col gap-3">
-      {/* Where the booking is now */}
-      <div className="rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
-        <p className="text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Was</p>
-        <p className="mt-0.5 font-semibold text-ink">{placeLine(wasPlace, wasProvider.name, today)}</p>
-        <p className="text-xs text-ink-muted">
-          {was.appointmentId.toUpperCase()} · {formatRupees(feePaid)} paid
-        </p>
+      {error ? <Alert tone="critical">{error}</Alert> : null}
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+        <SummaryItem label="Patient" value={patient ? `${patient.name} · ${patient.uhid}` : null} />
+        <SummaryItem label="Was" value={placeLine(wasPlace, wasProvider.name, today)} />
+        <SummaryItem label="Now" value={nowPlace} />
+      </dl>
+      <div className="grid grid-cols-1 items-center gap-3 xl:grid-cols-[auto_minmax(0,1fr)_auto]">
+        <fieldset className="flex flex-wrap items-center gap-2">
+          <legend className="sr-only">Who can't make the booked time?</legend>
+          <span className="text-xs font-medium text-ink-muted" aria-hidden="true">
+            Who can't make the booked time?
+          </span>
+          <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Who can't make the booked time">
+            {(['Patient', 'Doctor'] as UnavailableParty[]).map((party) => (
+              <button
+                key={party}
+                type="button"
+                role="radio"
+                aria-checked={by === party}
+                onClick={() => setBy(party)}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                  by === party ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
+                )}
+              >
+                {party === 'Patient' ? 'The patient' : 'The doctor'}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <input
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="Note (optional) — e.g. patient travelling, doctor in surgery"
+          aria-label="Note (optional)"
+          maxLength={120}
+          className="h-11 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600"
+        />
+        <Button size="lg" disabled={!ready} onClick={move}>
+          <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} />
+          {charge > 0 ? `Reschedule & send ${formatRupees(charge)} bill` : 'Reschedule'}
+        </Button>
       </div>
+      <p className={cn('text-xs', charge > 0 ? 'font-medium text-warning' : 'text-ink-muted')}>
+        {provider ? moneyLine() : 'Choose the doctor and time, and who can\'t make the booked time, to confirm.'}
+      </p>
+    </div>
+  )
 
-      {/* 1 · Doctor */}
-      <StepSection
-        step={1}
-        title="Doctor"
-        status={statusOf(doctorDone, true)}
-        summary={provider ? `${provider.name} · ${formatRupees(provider.consultationFee)}` : undefined}
-        onEdit={() => setEditing('doctor')}
-      >
+  return sheet(
+    <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-2">
+      {/* Top-left · Patient — fixed by the booking */}
+      <Quadrant step={1} title="Patient" done summary={patient ? `${patient.name} · ${patient.uhid}` : undefined}>
+        <div className="flex flex-col gap-3">
+          {patient ? (
+            <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+              <p className="truncate text-base font-semibold text-ink">{patient.name}</p>
+              <p className="mt-0.5 text-sm text-ink-muted">
+                {patient.uhid}
+                {patient.age ? ` · ${patient.age} ${patient.sex}` : ''}
+                {patient.mobile ? ` · ${patient.mobile}` : ''}
+              </p>
+            </div>
+          ) : null}
+          <div className="rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
+            <p className="text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Was</p>
+            <p className="mt-0.5 font-semibold text-ink">{placeLine(wasPlace, wasProvider.name, today)}</p>
+            <p className="text-xs text-ink-muted">
+              {was.appointmentId.toUpperCase()} · {formatRupees(feePaid)} paid
+            </p>
+          </div>
+        </div>
+      </Quadrant>
+
+      {/* Top-right · Department — a move stays in the booking's department */}
+      <Quadrant step={2} title="Department" done summary={was.department}>
+        <div className="flex items-center gap-3 rounded-xl border border-primary-600 bg-primary-50 px-3 py-3">
+          <Stethoscope className="h-5 w-5 shrink-0 text-primary-text" strokeWidth={1.75} aria-hidden="true" />
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-ink">{was.department}</span>
+            <span className="block text-xs text-ink-muted">A booking moves within its department.</span>
+          </span>
+        </div>
+      </Quadrant>
+
+      {/* Bottom-left · Doctor */}
+      <Quadrant step={3} title="Doctor" done={Boolean(provider)} summary={provider ? `${provider.name} · ${formatRupees(provider.consultationFee)}` : undefined}>
         <DoctorChoiceList
           suggestions={suggestions}
           selectedId={providerId}
@@ -209,120 +279,79 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
             )
           }}
         />
-      </StepSection>
+      </Quadrant>
 
-      {/* 2 · Time */}
-      <StepSection
-        step={2}
+      {/* Bottom-right · Time */}
+      <Quadrant
+        step={4}
         title="Time"
-        status={statusOf(timeDone, doctorDone)}
+        done={timeDone}
         summary={date && slot ? `${relativeDayLabel(date, today)} ${slot}${mode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined}
-        onEdit={() => setEditing('time')}
       >
-        <div className="flex flex-col gap-3">
-          {modes.length > 1 ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-medium text-ink-muted">How</span>
-              <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="How the patient is seen">
-                {modes.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={option === mode}
-                    onClick={() => setMode(option)}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                      option === mode ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
-                    )}
-                  >
-                    {option === 'Teleconsult' ? (
-                      <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                    ) : (
-                      <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                    )}
-                    {option}
-                  </button>
-                ))}
+        {!provider ? (
+          <Waiting>Choose a doctor to see their open times.</Waiting>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {modes.length > 1 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-ink-muted">How</span>
+                <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="How the patient is seen">
+                  {modes.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={option === mode}
+                      onClick={() => setMode(option)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
+                        option === mode ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
+                      )}
+                    >
+                      {option === 'Teleconsult' ? (
+                        <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                      ) : (
+                        <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                      )}
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : null}
-          {date ? (
-            <>
-              <DateStrip
-                days={dateStrip}
-                selected={date}
-                onSelect={(next) => {
-                  setDate(next)
-                  setSlot(null)
-                }}
-                today={today}
-              />
-              <SlotBoard
-                entries={slotEntries}
-                selectedSlot={slot}
-                currentAppointmentId={was.appointmentId}
-                onSelect={(next) => {
-                  setSlot(next)
-                  setEditing(null)
-                }}
-                emptyMessage="No session on this day."
-              />
-            </>
-          ) : (
-            <p className="text-sm text-ink-muted">No open time with this doctor in the next two weeks — choose another doctor.</p>
-          )}
-        </div>
-      </StepSection>
-
-      {/* 3 · Who can't make it, and confirm */}
-      <StepSection step={3} title="Confirm" status={timeDone ? 'active' : 'locked'}>
-        <div className="flex flex-col gap-4">
-          {error ? <Alert tone="critical">{error}</Alert> : null}
-          {provider && date && slot ? (
-            <div className="flex flex-col gap-1.5 rounded-xl bg-surface-2 px-4 py-3 text-sm">
-              <p className="text-ink-muted line-through decoration-ink-faint">{placeLine(wasPlace, wasProvider.name, today)}</p>
-              <p className="flex items-start gap-1.5 font-semibold text-ink">
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-primary-text" strokeWidth={2} aria-hidden="true" />
-                {placeLine({ providerId: provider.providerId, date, slot, mode }, provider.name, today)}
+            ) : modes[0] === 'Teleconsult' ? (
+              <p className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
+                <Video className="h-3.5 w-3.5 text-purple" strokeWidth={1.75} aria-hidden="true" />
+                Teleconsult only — the patient joins by video.
               </p>
-            </div>
-          ) : null}
-
-          <fieldset>
-            <legend className="mb-1.5 text-xs font-medium text-ink-muted">Who can't make the booked time?</legend>
-            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Who can't make the booked time">
-              {(['Patient', 'Doctor'] as UnavailableParty[]).map((party) => (
-                <button
-                  key={party}
-                  type="button"
-                  role="radio"
-                  aria-checked={by === party}
-                  onClick={() => setBy(party)}
-                  className={cn(
-                    'rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
-                    by === party ? 'border-primary-600 bg-primary-50 font-semibold text-ink' : 'border-border text-ink-muted hover:bg-surface-2',
-                  )}
-                >
-                  {party === 'Patient' ? 'The patient' : 'The doctor'}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-          <input
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Note (optional) — e.g. patient travelling, doctor in surgery"
-            aria-label="Note (optional)"
-            maxLength={120}
-            className="h-11 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600"
-          />
-          {provider ? <p className={cn('text-sm', charge > 0 ? 'font-medium text-warning' : 'text-ink-muted')}>{moneyLine()}</p> : null}
-
-          <Button size="lg" disabled={!ready} onClick={move}>
-            {charge > 0 ? `Reschedule & send ${formatRupees(charge)} bill to the billing counter` : 'Reschedule'}
-          </Button>
-        </div>
-      </StepSection>
+            ) : null}
+            {date ? (
+              <>
+                <DateStrip
+                  days={dateStrip}
+                  selected={date}
+                  onSelect={(next) => {
+                    setDate(next)
+                    setSlot(null)
+                  }}
+                  today={today}
+                />
+                <SlotBoard
+                  entries={slotEntries}
+                  selectedSlot={slot}
+                  currentAppointmentId={was.appointmentId}
+                  onSelect={(next) => {
+                    setError(null)
+                    setSlot(next)
+                  }}
+                  emptyMessage="No session on this day."
+                />
+              </>
+            ) : (
+              <p className="text-sm text-ink-muted">No open time with this doctor in the next two weeks — choose another doctor.</p>
+            )}
+          </div>
+        )}
+      </Quadrant>
     </div>,
+    confirmBar,
   )
 }

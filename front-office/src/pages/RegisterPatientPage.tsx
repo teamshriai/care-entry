@@ -29,7 +29,7 @@ interface RegisterPatientLocationState {
   prefillName?: string
 }
 
-/** What the desk typed into the search box before pressing Create Patient. */
+/** What the desk typed into the search box before pressing Register Patient. */
 function prefillFrom(search: string, state: RegisterPatientLocationState | null): { name: string; mobile: string } {
   const query = new URLSearchParams(search)
   return {
@@ -157,7 +157,7 @@ export function RegisterPatientPage() {
 
   return (
     <div>
-      <PageHeader title="Create Patient" subtitle="Create a new patient record and allocate a UHID. The registration fee is billed to the billing counter." />
+      <PageHeader title="Register Patient" subtitle="Create a new patient record and allocate a UHID. The registration fee is billed to the billing counter." />
 
       <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
         <Card accentTone="teal" className="min-w-0">
@@ -275,7 +275,7 @@ export function RegisterPatientPage() {
                 ) : null}
                 <Button type="submit" disabled={!ready}>
                   <UserPlus className="h-4 w-4" strokeWidth={1.75} />
-                  Create Patient
+                  Register Patient
                 </Button>
               </div>
             </form>

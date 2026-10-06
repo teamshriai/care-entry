@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { BedDouble, ShieldCheck } from 'lucide-react'
+import { BedDouble, Pencil, ShieldCheck } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
-import { StepSection } from '../../components/flow/StepSection'
-import type { StepStatus } from '../../components/flow/StepSection'
+import { Quadrant, SummaryItem, Waiting } from '../../components/flow/Quadrant'
 import { BillAtCounter } from '../../components/payment/BillAtCounter'
 import { sendToBillingCounter } from '../../domain/billingCounter'
 import { PatientSearch } from '../../components/patient/PatientSearch'
@@ -73,10 +72,12 @@ function detailsComplete(d: Details): boolean {
 }
 
 /**
- * Admit, over the page it was opened from: where (ward → the first free bed,
- * changeable), the admission details, the first-day bill and — for a
- * self-pay patient — its payment, then "Patient Admitted". The profile
- * shows the inpatient tag the moment it closes.
+ * Admit, over the page it was opened from, laid out like Schedule Appointment:
+ * one full-screen page — patient top-left, ward & bed top-right, the admission
+ * details bottom-left, the first-day bill bottom-right — each editable at any
+ * time, with the confirmation along the bottom. A self-pay patient's bill
+ * goes to the billing counter; then "Patient Admitted". The profile shows the
+ * inpatient tag the moment it closes.
  */
 export function AdmitFlow({ params, onClose }: FlowProps) {
   const [patientId, setPatientId] = useState(params.uhid ?? '')
@@ -92,8 +93,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
   const bed = beds.find((b) => b.bedId === bedId) ?? null
 
   const [details, setDetails] = useState<Details>(() => startingDetails(params.uhid ?? ''))
-  const [detailsDone, setDetailsDone] = useState(false)
-  const [editing, setEditing] = useState<'patient' | 'ward' | 'details' | null>(null)
+  const [changingPatient, setChangingPatient] = useState(false)
   const [done, setDone] = useState<{ admission: Admission; bill: Payment } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -101,19 +101,13 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
   const selfPay = details.paymentType === 'Self Pay'
   const billItems = bed ? admissionBillItems(bed.roomType, 1) : []
 
-  const patientDone = Boolean(patient) && editing !== 'patient'
-  const wardDone = patientDone && !alreadyAdmitted && Boolean(bed && bed.status === 'Available') && editing !== 'ward'
-  const detailsStepDone = wardDone && detailsDone && detailsComplete(details) && editing !== 'details'
-
-  function statusOf(finished: boolean, reachable: boolean): StepStatus {
-    return finished ? 'done' : reachable ? 'active' : 'locked'
-  }
+  const wardDone = !alreadyAdmitted && Boolean(bed && bed.status === 'Available')
+  const ready = Boolean(patient) && wardDone && detailsComplete(details)
 
   function choosePatient(next: Patient) {
     setPatientId(next.patientId)
     setDetails(startingDetails(next.patientId))
-    setDetailsDone(false)
-    setEditing(null)
+    setChangingPatient(false)
   }
 
   function chooseWard(next: Ward) {
@@ -123,7 +117,6 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
     if ((next === 'ICU' || next === 'Emergency') && details.admissionType === 'Elective') {
       setDetails((d) => ({ ...d, admissionType: 'Emergency' }))
     }
-    setEditing(null)
   }
 
   function update(patch: Partial<Details>) {
@@ -131,7 +124,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
   }
 
   function admit() {
-    if (!patient || !bed) return
+    if (!patient || !bed || !ready) return
     setError(null)
     try {
       const result = admitPatient({
@@ -167,131 +160,188 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
   if (done) {
     const { admission, bill } = done
     return (
-      <FlowSheet title="Admit" subtitle={subtitle} icon={BedDouble} iconTone="info" onClose={onClose}>
-        <AckCard title="Patient Admitted" icon={BedDouble} onDone={onClose} durationMs={9000}>
-          <p className="text-base font-semibold text-ink">
-            {admission.wardLabel} · {admission.bedNumber}
-          </p>
-          <p>
-            {admission.admissionNumber} · {admission.doctorName} · Day 1
-          </p>
-          {admission.paymentType === 'Self Pay' ? (
-            <BillAtCounter paymentId={bill.paymentId} className="mt-1 w-full" />
-          ) : (
-            <p>Billed to {admission.insuranceProvider ?? admission.paymentType} — settled at discharge</p>
-          )}
-        </AckCard>
+      <FlowSheet title="Admit" subtitle={subtitle} icon={BedDouble} iconTone="info" onClose={onClose} size="full">
+        {/* Full screen like the admit page itself, with the confirmation centred. */}
+        <div className="flex min-h-full items-center justify-center py-6">
+          <div className="w-full max-w-xl rounded-2xl border border-border bg-surface-1 px-6 shadow-card">
+            <AckCard title="Patient Admitted" icon={BedDouble} onDone={onClose} durationMs={9000}>
+              <p className="text-base font-semibold text-ink">
+                {admission.wardLabel} · {admission.bedNumber}
+              </p>
+              <p>
+                {admission.admissionNumber} · {admission.doctorName} · Day 1
+              </p>
+              {admission.paymentType === 'Self Pay' ? (
+                <BillAtCounter paymentId={bill.paymentId} className="mt-1 w-full" />
+              ) : (
+                <p>Billed to {admission.insuranceProvider ?? admission.paymentType} — settled at discharge</p>
+              )}
+            </AckCard>
+          </div>
+        </div>
       </FlowSheet>
     )
   }
 
-  return (
-    <FlowSheet title="Admit" subtitle={subtitle} icon={BedDouble} iconTone="info" onClose={onClose}>
-      <div className="flex flex-col gap-3">
-        {/* 1 · Patient */}
-        <StepSection
-          step={1}
-          title="Patient"
-          status={statusOf(patientDone, true)}
-          summary={patient ? `${patient.name} · ${patient.uhid}` : undefined}
-          onEdit={() => setEditing('patient')}
-        >
-          <PatientSearch mode="pick" onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile or UHID" />
-        </StepSection>
+  const showPatientSearch = !patient || changingPatient
+  const billTotal = billItems.reduce((sum, item) => sum + item.amount, 0)
+  const bedSummary = bed ? `${bed.ward} · ${bed.bedNumber} · ${formatRupees(DAILY_BED_CHARGE[bed.roomType])}/day` : undefined
 
-        {alreadyAdmitted ? (
-          <Alert tone="warning">
-            <strong>{patient?.name} is already admitted</strong> — {alreadyAdmitted.wardLabel} · {alreadyAdmitted.bedNumber} (
-            {alreadyAdmitted.admissionNumber}).
-          </Alert>
-        ) : current ? (
-          <Alert tone="info">Admitting the request already waiting for a bed ({current.admissionNumber}).</Alert>
-        ) : null}
-
-        {/* 2 · Ward and bed */}
-        <StepSection
-          step={2}
-          title="Ward & bed"
-          status={statusOf(wardDone, patientDone && !alreadyAdmitted)}
-          summary={bed ? `${bed.ward} · ${bed.bedNumber} · ${formatRupees(DAILY_BED_CHARGE[bed.roomType])}/day` : undefined}
-          onEdit={() => setEditing('ward')}
-        >
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {wards.map((w) => {
-              const roomType = w.beds[0]?.roomType ?? 'General'
-              const full = w.available === 0
-              return (
-                <button
-                  key={w.ward}
-                  type="button"
-                  disabled={full}
-                  aria-pressed={w.ward === ward}
-                  onClick={() => chooseWard(w.ward)}
-                  className={cn(
-                    'flex flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors',
-                    w.ward === ward ? 'border-primary-600 bg-primary-50' : 'border-border bg-surface-1 hover:bg-surface-2',
-                    full && 'cursor-not-allowed opacity-50',
-                  )}
-                >
-                  <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                    <WardIcon
-                      ward={w.ward}
-                      className={cn('h-4.5 w-4.5', w.ward === 'ICU' || w.ward === 'Emergency' ? 'text-critical' : 'text-primary-text')}
-                    />
-                    {w.ward}
-                  </span>
-                  <span className={cn('text-xs font-medium', full ? 'text-critical' : 'text-stable')}>
-                    {full ? 'Full' : `${w.available} free`} of {w.total}
-                  </span>
-                  <span className="text-xs text-ink-muted">{formatRupees(DAILY_BED_CHARGE[roomType])}/day</span>
-                </button>
-              )
-            })}
+  const confirmBar = (
+    <div className="flex flex-col gap-3">
+      {error ? <Alert tone="critical">{error}</Alert> : null}
+      <div className="grid grid-cols-1 items-center gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
+          <SummaryItem label="Patient" value={patient ? `${patient.name} · ${patient.uhid}` : null} />
+          <SummaryItem label="Ward & bed" value={bed && wardDone ? `${bed.ward} · ${bed.bedNumber}` : null} />
+          <SummaryItem label="Doctor" value={doctor ? doctor.name : null} />
+          <SummaryItem label="Payer" value={selfPay ? 'Self pay' : details.insuranceProvider || details.paymentType} />
+        </dl>
+        <div className="flex flex-wrap items-center justify-between gap-3 xl:justify-end">
+          <div className="text-right">
+            <p className="text-xs text-ink-muted">First-day bill</p>
+            <p className="text-lg font-semibold tabular-nums text-ink">{formatRupees(billTotal)}</p>
           </div>
-          {ward ? (
-            <div className="mt-3">
-              <p className="mb-2 text-xs font-medium text-ink-muted">Bed — the first free one is chosen; tap another to change</p>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Bed">
-                {beds.map((b) => {
-                  const free = b.status === 'Available'
+          <Button size="lg" onClick={admit} disabled={!ready}>
+            {selfPay ? <BedDouble className="h-4 w-4" strokeWidth={1.75} /> : <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />}
+            {selfPay ? 'Admit & send bill' : `Admit — bill ${details.insuranceProvider || details.paymentType}`}
+          </Button>
+        </div>
+      </div>
+      <p className="text-xs text-ink-muted">
+        {ready
+          ? selfPay
+            ? 'The first-day bill goes to the billing counter. The bed charge accrues daily; the final bill is settled at discharge.'
+            : 'The bill goes to the payer and is settled at discharge.'
+          : 'Choose the patient, a free bed and complete the details to admit.'}
+      </p>
+    </div>
+  )
+
+  return (
+    <FlowSheet title="Admit" subtitle={subtitle} icon={BedDouble} iconTone="info" onClose={onClose} size="full" footer={confirmBar}>
+      <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-2">
+        {/* Top-left · Patient */}
+        <Quadrant step={1} title="Patient" done={Boolean(patient)} summary={patient ? `${patient.name} · ${patient.uhid}` : undefined} allowOverflow>
+          <div className="flex flex-col gap-3">
+            {showPatientSearch ? (
+              <div className="flex flex-col gap-2">
+                <PatientSearch mode="pick" onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile or UHID" />
+                {patient ? (
+                  <button type="button" onClick={() => setChangingPatient(false)} className="self-start text-xs font-semibold text-primary-text hover:underline">
+                    Keep {patient.name}
+                  </button>
+                ) : null}
+              </div>
+            ) : patient ? (
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-ink">{patient.name}</p>
+                  <p className="mt-0.5 text-sm text-ink-muted">
+                    {patient.uhid}
+                    {patient.age ? ` · ${patient.age} ${patient.sex}` : ''}
+                    {patient.mobile ? ` · ${patient.mobile}` : ''}
+                  </p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setChangingPatient(true)}>
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                  Change
+                </Button>
+              </div>
+            ) : null}
+            {alreadyAdmitted ? (
+              <Alert tone="warning">
+                <strong>{patient?.name} is already admitted</strong> — {alreadyAdmitted.wardLabel} · {alreadyAdmitted.bedNumber} (
+                {alreadyAdmitted.admissionNumber}).
+              </Alert>
+            ) : current ? (
+              <Alert tone="info">Admitting the request already waiting for a bed ({current.admissionNumber}).</Alert>
+            ) : null}
+          </div>
+        </Quadrant>
+
+        {/* Top-right · Ward & bed */}
+        <Quadrant step={2} title="Ward & bed" done={wardDone} summary={bedSummary}>
+          {!patient ? (
+            <Waiting>Choose the patient to pick a ward and bed.</Waiting>
+          ) : alreadyAdmitted ? (
+            <Waiting>This patient is already admitted.</Waiting>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {wards.map((w) => {
+                  const roomType = w.beds[0]?.roomType ?? 'General'
+                  const full = w.available === 0
                   return (
                     <button
-                      key={b.bedId}
+                      key={w.ward}
                       type="button"
-                      disabled={!free}
-                      aria-pressed={b.bedId === bedId}
-                      onClick={() => {
-                        setBedId(b.bedId)
-                        setEditing(null)
-                      }}
-                      title={`${b.bedNumber} · ${b.status}`}
+                      disabled={full}
+                      aria-pressed={w.ward === ward}
+                      onClick={() => chooseWard(w.ward)}
                       className={cn(
-                        'rounded-lg border px-2.5 py-1.5 text-xs font-semibold tabular-nums transition-colors',
-                        b.bedId === bedId
-                          ? 'border-primary-600 bg-primary-600 text-on-primary'
-                          : free
-                            ? 'border-stable-border bg-stable-bg text-ink hover:border-primary-600'
-                            : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle line-through',
+                        'flex flex-col items-start gap-1 rounded-xl border px-3 py-3 text-left transition-colors',
+                        w.ward === ward ? 'border-primary-600 bg-primary-50' : 'border-border bg-surface-1 hover:bg-surface-2',
+                        full && 'cursor-not-allowed opacity-50',
                       )}
                     >
-                      {b.bedNumber}
+                      <span className="flex items-center gap-2 text-sm font-semibold text-ink">
+                        <WardIcon
+                          ward={w.ward}
+                          className={cn('h-4.5 w-4.5', w.ward === 'ICU' || w.ward === 'Emergency' ? 'text-critical' : 'text-primary-text')}
+                        />
+                        {w.ward}
+                      </span>
+                      <span className={cn('text-xs font-medium', full ? 'text-critical' : 'text-stable')}>
+                        {full ? 'Full' : `${w.available} free`} of {w.total}
+                      </span>
+                      <span className="text-xs text-ink-muted">{formatRupees(DAILY_BED_CHARGE[roomType])}/day</span>
                     </button>
                   )
                 })}
               </div>
-            </div>
-          ) : null}
-        </StepSection>
+              {ward ? (
+                <div className="mt-3">
+                  <p className="mb-2 text-xs font-medium text-ink-muted">Bed — the first free one is chosen; tap another to change</p>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Bed">
+                    {beds.map((b) => {
+                      const free = b.status === 'Available'
+                      return (
+                        <button
+                          key={b.bedId}
+                          type="button"
+                          disabled={!free}
+                          aria-pressed={b.bedId === bedId}
+                          onClick={() => setBedId(b.bedId)}
+                          title={`${b.bedNumber} · ${b.status}`}
+                          className={cn(
+                            'rounded-lg border px-2.5 py-1.5 text-xs font-semibold tabular-nums transition-colors',
+                            b.bedId === bedId
+                              ? 'border-primary-600 bg-primary-600 text-on-primary'
+                              : free
+                                ? 'border-stable-border bg-stable-bg text-ink hover:border-primary-600'
+                                : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle line-through',
+                          )}
+                        >
+                          {b.bedNumber}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </Quadrant>
 
-        {/* 3 · Admission details */}
-        <StepSection
+        {/* Bottom-left · Details */}
+        <Quadrant
           step={3}
           title="Details"
-          status={statusOf(detailsStepDone, wardDone)}
+          done={detailsComplete(details)}
           summary={
             doctor ? `${doctor.name} · ${details.admissionType} · ${selfPay ? 'Self pay' : details.insuranceProvider || details.paymentType}` : undefined
           }
-          onEdit={() => setEditing('details')}
         >
           <div className="flex flex-col gap-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -382,37 +432,35 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                 <input value={details.policyNumber} onChange={(e) => update({ policyNumber: e.target.value })} placeholder="Policy / member ID" aria-label="Policy or member ID" className={inputClass} />
               </div>
             ) : null}
-            <Button
-              disabled={!detailsComplete(details)}
-              onClick={() => {
-                setDetailsDone(true)
-                setEditing(null)
-              }}
-            >
-              Continue
-            </Button>
           </div>
-        </StepSection>
+        </Quadrant>
 
-        {/* 4 · Bill — paid now by a self-pay patient, billed to the payer otherwise */}
-        <StepSection step={4} title="Bill" status={detailsStepDone ? 'active' : 'locked'}>
-          <div className="flex flex-col gap-4">
-            {error ? <Alert tone="critical">{error}</Alert> : null}
-            <div className="divide-y divide-border-soft rounded-xl border border-border">
-              {billItems.map((item) => (
-                <div key={item.code} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="text-ink">{item.description}</span>
-                  <span className="font-medium tabular-nums text-ink">{formatRupees(item.amount)}</span>
+        {/* Bottom-right · Bill — paid now by a self-pay patient, billed to the payer otherwise */}
+        <Quadrant step={4} title="Bill" done={billItems.length > 0 && ready} summary={billItems.length ? formatRupees(billTotal) : undefined}>
+          {billItems.length === 0 ? (
+            <Waiting>Choose a bed to see the first-day bill.</Waiting>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="divide-y divide-border-soft rounded-xl border border-border">
+                {billItems.map((item) => (
+                  <div key={item.code} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <span className="text-ink">{item.description}</span>
+                    <span className="font-medium tabular-nums text-ink">{formatRupees(item.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between bg-surface-2 px-4 py-2.5 text-sm font-semibold text-ink">
+                  <span>Total</span>
+                  <span className="tabular-nums">{formatRupees(billTotal)}</span>
                 </div>
-              ))}
+              </div>
+              <p className="text-xs text-ink-muted">
+                {selfPay
+                  ? 'Paid at the billing counter. The bed charge accrues daily; the final bill is settled at discharge.'
+                  : `Billed to ${details.insuranceProvider || details.paymentType} — settled at discharge.`}
+              </p>
             </div>
-            <Button size="lg" onClick={admit}>
-              {selfPay ? <BedDouble className="h-4 w-4" strokeWidth={1.75} /> : <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />}
-              {selfPay ? 'Admit & send first-day bill to the billing counter' : `Admit — bill ${details.insuranceProvider || details.paymentType}`}
-            </Button>
-            <p className="text-xs text-ink-muted">The bed charge accrues daily; the final bill is settled at discharge.</p>
-          </div>
-        </StepSection>
+          )}
+        </Quadrant>
       </div>
     </FlowSheet>
   )

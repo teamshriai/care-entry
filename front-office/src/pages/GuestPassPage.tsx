@@ -1,29 +1,24 @@
 import { useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BriefcaseMedical, IdCard, Printer, ShieldCheck, Stethoscope, Undo2, Users, Wrench } from 'lucide-react'
+import { IdCard, Printer, ShieldCheck, Stethoscope, Users, Wrench } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Badge } from '../components/ui/Badge'
 import { Alert } from '../components/ui/Alert'
-import { EmptyState } from '../components/ui/EmptyState'
 import { MobileInput } from '../components/ui/MobileInput'
 import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
-import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { useCurrentUser } from '../hooks/useCurrentUser'
-import { getDepartments, getGuestPasses, getPatientById, getProviders } from '../domain/selectors'
+import { getDepartments, getPatientById, getProviders } from '../domain/selectors'
 import { getCurrentAdmissionForPatient } from '../domain/patientSelectors'
-import { issueGuestPass, returnGuestPass } from '../domain/actions'
-import { todayKey } from '../domain/time'
-import { formatClock, formatRelativeTime } from '../utils/format'
+import { issueGuestPass } from '../domain/actions'
 import { isValidMobile } from '../utils/phone'
 import { nameError, nextNameInput } from '../utils/validation'
 import { cn } from '../utils/cn'
 import { GUEST_PASS_TYPES } from '../types/frontDesk'
-import type { GuestPass, GuestPassType } from '../types/frontDesk'
+import type { GuestPassType } from '../types/frontDesk'
 
 const RELATIONSHIPS = ['Spouse', 'Son', 'Daughter', 'Parent', 'Sibling', 'Other relative', 'Friend']
 const STAFF_ROLES = ['Staff without ID card', 'Trainee', 'Vendor', 'Contractor']
@@ -53,11 +48,9 @@ const inputClass =
  * service people. Every pass is returned when its holder leaves.
  */
 export function GuestPassPage() {
-  const now = useNow(30000)
   const navigate = useNavigate()
   const { notify } = useToast()
   const user = useCurrentUser()
-  const passes = useStoreValue(getGuestPasses)
   const providers = useStoreValue(getProviders)
   const departments = useStoreValue(getDepartments)
 
@@ -78,10 +71,6 @@ export function GuestPassPage() {
   const [error, setError] = useState<string | null>(null)
 
   const host = providers.find((p) => p.providerId === hostProviderId) ?? null
-  const active = passes.filter((pass) => !pass.returned)
-  const returned = passes.filter(
-    (pass) => pass.returned && pass.returnedAt !== null && todayKey(new Date(pass.returnedAt)) === todayKey(new Date(now)),
-  )
 
   // Who confirms the visit, as the checkbox says it.
   const confirmer =
@@ -144,15 +133,6 @@ export function GuestPassPage() {
     }
   }
 
-  function handleReturn(pass: GuestPass) {
-    try {
-      returnGuestPass(pass.passId)
-      notify('Pass returned', { detail: pass.passId })
-    } catch (err) {
-      notify('Could not return pass', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
-    }
-  }
-
   return (
     <div>
       <PageHeader
@@ -160,8 +140,8 @@ export function GuestPassPage() {
         subtitle="Nobody moves about the hospital without a hospital ID or a pass — printed only after the ID is seen and the visit confirmed."
       />
 
-      <div className="grid grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:px-8 2xl:grid-cols-[400px_minmax(0,1fr)]">
-        <Card accentTone="brand" className="min-w-0">
+      <div className="px-4 py-6 sm:px-6 lg:px-8">
+        <Card accentTone="brand" className="min-w-0 max-w-2xl">
           <CardHeader icon={IdCard} iconTone="brand" title="Print a pass" subtitle={TYPE_HINT[type]} />
           <CardBody>
             <form onSubmit={handlePrint} className="flex flex-col gap-4" noValidate>
@@ -306,80 +286,6 @@ export function GuestPassPage() {
             </form>
           </CardBody>
         </Card>
-
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card accentTone="brand">
-            <CardHeader
-              icon={BriefcaseMedical}
-              iconTone="brand"
-              title="Passes out"
-              subtitle="Everyone holding a pass now, newest first"
-              action={<span className="text-xs tabular-nums text-ink-faint">{active.length}</span>}
-            />
-            {active.length === 0 ? (
-              <EmptyState icon={IdCard} title="No passes out" description="Printed passes appear here until they are returned." />
-            ) : (
-              <div className="divide-y divide-border-soft">
-                {active.map((pass) => {
-                  const overdue = now > pass.validUntil
-                  return (
-                    <div key={pass.passId} className="flex flex-col gap-2 px-5 py-3 transition-colors hover:bg-surface-subtle sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-                          <span className="truncate">
-                            {pass.holderName} · {pass.passId}
-                          </span>
-                          <Badge tone={pass.type === 'Patient visitor' ? 'info' : pass.type === 'Visiting doctor' ? 'indigo' : 'neutral'}>{pass.type}</Badge>
-                        </p>
-                        <p className="truncate text-xs text-ink-muted">
-                          {pass.patientName ? `Visiting ${pass.patientName} (${pass.relationship})` : `${pass.relationship} · for ${pass.hostName}`} · {pass.ward} · confirmed
-                          with {pass.verifiedWith} · printed {formatRelativeTime(pass.issuedAt, now)}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Badge status={overdue ? 'Overdue' : 'Issued'} />
-                        <Button size="sm" variant="ghost" onClick={() => navigate(`/services/guest-pass/print?pass=${encodeURIComponent(pass.passId)}`)}>
-                          <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
-                          Reprint
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => handleReturn(pass)}>
-                          <Undo2 className="h-3.5 w-3.5 text-primary-text" strokeWidth={1.75} />
-                          Return
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </Card>
-
-          <Card accentTone="brand">
-            <CardHeader title="Returned today" action={<span className="text-xs tabular-nums text-ink-faint">{returned.length}</span>} />
-            {returned.length === 0 ? (
-              <EmptyState title="Nothing returned yet" description="Returned passes are listed here for the shift." />
-            ) : (
-              <div className="divide-y divide-border-soft">
-                {returned.map((pass) => (
-                  <div key={pass.passId} className="flex items-center justify-between gap-3 px-5 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm text-ink">
-                        {pass.holderName} · {pass.passId}
-                      </p>
-                      <p className="truncate text-xs text-ink-muted">
-                        {pass.type} · {pass.ward}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-xs tabular-nums text-ink-muted">
-                      {/* A returned pass always has returnedAt set, by construction of returnGuestPass. */}
-                      Returned {formatClock(pass.returnedAt!)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
       </div>
     </div>
   )

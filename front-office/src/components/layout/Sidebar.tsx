@@ -8,10 +8,9 @@ import {
   IdCard,
   Receipt,
   FileWarning,
+  ChartNoAxesCombined,
 } from 'lucide-react'
 import { cn } from '../../utils/cn'
-import { TONE_STYLES } from '../../utils/tone'
-import type { Tone } from '../../utils/tone'
 import logo from '../../logo.png'
 
 interface NavItem {
@@ -19,10 +18,22 @@ interface NavItem {
   label: string
   icon: LucideIcon
   end?: boolean
-  /** Semantic accent for the icon while the item is NOT active — the active
-   *  state keeps its existing brand highlight unchanged either way. Reuses
-   *  the app's existing tone palette (see utils/tone.ts). */
-  tone?: Tone
+  /** The icon's own bright colour (index.css --color-nav-*), in both themes. */
+  color: NavColor
+}
+
+type NavColor = 'blue' | 'cyan' | 'amber' | 'green' | 'violet' | 'pink' | 'orange' | 'red'
+
+/** Class names written out whole so Tailwind can see them. */
+const ICON_COLOR: Record<NavColor, string> = {
+  blue: 'text-nav-blue',
+  cyan: 'text-nav-cyan',
+  amber: 'text-nav-amber',
+  green: 'text-nav-green',
+  violet: 'text-nav-violet',
+  pink: 'text-nav-pink',
+  orange: 'text-nav-orange',
+  red: 'text-nav-red',
 }
 
 interface NavGroup {
@@ -37,20 +48,21 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, tone: 'brand' },
+      { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true, color: 'blue' },
       // One place for patients — everyone, outpatients and inpatients are
       // its tabs, and a patient's profile lives under it too.
-      { to: '/patients', label: 'Patients', icon: Users, tone: 'teal' },
-      { to: '/billing', label: 'Billing', icon: IndianRupee, tone: 'stable' },
-      { to: '/doctors', label: 'Doctors', icon: Stethoscope, tone: 'indigo' },
+      { to: '/patients', label: 'Patients', icon: Users, color: 'cyan' },
+      { to: '/billing', label: 'Billing', icon: IndianRupee, color: 'amber' },
+      { to: '/doctors', label: 'Doctors', icon: Stethoscope, color: 'green' },
+      { to: '/activity-analytics', label: 'Activity & Analytics', icon: ChartNoAxesCombined, color: 'violet' },
     ],
   },
   {
     label: 'Services',
     items: [
-      { to: '/services/guest-pass', label: 'Guest Pass', icon: IdCard, tone: 'brand' },
-      { to: '/services/enquiry', label: 'Enquiry & Estimate', icon: Receipt, tone: 'stable' },
-      { to: '/services/mlc', label: 'MLC', icon: FileWarning, tone: 'warning' },
+      { to: '/services/guest-pass', label: 'Guest Pass', icon: IdCard, color: 'pink' },
+      { to: '/services/enquiry', label: 'Enquiry & Estimate', icon: Receipt, color: 'orange' },
+      { to: '/services/mlc', label: 'MLC', icon: FileWarning, color: 'red' },
     ],
   },
 ]
@@ -83,14 +95,14 @@ export function Sidebar() {
               <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">{group.label}</p>
             ) : null}
             <div className="flex flex-col gap-0.5">
-              {group.items.map(({ to, label, icon: Icon, end, tone }) => (
+              {group.items.map(({ to, label, icon: Icon, end, color }) => (
                 <NavLink
                   key={to}
                   to={to}
                   end={end}
                   className={({ isActive }) =>
                     cn(
-                      'focus-ring inline-flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium leading-snug transition-colors',
+                      'group focus-ring inline-flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium leading-snug transition-colors',
                       isActive
                         ? 'bg-surface-1 text-primary-text shadow-card'
                         : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
@@ -101,9 +113,9 @@ export function Sidebar() {
                     <>
                       <Icon
                         size={17}
-                        strokeWidth={isActive ? 2.2 : 1.8}
+                        strokeWidth={isActive ? 2.4 : 2.1}
                         aria-hidden="true"
-                        className={cn('shrink-0', tone && TONE_STYLES[tone].text)}
+                        className={cn('shrink-0 transition-[filter] duration-150 group-hover:brightness-110 group-hover:saturate-150', ICON_COLOR[color])}
                       />
                       {label}
                       {isActive ? <span className="sr-only">(current page)</span> : null}
