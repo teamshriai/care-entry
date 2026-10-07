@@ -16,7 +16,7 @@ export function StepComplete({
   onBack: () => void;
 }) {
   return (
-    <Card center>
+    <Card center tone="green">
       <Confetti />
       <StepNav onBack={onBack} />
 
@@ -24,7 +24,7 @@ export function StepComplete({
       <h2 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">Registration complete</h2>
       <StepSub className="mx-auto mb-7 max-w-md">Your details have been recorded and sent to the care team.</StepSub>
 
-      <SummaryList className="mx-auto max-w-lg">
+      <SummaryList tone="green" className="mx-auto max-w-lg">
         <SummaryRow icon="userCheck" label="Name" value={patient.name} />
         <SummaryRow icon="idCard" label="Patient ID" value={patient.systemId} mono />
         <SummaryRow icon="activity" label="Visit reference" value={encounterCode} mono />

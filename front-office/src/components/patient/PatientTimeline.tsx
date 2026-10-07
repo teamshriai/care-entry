@@ -1,4 +1,4 @@
-import type { ElementType } from 'react'
+import type { CSSProperties, ElementType } from 'react'
 import { Link } from 'react-router-dom'
 import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogOut, MoreHorizontal, Stethoscope, Ticket, UserPlus, Video, XCircle } from 'lucide-react'
 import { Card, CardHeader } from '../ui/Card'
@@ -24,6 +24,19 @@ const KIND_ICON: Record<TimelineKind, ElementType> = {
   'admission-cancelled': XCircle,
   mlc: FileWarning,
   'guest-pass': IdCard,
+}
+
+/** Each kind of event keeps one hue, so a patient's story reads at a glance. */
+const KIND_HUE: Record<TimelineKind, string> = {
+  registered: 'var(--color-hue-teal)',
+  encounter: 'var(--color-hue-blue)',
+  'walk-in': 'var(--color-hue-orange)',
+  bill: 'var(--color-hue-amber)',
+  admitted: 'var(--color-hue-violet)',
+  discharged: 'var(--color-hue-pink)',
+  'admission-cancelled': 'var(--color-ink-subtle)',
+  mlc: 'var(--color-hue-red)',
+  'guest-pass': 'var(--color-hue-indigo)',
 }
 
 /**
@@ -77,8 +90,11 @@ export function PatientTimeline({
                 )
               return (
                 <li key={event.id} className="flex items-start gap-3 px-5 py-3">
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2">
-                    <Icon className="h-4 w-4 text-ink-muted" strokeWidth={1.75} aria-hidden="true" />
+                  <span
+                    style={{ '--tone': KIND_HUE[event.kind] } as CSSProperties}
+                    className="ink-tone mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_24%,var(--color-surface-1)),color-mix(in_oklab,var(--tone)_10%,var(--color-surface-1)))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tone)_24%,transparent)]"
+                  >
+                    <Icon className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">
                     {event.paymentId ? (

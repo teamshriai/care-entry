@@ -18,7 +18,7 @@ export function Step4Abha({
   nextDisabled?: boolean;
 }) {
   return (
-    <Card>
+    <Card tone="pink">
       <StepNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
       <StepHeader icon="heartPulse" title="ABHA" badge={<Badge>Optional</Badge>} />
       <StepSub>Link an Ayushman Bharat Health Account. This may also be added after registration.</StepSub>

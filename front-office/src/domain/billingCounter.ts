@@ -41,11 +41,6 @@ export function sendToBillingCounter(paymentId: string): void {
   waiting.set(paymentId, timer)
 }
 
-/** Whether a bill is with the billing counter, waiting for the payment. */
-export function isAtBillingCounter(paymentId: string): boolean {
-  return waiting.has(paymentId)
-}
-
 /** Hears each payment the counter records — for the desk's notice. */
 export function onCounterPayment(listener: (bill: Payment) => void): () => void {
   listeners.add(listener)

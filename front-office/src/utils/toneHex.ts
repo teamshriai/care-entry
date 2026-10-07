@@ -6,25 +6,27 @@ import type { Tone } from './tone'
 // dashboard section heading and the "Go to" tile, so a place is recognisable
 // by colour AND shape. Used as SOFT TINTS — solid fills only on IconTile.
 
-export type IconTone = 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'red' | 'pink' | 'violet' | 'indigo' | 'gray'
+export type IconTone = 'blue' | 'teal' | 'green' | 'amber' | 'orange' | 'red' | 'pink' | 'violet' | 'indigo' | 'cyan' | 'gray'
 
+/** Each hue as its theme-aware token (shared/design-system.css) — softened
+ *  mid-saturation colours with their own dark-mode values. A CSS colour
+ *  value, so use it in styles and color-mix(); never parse it. */
 export const TONE_HEX: Record<IconTone, string> = {
-  blue: '#0A84FF',
-  teal: '#30B0C7',
-  green: '#34C759',
-  amber: '#FF9F0A',
-  orange: '#FF6B2C',
-  red: '#FF3B30',
-  pink: '#FF2D55',
-  violet: '#AF52DE',
-  indigo: '#5856D6',
-  gray: '#8E8E93',
+  blue: 'var(--color-hue-blue)',
+  teal: 'var(--color-hue-teal)',
+  green: 'var(--color-hue-green)',
+  amber: 'var(--color-hue-amber)',
+  orange: 'var(--color-hue-orange)',
+  red: 'var(--color-hue-red)',
+  pink: 'var(--color-hue-pink)',
+  violet: 'var(--color-hue-violet)',
+  indigo: 'var(--color-hue-indigo)',
+  cyan: 'var(--color-hue-cyan)',
+  gray: 'var(--color-ink-subtle)',
 }
 
 export function toneTint(tone: IconTone, alpha: number): string {
-  const hex = TONE_HEX[tone]
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  return `color-mix(in oklab, ${TONE_HEX[tone]} ${Math.round(alpha * 1000) / 10}%, transparent)`
 }
 
 /** A card tinted in a tone. The tint is LAYERED over the element's own
@@ -47,8 +49,14 @@ export const TONE_ICON: Record<Tone, IconTone> = {
   brand: 'blue',
   neutral: 'gray',
   teal: 'teal',
-  cyan: 'teal',
+  cyan: 'cyan',
   indigo: 'indigo',
   purple: 'violet',
   rose: 'pink',
+}
+
+/** A solid gradient chip in a hue (icon tile, avatar, count): pair with the
+ *  `chip-solid` class, which reads `--tone`. */
+export function toneVar(tone: IconTone): CSSProperties {
+  return { '--tone': TONE_HEX[tone] } as CSSProperties
 }

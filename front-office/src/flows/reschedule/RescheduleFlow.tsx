@@ -5,7 +5,7 @@ import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { Quadrant, SummaryItem, Waiting } from '../../components/flow/Quadrant'
 import { BillAtCounter } from '../../components/payment/BillAtCounter'
-import { sendToBillingCounter } from '../../domain/billingCounter'
+import { printBill } from '../../utils/printBill'
 import { SlotBoard } from '../../components/clinician/SlotBoard'
 import { DateStrip } from '../../components/clinician/DateStrip'
 import { DoctorChoiceList } from '../../components/clinician/DoctorChoiceList'
@@ -154,8 +154,9 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     setError(null)
     try {
       const result = rescheduleAppointment({ appointmentId: was!.appointmentId, providerId, date, slot, mode, by, note })
-      // A fee difference is paid at the billing counter, not here.
-      if (result.differenceBill) sendToBillingCounter(result.differenceBill.paymentId)
+      // A fee difference is paid at the billing counter, not here: its bill is
+      // printed for the patient to take there.
+      if (result.differenceBill) printBill(result.differenceBill.paymentId)
       setDone(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -172,7 +173,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
     if (difference < 0) return `${name}'s fee is ${formatRupees(-difference)} less than the ${formatRupees(feePaid)} paid — a move is not refunded.`
     if (difference === 0) return 'Same fee — nothing to pay.'
     if (by === 'Doctor') return `${name}'s fee is ${formatRupees(difference)} more — the hospital absorbs it, as the doctor is unavailable.`
-    if (by === 'Patient') return `${name}'s fee is ${formatRupees(difference)} more than the ${formatRupees(feePaid)} paid — the difference is billed to the billing counter.`
+    if (by === 'Patient') return `${name}'s fee is ${formatRupees(difference)} more than the ${formatRupees(feePaid)} paid — the patient pays the difference at the billing counter.`
     return `${name}'s fee is ${formatRupees(difference)} more — it is charged only if the patient asked for the move.`
   }
 
@@ -218,7 +219,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
         />
         <Button size="lg" disabled={!ready} onClick={move}>
           <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} />
-          {charge > 0 ? `Reschedule & send ${formatRupees(charge)} bill` : 'Reschedule'}
+          {charge > 0 ? `Reschedule & print ${formatRupees(charge)} bill` : 'Reschedule'}
         </Button>
       </div>
       <p className={cn('text-xs', charge > 0 ? 'font-medium text-warning-fg' : 'text-ink-muted')}>

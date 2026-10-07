@@ -16,20 +16,20 @@ export function figureClasses({ interactive, selected }: { interactive: boolean;
 }
 
 /**
- * The figure card's surface: a soft glow of its hue in the top-left corner
- * and a faint diagonal sheen, over the card's own white (or dark) surface —
- * premium and calm, never a saturated fill. The hue also tints the edge and
- * is exposed as --fig-tone for the icon tile, the watermark and the
- * selected ring.
+ * The figure card's surface: a pastel diagonal gradient of its hue with a
+ * soft light in one corner, over the card's own white (or dark) surface —
+ * colourful but calm, never a saturated fill. The hue also tints the edge
+ * and is exposed as --fig-tone for the icon chip, sparkline, hint, watermark
+ * and the selected ring.
  */
 export function figureStyle(hue: IconTone, selected?: boolean): CSSProperties {
-  const strong = selected ? 0.24 : 0.16
   return {
     '--fig-tone': TONE_HEX[hue],
-    borderColor: toneTint(hue, selected ? 0.5 : 0.26),
+    borderColor: toneTint(hue, selected ? 0.55 : 0.3),
     backgroundImage: [
-      `radial-gradient(130% 110% at 0% 0%, ${toneTint(hue, strong)} 0%, transparent 58%)`,
-      `linear-gradient(155deg, ${toneTint(hue, selected ? 0.1 : 0.06)} 0%, transparent 55%)`,
+      // A soft light in the top-right corner, over a pastel diagonal of the hue.
+      `radial-gradient(90% 80% at 100% 0%, ${toneTint(hue, selected ? 0.2 : 0.14)} 0%, transparent 60%)`,
+      `linear-gradient(140deg, ${toneTint(hue, selected ? 0.24 : 0.17)} 0%, ${toneTint(hue, selected ? 0.1 : 0.06)} 55%, ${toneTint(hue, 0.02)} 100%)`,
     ].join(', '),
   } as CSSProperties
 }
@@ -41,7 +41,7 @@ export function figureStyle(hue: IconTone, selected?: boolean): CSSProperties {
  */
 export function figureRowClass(columns: string) {
   return cn(
-    'scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto overscroll-x-contain px-4 py-1',
+    'scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 py-1',
     '[&>*]:w-[44%] [&>*]:min-w-[8.5rem] [&>*]:shrink-0 [&>*]:snap-start',
     'sm:mx-0 sm:grid sm:gap-3 sm:overflow-visible sm:p-0 sm:[&>*]:w-auto sm:[&>*]:min-w-0',
     columns,

@@ -43,7 +43,7 @@ export function AppLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <AppBar ref={headerRef} />
-        <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden focus:outline-none">
+        <main id="main-content" tabIndex={-1} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden focus:outline-none">
           {/* pb clears the home indicator on phones. */}
           <div className="app-content mx-auto w-full max-w-[112rem] px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:px-5 sm:pt-5 md:pb-6 xl:px-6">
             {/* Keyed on the path: moving to another place clears a failed one. */}

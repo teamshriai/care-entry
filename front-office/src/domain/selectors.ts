@@ -13,8 +13,8 @@ import type { QueueTokenRow, QueueView } from '../types/queue'
 import type { GuestPass, Estimate, MlcRecord, Tariff } from '../types/frontDesk'
 import type { Connectivity } from '../types/connectivity'
 import type { Payment, PaymentItem, PaymentSummary } from '../types/payment'
-import { REGISTRATION_FEE, billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
-import { abhaError, normalizeAbha } from '../utils/validation'
+import { billDisplayStatus, billNumberFor, formatRupees, isBillDue } from '../utils/billing'
+import { abhaError, abhaKind, normalizeAbha } from '../utils/validation'
 
 // Only a CANCELLED appointment releases its slot. Completed and No-show
 // appointments still occupy the slot they were booked into.
@@ -58,10 +58,6 @@ export function getGuestPasses(state: AppState): GuestPass[] {
 /** A patient's guest passes still out. */
 export function getActiveGuestPasses(state: AppState, patientId: string): GuestPass[] {
   return state.guestPasses.filter((p) => p.patientId === patientId && !p.returned)
-}
-
-export function getEstimateById(state: AppState, estimateId: string): Estimate | null {
-  return state.estimates.find((e) => e.estimateId === estimateId) ?? null
 }
 
 /** The bill an estimate became, once it was paid — an estimate is billed once. */
@@ -300,6 +296,23 @@ export function getDoctorSuggestions(state: AppState, department: string, now: n
     .sort((a, b) => Number(b.bookable) - Number(a.bookable) || firstSlotAt(a) - firstSlotAt(b))
 }
 
+/** Every doctor with their availability, for the directory: each
+ *  department's doctors soonest-free first (departments in name order), then
+ *  doctors not taking appointments. */
+export function getDirectorySuggestions(state: AppState, now: number): DoctorSuggestion[] {
+  const active = getDepartments(state).flatMap((department) => getDoctorSuggestions(state, department, now))
+  const inactive = state.providers
+    .filter((provider) => provider.status !== 'Active')
+    .map((provider) => ({
+      provider,
+      status: getDoctorStatus(state, provider.providerId, now, state.today),
+      nextSlots: [],
+      bookable: false,
+      reason: 'Not taking appointments',
+    }))
+  return [...active, ...inactive]
+}
+
 export interface DepartmentSummary {
   department: string
   /** Active doctors in the department. */
@@ -349,28 +362,13 @@ export function getDoctorDateStrip(state: AppState, providerId: string, now: num
   return days
 }
 
-/** Whether a patient still owes the one-time registration fee — true until
- *  a registration fee is on one of their bills (cancelled or refunded ones
- *  don't count). */
-export function needsRegistrationFee(state: AppState, patientId: string): boolean {
-  return !state.payments.some(
-    (p) =>
-      p.patientId === patientId &&
-      p.status !== 'Cancelled' &&
-      p.status !== 'Refunded' &&
-      p.items.some((item) => item.code === REGISTRATION_FEE.code),
-  )
-}
-
-/** A consultation's bill lines: the registration fee the first time, then
- *  the doctor's own consultation fee. */
-export function getConsultationBillItems(state: AppState, patientId: string, providerId: string): PaymentItem[] {
+/** A consultation's bill lines: exactly one — the doctor's own consultation
+ *  fee. Registering is free, so a booking carries no other charge (the
+ *  patient stays in the signature for the bill's callers). */
+export function getConsultationBillItems(state: AppState, _patientId: string, providerId: string): PaymentItem[] {
   const provider = getProviderById(state, providerId)
   if (!provider) return []
-  return [
-    ...(needsRegistrationFee(state, patientId) ? [REGISTRATION_FEE] : []),
-    { code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee },
-  ]
+  return [{ code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee }]
 }
 
 export function getAppointmentById(state: AppState, appointmentId: string): Appointment | null {
@@ -564,6 +562,34 @@ export interface NeedsAttentionItem {
 
 const ATTENTION_ORDER: Record<NeedsAttentionItem['tone'], number> = { critical: 0, warning: 1, info: 2, neutral: 3 }
 
+export interface NavBadge {
+  count: number
+  tone: 'critical' | 'warning' | 'info'
+  /** What the count is, for the tooltip and screen readers. */
+  label: string
+}
+
+/** The counts beside places in the navigation — only those with something
+ *  in them. Each comes from the same records as the place's own figures. */
+export function getNavBadges(state: AppState, now: number = Date.now()): Record<string, NavBadge> {
+  const badges: Record<string, NavBadge> = {}
+  const waiting = getQueueView(state, now).waiting.length
+  if (waiting) badges['/patients'] = { count: waiting, tone: 'info', label: `${waiting} waiting for consultation` }
+  const billing = getBillingOverview(state)
+  if (billing.dueCount) {
+    badges['/billing'] = {
+      count: billing.dueCount,
+      tone: billing.failedCount ? 'critical' : 'warning',
+      label: `${billing.dueCount} ${billing.dueCount === 1 ? 'bill' : 'bills'} due${billing.failedCount ? `, ${billing.failedCount} failed` : ''}`,
+    }
+  }
+  const overdue = state.guestPasses.filter((pass) => !pass.returned && now > pass.validUntil).length
+  if (overdue) badges['/services/guest-pass'] = { count: overdue, tone: 'critical', label: `${overdue} ${overdue === 1 ? 'pass' : 'passes'} overdue` }
+  const mlc = state.mlcRecords.filter((record) => !record.acknowledgedAt).length
+  if (mlc) badges['/services/mlc'] = { count: mlc, tone: 'warning', label: `${mlc} awaiting acknowledgement` }
+  return badges
+}
+
 /** What the front desk should deal with now, most urgent first. */
 export function getNeedsAttention(state: AppState, now: number = Date.now()): NeedsAttentionItem[] {
   const items: NeedsAttentionItem[] = []
@@ -747,25 +773,40 @@ function abhaTier(abha: string | null, raw: string, query: string): number {
   return 0
 }
 
+/** "ABHA 91-4410-…", "ABHA ID: name@abdm", "abha no 9144…" — the typed
+ *  value without its label, or null when no label was typed. */
+function withoutAbhaLabel(raw: string): string | null {
+  const rest = raw.replace(/^abha(\s*(id|number|no\.?|address))?\s*[:#-]?\s*/i, '')
+  return rest !== raw && rest ? rest : null
+}
+
 /** Ranked patient search: best match first, then the patients the desk
- *  opens most, then the newest registrations. */
+ *  opens most, then the newest registrations. A patient is found by UHID,
+ *  mobile, name (any script, known aliases), ABHA ID (name@abdm, or just the
+ *  name part) or ABHA number (with or without dashes, or its first digits).
+ *  Typing "ABHA …" searches the ABHA alone. */
 export function searchPatients(state: AppState, rawQuery: string): PatientSearchMatch[] {
-  const raw = rawQuery.trim()
-  if (!raw) return []
+  const typed = rawQuery.trim()
+  if (!typed) return []
+  const abhaOnly = withoutAbhaLabel(typed)
+  const raw = abhaOnly ?? typed
   const query = normText(raw)
   const opens = (patientId: string) => state.patientOpens[patientId]?.count ?? 0
 
   return state.patients
     .map((patient): PatientSearchMatch | null => {
       // Listed in tie-break order: on equal scores the earlier field is named.
-      const scores: [MatchField, number][] = [
-        ['UHID', uhidTier(patient.uhid, raw)],
-        ['Mobile', mobileTier(patient.mobile, raw)],
-        ['ABHA', abhaTier(patient.abhaId, raw, query)],
-        ['Name', textTier(normText(patient.name), query)],
-        ['Name (native script)', patient.nameNative ? textTier(normText(patient.nameNative), query) : 0],
-        ['Name (known alias)', Math.max(0, ...(patient.aliases ?? []).map((alias) => textTier(normText(alias), query)))],
-      ]
+      const abha: [MatchField, number] = [patient.abhaId ? abhaKind(patient.abhaId) : 'ABHA number', abhaTier(patient.abhaId, raw, query)]
+      const scores: [MatchField, number][] = abhaOnly
+        ? [abha]
+        : [
+            ['UHID', uhidTier(patient.uhid, raw)],
+            ['Mobile', mobileTier(patient.mobile, raw)],
+            abha,
+            ['Name', textTier(normText(patient.name), query)],
+            ['Name (native script)', patient.nameNative ? textTier(normText(patient.nameNative), query) : 0],
+            ['Name (known alias)', Math.max(0, ...(patient.aliases ?? []).map((alias) => textTier(normText(alias), query)))],
+          ]
       let best: [MatchField, number] | null = null
       for (const entry of scores) if (entry[1] > (best?.[1] ?? 0)) best = entry
       return best ? { patient, matchedOn: best[0], tier: best[1] } : null
@@ -842,10 +883,6 @@ export function getPayments(state: AppState): Payment[] {
 
 export function getPaymentById(state: AppState, paymentId: string): Payment | null {
   return state.payments.find((p) => p.paymentId === paymentId) ?? null
-}
-
-export function getPaymentsForPatient(state: AppState, patientId: string): Payment[] {
-  return getPayments(state).filter((p) => p.patientId === patientId)
 }
 
 /** A booking's live bills, oldest first: the consultation bill, then any

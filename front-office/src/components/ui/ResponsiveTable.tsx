@@ -43,6 +43,7 @@ export function ResponsiveTable<T>({
   maxHeight,
   showFooter = false,
   rowClassName,
+  listLimit,
 }: {
   rows: T[]
   columns: Column<T>[]
@@ -52,14 +53,19 @@ export function ResponsiveTable<T>({
   /** Accessible name for a focusable row, e.g. the patient's name. */
   rowLabel?: (row: T) => string
   caption?: string
-  /** A bounded, scrolling box (e.g. `max-h-[28rem]`) with a sticky head. */
+  /** A bounded, scrolling box from tablet up (e.g. `md:max-h-[28rem]`) with a
+   *  sticky head. Phones show every row — no scroll box inside the page. */
   maxHeight?: string
   /** "24 rows · sorted by Date" under the table. */
   showFooter?: boolean
   rowClassName?: (row: T) => string | undefined
+  /** Show this many rows, then "Show more" (table and phone list alike) —
+   *  a long log stays a normal-length page with no scroll box inside it. */
+  listLimit?: number
 }) {
   const [sort, setSort] = useState<Sort>(null)
   const [tooWide, setTooWide] = useState(false)
+  const [listShown, setListShown] = useState(listLimit ?? Number.POSITIVE_INFINITY)
   const body = useRef<HTMLTableSectionElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const table = useRef<HTMLTableElement>(null)
@@ -139,12 +145,12 @@ export function ResponsiveTable<T>({
         className={cn(
           tooWide
             ? 'pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden'
-            : cn('hidden md:block', maxHeight && cn('overflow-y-auto overscroll-contain', maxHeight)),
+            : cn('hidden md:block', maxHeight && cn('md:overflow-y-auto', maxHeight)),
         )}
       >
         <table ref={table} className="w-full border-collapse text-left text-sm">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
-          <thead className="sticky top-0 z-10 bg-surface-2/80 backdrop-blur">
+          <thead className="sticky top-0 z-10 bg-[color-mix(in_oklab,var(--color-hue-blue)_7%,var(--color-surface-2))] backdrop-blur">
             <tr>
               {columns.map((column) => {
                 const active = sort?.key === column.key
@@ -154,7 +160,7 @@ export function ResponsiveTable<T>({
                     scope="col"
                     aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : column.sortValue ? 'none' : undefined}
                     className={cn(
-                      'border-b border-border-soft px-3 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-ink-subtle first:pl-4 last:pr-4 xl:first:pl-5 xl:last:pr-5',
+                      'border-b border-[color-mix(in_oklab,var(--color-hue-blue)_14%,var(--color-border-soft))] px-3 py-2 text-2xs font-semibold uppercase tracking-[0.06em] text-[color-mix(in_oklab,var(--color-hue-blue)_28%,var(--color-ink-muted))] first:pl-4 last:pr-4 xl:first:pl-5 xl:last:pr-5',
                       column.numeric && 'text-right',
                       column.className,
                     )}
@@ -188,7 +194,7 @@ export function ResponsiveTable<T>({
             </tr>
           </thead>
           <tbody ref={body}>
-            {sorted.map((row) => (
+            {sorted.slice(0, listShown).map((row) => (
               <tr
                 key={rowKey(row)}
                 tabIndex={onRowClick ? 0 : undefined}
@@ -222,8 +228,8 @@ export function ResponsiveTable<T>({
       </div>
 
       {/* ── otherwise: stacked records ───────────────────────────────── */}
-      <ul className={cn('divide-y divide-border-soft', !tooWide && 'md:hidden', maxHeight && cn('overflow-y-auto overscroll-contain', maxHeight))} aria-label={caption}>
-        {sorted.map((row) => (
+      <ul className={cn('divide-y divide-border-soft', !tooWide && 'md:hidden', maxHeight && cn('md:overflow-y-auto', maxHeight))} aria-label={caption}>
+        {sorted.slice(0, listShown).map((row) => (
           <li
             key={rowKey(row)}
             onClick={onRowClick ? () => onRowClick(row) : undefined}
@@ -280,6 +286,19 @@ export function ResponsiveTable<T>({
           </li>
         ))}
       </ul>
+      {sorted.length > listShown ? (
+        <div className="border-t border-border-soft px-4 py-1.5 @2xl:px-5">
+          <button
+            type="button"
+            onClick={() => setListShown((n) => n + (listLimit ?? sorted.length))}
+            className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-lg px-1 text-sm font-semibold text-primary-text hover:underline"
+          >
+            <ChevronDown size={15} aria-hidden="true" />
+            Show {Math.min(listLimit ?? sorted.length, sorted.length - listShown)} more
+            <span className="font-normal text-ink-subtle">· {sorted.length - listShown} left</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import { HISTORY_DEFS, SYMPTOM_DEFS } from '../data';
-import { Icon } from './Icon';
+import { Icon, IconBadge } from './Icon';
 import type { SymptomsDraft } from '../drafts';
 import type { Hypertension } from '../types';
 import { Alert, Button, ButtonRow, Card, CheckCard, ChipGroup, Field, Reveal, Section, StepHeader, StepNav, StepSub } from '../ui/kit';
 import { formGridClass, inputClass } from '../ui/classes';
 import { cn } from '../ui/cn';
+import { toneVar } from '../ui/tones';
 
 export function Step5Symptoms({
   draft,
@@ -36,7 +37,7 @@ export function Step5Symptoms({
   }
 
   return (
-    <Card>
+    <Card tone="pink">
       <StepNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
       <StepHeader icon="activity" title="Current symptoms" />
       <StepSub>
@@ -140,10 +141,14 @@ function RecordUpload({ files, onChange }: { files: File[]; onChange: (f: File[]
 
   return (
     <div>
+      {/* A drop zone washed in blue; it deepens while a file is dragged over it. */}
       <div
+        style={toneVar('blue')}
         className={cn(
           'focus-ring flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors',
-          dragging ? 'border-primary-600 bg-primary-50' : 'border-border bg-surface-2 hover:border-border-strong',
+          dragging
+            ? 'border-primary-600 bg-[color-mix(in_oklab,var(--tone)_16%,var(--color-surface-1))]'
+            : 'border-[color-mix(in_oklab,var(--tone)_35%,var(--color-border))] bg-[radial-gradient(70%_120%_at_50%_0%,color-mix(in_oklab,var(--tone)_12%,transparent),transparent_70%)] bg-surface-1 hover:border-[color-mix(in_oklab,var(--tone)_60%,var(--color-border))]',
         )}
         onClick={() => inputRef.current?.click()}
         onDragOver={(e) => {
@@ -166,7 +171,7 @@ function RecordUpload({ files, onChange }: { files: File[]; onChange: (f: File[]
           }
         }}
       >
-        <span className="mb-1 flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-primary-text shadow-card">
+        <span className="chip-solid mb-1 flex h-11 w-11 items-center justify-center rounded-full">
           <Icon name="upload" size={18} />
         </span>
         <span className="text-sm text-ink-muted">
@@ -196,9 +201,7 @@ function RecordUpload({ files, onChange }: { files: File[]; onChange: (f: File[]
               key={`${file.name}-${file.size}`}
               className="flex min-w-0 items-center gap-3 rounded-lg border border-border-soft bg-surface-1 py-1 pl-3 pr-1 motion-safe:animate-[fadeIn_200ms_ease-out]"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-ink-subtle">
-                <Icon name="file" size={15} />
-              </span>
+              <IconBadge name="file" size={32} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-ink">{file.name}</span>
                 <span className="block text-xs text-ink-subtle">{formatBytes(file.size)}</span>

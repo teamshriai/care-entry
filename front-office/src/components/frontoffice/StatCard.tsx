@@ -19,6 +19,7 @@ export function StatCard({
   title,
   selected,
   onSelect,
+  trend,
 }: {
   icon: ElementType
   hue: IconTone
@@ -33,8 +34,10 @@ export function StatCard({
   onSelect?: () => void
   /** With onSelect: this is the chosen card — ringed and lifted. */
   selected?: boolean
+  /** A small series drawn as a sparkline (e.g. per hour today). */
+  trend?: number[]
 }) {
-  const body = <FigureBody icon={icon} hue={hue} value={value} label={label} hint={hint} />
+  const body = <FigureBody icon={icon} hue={hue} value={value} label={label} hint={hint} trend={trend} />
   if (onSelect) {
     return (
       <button

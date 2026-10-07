@@ -28,6 +28,10 @@
 
 /* A coloured card prints plain: no top bar, no tinted header. */
 @media print {
+  /* Printing a bill (BillPrintHost): the bill alone, none of the page behind it. */
+  body:has(> [data-bill-print]) > :not([data-bill-print]) {
+    display: none !important;
+  }
   .card-accent {
     border-color: var(--color-border) !important;
     border-top-width: 1px !important;

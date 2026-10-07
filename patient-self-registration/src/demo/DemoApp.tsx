@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon } from '../components/Icon';
+import { IconBadge } from '../components/Icon';
 import type { IconName } from '../components/Icon';
 import { INDIAN_STATES, MOBILE_ERROR, dobError, generateSystemId, isValidMobile, maskAadhaar } from '../data';
 import { MethodChooser, type IdMethod } from '../identity/MethodChooser';
@@ -27,6 +27,7 @@ import {
 } from '../ui/kit';
 import { formGridClass, inputClass } from '../ui/classes';
 import { useTheme } from '../ui/useTheme';
+import type { IconTone } from '../ui/tones';
 
 type Stage = 'choose' | 'verify' | 'form' | 'done';
 
@@ -118,6 +119,9 @@ export default function DemoApp() {
   const stageIndex = STAGES.findIndex((s) => s.key === stage) + 1;
   const pct = Math.round(((stageIndex - 1) / (STAGES.length - 1)) * 100);
   const filledCount = identity ? 6 : 0;
+  /** The card takes the hue of its stage: choosing (blue), identity (violet;
+   *  ABHA pink) and done (green). */
+  const cardTone: IconTone = stage === 'choose' ? 'blue' : stage === 'done' ? 'green' : stage === 'verify' && method === 'abha' ? 'pink' : 'violet';
 
   const heading =
     stage === 'choose'
@@ -153,13 +157,14 @@ export default function DemoApp() {
       progress={pct}
       user={{
         name: form.name || 'New patient',
+        person: !!form.name.trim(),
         detail: identity ? `${sourceLabel} verified` : sourceLabel,
         badge: { label: stage === 'done' ? 'Complete' : 'Demo', done: stage === 'done' },
       }}
       theme={{ dark: theme.dark, onToggle: theme.toggle }}
       rail={
         <>
-          <RailPanel title="Retrieved record" aside={<Badge tone={identity ? 'success' : 'neutral'}>{identity ? 'Verified' : 'None'}</Badge>}>
+          <RailPanel title="Retrieved record" tone="violet" aside={<Badge tone={identity ? 'success' : 'neutral'}>{identity ? 'Verified' : 'None'}</Badge>}>
             <RailRow icon="userCheck" label="Name" value={identity?.name} />
             <RailRow icon="calendar" label="Date of birth" value={identity?.dob} />
             <RailRow icon="mapPin" label="Town or city" value={identity?.city} />
@@ -172,14 +177,14 @@ export default function DemoApp() {
             />
           </RailPanel>
 
-          <RailPanel title="Mobile number" accent aside={<span className="text-primary-text"><Icon name="phone" size={16} /></span>}>
+          <RailPanel title="Mobile number" accent tone="blue" aside={<IconBadge name="phone" size={28} variant="solid" />}>
             <p className="text-sm leading-relaxed text-ink-muted">
               Aadhaar offline eKYC returns only a hash of the registered mobile number, and ABHA returns it masked. Neither discloses a usable number, so it
               must be provided by the patient.
             </p>
           </RailPanel>
 
-          <RailPanel title="Sample data notice">
+          <RailPanel title="Sample data notice" tone="indigo" aside={<IconBadge name="lock" size={28} tone="indigo" />}>
             <p className="text-sm leading-relaxed text-ink-muted">
               No UIDAI or ABDM service is contacted. Lookups read a local sample table and the code check accepts the value displayed on screen. Production
               integration requires replacing two lookup functions.
@@ -188,7 +193,7 @@ export default function DemoApp() {
         </>
       }
     >
-      <Card center={stage === 'done'}>
+      <Card center={stage === 'done'} tone={cardTone}>
         {stage === 'choose' && (
           <>
             <StepHeader icon="userCheck" title="Select a registration method" />
@@ -293,7 +298,7 @@ export default function DemoApp() {
             <h2 className="text-xl font-semibold tracking-tight text-ink sm:text-2xl">Registration complete</h2>
             <StepSub className="mx-auto mb-6 max-w-md">{identity ? `Verified via ${sourceLabel}.` : 'Registered using the details provided.'}</StepSub>
 
-            <SummaryList className="mx-auto max-w-lg">
+            <SummaryList tone="green" className="mx-auto max-w-lg">
               <SummaryRow icon="userCheck" label="Name" value={form.name} />
               <SummaryRow icon="phone" label="Mobile" value={form.mobile} />
               <SummaryRow icon="mapPin" label="Town or city" value={form.city} />
@@ -310,7 +315,7 @@ export default function DemoApp() {
 
       <AssuranceStrip>
         <Assurance icon="lock" title="No external requests" copy="Lookups read local sample records only." />
-        <Assurance icon="shieldCheck" title="Consent required" copy="Details are retrieved only after verification." />
+        <Assurance icon="shieldCheck" tone="violet" title="Consent required" copy="Details are retrieved only after verification." />
         <Assurance icon="stethoscope" title="Reduced data entry" copy="Verification removes six fields from the form." />
       </AssuranceStrip>
     </PatientShell>

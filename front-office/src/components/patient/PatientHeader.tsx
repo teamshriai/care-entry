@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from 'react'
+import type { ElementType } from 'react'
 import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut, Phone, ShieldCheck } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
@@ -8,7 +8,6 @@ import { usePatientCareStatus } from '../../hooks/useCareStatus'
 import { PatientStatusIcons } from './PatientStatusIcons'
 import { formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
-import { cn } from '../../utils/cn'
 import type { PatientHeaderSummary } from '../../domain/patientSelectors'
 import type { Patient } from '../../types/patient'
 import type { Tone } from '../../utils/tone'
@@ -27,12 +26,11 @@ export interface PatientActions {
   schedule: () => void
   admit: () => void
   discharge: () => void
-  billing: () => void
 }
 
 /**
  * The top of the patient profile — who this is, how to reach them, whether
- * money is owed, whether they are admitted, and the four things the desk does
+ * money is owed, whether they are admitted, and the things the desk does
  * for a patient. It stays in view while the timeline scrolls underneath.
  */
 export function PatientHeader({
@@ -115,16 +113,14 @@ export function PatientHeader({
               )}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={actions.billing} title="Open the patient's bills" className="focus-ring tap-reach rounded-lg">
-                <Badge tone={PAYMENT_TONE[payment.status]}>
-                  <IndianRupee className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-                  {payment.status === 'Paid'
-                    ? 'Payment received'
-                    : payment.status === 'No bills'
-                      ? 'No bills'
-                      : `${payment.status === 'Failed' ? 'Payment failed' : 'Payment pending'} · ${formatRupees(payment.due)}`}
-                </Badge>
-              </button>
+              <Badge tone={PAYMENT_TONE[payment.status]}>
+                <IndianRupee className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+                {payment.status === 'Paid'
+                  ? 'Payment received'
+                  : payment.status === 'No bills'
+                    ? 'No bills'
+                    : `${payment.status === 'Failed' ? 'Payment failed' : 'Payment pending'} · ${formatRupees(payment.due)}`}
+              </Badge>
               {inpatient ? (
                 <span title={`Inpatient · ${inpatient.ward} · ${inpatient.bed} · Day ${inpatient.day}`} className="flex min-w-0 max-w-full">
                   <Badge tone={inpatient.critical ? 'critical' : 'info'} className="max-w-full">
@@ -152,41 +148,17 @@ export function PatientHeader({
           ) : (
             <Action icon={BedDouble} label="Admit" onClick={actions.admit} />
           )}
-          <Action
-            icon={IndianRupee}
-            label="Bills"
-            onClick={actions.billing}
-            badge={payment.due > 0 ? formatRupees(payment.due) : undefined}
-            primary={payment.due > 0}
-          />
         </div>
       </div>
     </header>
   )
 }
 
-function Action({
-  icon: Icon,
-  label,
-  onClick,
-  badge,
-  primary = false,
-}: {
-  icon: ElementType
-  label: string
-  onClick: () => void
-  badge?: ReactNode
-  primary?: boolean
-}) {
+function Action({ icon: Icon, label, onClick }: { icon: ElementType; label: string; onClick: () => void }) {
   return (
-    <Button size="md" variant={primary ? 'primary' : 'secondary'} onClick={onClick} aria-label={label} title={label}>
+    <Button size="md" variant="secondary" onClick={onClick} aria-label={label} title={label}>
       <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
       <span className="hidden sm:inline">{label}</span>
-      {badge ? (
-        <span className={cn('rounded-md px-1.5 py-0.5 text-2xs font-bold tabular-nums', primary ? 'bg-white/20' : 'bg-warning-bg text-warning-fg')}>
-          {badge}
-        </span>
-      ) : null}
     </Button>
   )
 }

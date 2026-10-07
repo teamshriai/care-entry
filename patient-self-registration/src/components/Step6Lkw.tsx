@@ -21,7 +21,7 @@ export function Step6Lkw({
   const elapsed = computeElapsed(date, time);
 
   return (
-    <Card>
+    <Card tone="orange">
       <StepNav onBack={onBack} />
       <StepHeader icon="clock" title="Last known well" />
       <StepSub>

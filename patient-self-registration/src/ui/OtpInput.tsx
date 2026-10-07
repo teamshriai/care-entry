@@ -110,7 +110,14 @@ export function OtpInput({
           className={cn(
             'h-12 w-full min-w-0 rounded-xl border bg-surface-1 p-0 text-center text-xl font-semibold tabular-nums text-ink transition-all duration-150 sm:h-14',
             'focus:border-transparent focus:outline-none focus:ring-2 focus:ring-focus/40',
-            success ? 'border-success-fg bg-success-bg text-success-fg' : invalid ? 'border-critical-fg/50' : 'border-border',
+            // A digit that has landed takes a breath of primary, so progress shows at a glance.
+            success
+              ? 'border-success-fg bg-success-bg text-success-fg'
+              : invalid
+                ? 'border-critical-fg/50'
+                : value[index]
+                  ? 'border-[color-mix(in_oklab,var(--color-primary-500)_45%,var(--color-border))] bg-[linear-gradient(180deg,var(--color-surface-1),color-mix(in_oklab,var(--color-primary-500)_9%,var(--color-surface-1)))]'
+                  : 'border-border',
           )}
         />
       ))}

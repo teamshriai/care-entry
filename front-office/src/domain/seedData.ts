@@ -31,7 +31,7 @@ import type { Estimate, GuestPass, MlcRecord, RegistrationLogEntry, Tariff } fro
 import type { Payment, PaymentItem, PaymentMethod } from '../types/payment'
 import type { Admission } from '../types/admission'
 import { createAdmissionSeed } from './admissionSeedData'
-import { REGISTRATION_FEE, admissionBillItems, formatRupees, stayDays, sumItems } from '../utils/billing'
+import { admissionBillItems, formatRupees, stayDays, sumItems } from '../utils/billing'
 import { NO_SHOW_GRACE_MINUTES } from '../utils/appointment'
 
 export { todayKey }
@@ -187,7 +187,7 @@ export function createSeedState(): AppState {
       experienceYears: 18,
       employeeId: 'SHRI-DOC-014',
       consultationType: 'Outpatient',
-      consultationFee: 800,
+      consultationFee: 250,
       room: 'Room 12, Block B',
       loginEmail: 'arun.kumar@shrimedical.mock',
       role: 'Consultant',
@@ -209,7 +209,7 @@ export function createSeedState(): AppState {
       experienceYears: 12,
       employeeId: 'SHRI-DOC-021',
       consultationType: 'Outpatient + Teleconsult',
-      consultationFee: 900,
+      consultationFee: 250,
       room: 'Room 4, Block A',
       loginEmail: 'priya.nair@shrimedical.mock',
       role: 'Consultant',
@@ -231,7 +231,7 @@ export function createSeedState(): AppState {
       experienceYears: 15,
       employeeId: 'SHRI-DOC-008',
       consultationType: 'Outpatient',
-      consultationFee: 600,
+      consultationFee: 200,
       room: 'Room 2, Block A',
       loginEmail: 'rahul.menon@shrimedical.mock',
       role: 'Consultant',
@@ -253,7 +253,7 @@ export function createSeedState(): AppState {
       experienceYears: 10,
       employeeId: 'SHRI-DOC-030',
       consultationType: 'Outpatient',
-      consultationFee: 750,
+      consultationFee: 200,
       room: 'Room 8, Block C',
       loginEmail: 'meera.shah@shrimedical.mock',
       role: 'Consultant',
@@ -275,7 +275,7 @@ export function createSeedState(): AppState {
       experienceYears: 8,
       employeeId: 'SHRI-DOC-042',
       consultationType: 'Outpatient',
-      consultationFee: 800,
+      consultationFee: 200,
       room: 'Room 14, Block B',
       loginEmail: 'ananya.rao@shrimedical.mock',
       role: 'Consultant',
@@ -305,7 +305,7 @@ export function createSeedState(): AppState {
       experienceYears: 20,
       employeeId: 'SHRI-DOC-003',
       consultationType: 'Outpatient + Teleconsult',
-      consultationFee: 650,
+      consultationFee: 300,
       room: 'Room 1, Block A',
       loginEmail: 'vikram.das@shrimedical.mock',
       role: 'Senior Consultant',
@@ -328,7 +328,7 @@ export function createSeedState(): AppState {
       experienceYears: 22,
       employeeId: 'SHRI-DOC-031',
       consultationType: 'Outpatient',
-      consultationFee: 1200,
+      consultationFee: 300,
       room: 'Room 16, Block B',
       loginEmail: 'raj.srinivas@shrimedical.mock',
       role: 'Senior Consultant',
@@ -350,7 +350,7 @@ export function createSeedState(): AppState {
       experienceYears: 11,
       employeeId: 'SHRI-DOC-036',
       consultationType: 'Outpatient',
-      consultationFee: 700,
+      consultationFee: 200,
       room: 'Emergency Block, Bay 2',
       loginEmail: 'logesh@shrimedical.mock',
       role: 'Consultant',
@@ -364,13 +364,13 @@ export function createSeedState(): AppState {
     seedDoctor({
       providerId: 'dr-sanjay-iyer', name: 'Dr. Sanjay Iyer', gender: 'Male', dateOfBirth: '1979-02-14', mobile: '+91 98456 20341', handle: 'sanjay.iyer',
       department: 'Neurology', specialty: 'Movement Disorders', qualification: 'MBBS, MD, DM (Neurology)', registrationNumber: 'KMC-55617', experienceYears: 15,
-      employeeId: 'SHRI-DOC-044', consultationType: 'Outpatient', consultationFee: 850, room: 'Room 15, Block B', role: 'Consultant',
+      employeeId: 'SHRI-DOC-044', consultationType: 'Outpatient', consultationFee: 250, room: 'Room 15, Block B', role: 'Consultant',
       start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 280,
     }),
     seedDoctor({
       providerId: 'dr-revathi-reddy', name: 'Dr. Revathi Reddy', gender: 'Female', dateOfBirth: '1983-11-02', mobile: '+91 98457 41190', handle: 'revathi.reddy',
       department: 'Cardiology', specialty: 'Cardiac Electrophysiology', qualification: 'MBBS, MD, DM (Cardiology)', registrationNumber: 'KMC-60482', experienceYears: 11,
-      employeeId: 'SHRI-DOC-047', consultationType: 'Outpatient + Teleconsult', consultationFee: 950, room: 'Room 5, Block A', role: 'Consultant',
+      employeeId: 'SHRI-DOC-047', consultationType: 'Outpatient + Teleconsult', consultationFee: 250, room: 'Room 5, Block A', role: 'Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 190,
       // A lunch break in the afternoon part of her session.
       breaks: [{ start: t(sessionStart + 180 * MINUTE), end: t(sessionStart + 210 * MINUTE) }],
@@ -378,50 +378,50 @@ export function createSeedState(): AppState {
     seedDoctor({
       providerId: 'dr-harish-menon', name: 'Dr. Harish Menon', gender: 'Male', dateOfBirth: '1972-06-25', mobile: '+91 98458 77012', handle: 'harish.menon',
       department: 'Cardiology', specialty: 'Heart Failure & Preventive Cardiology', qualification: 'MBBS, MD, DM (Cardiology)', registrationNumber: 'KMC-41275', experienceYears: 21,
-      employeeId: 'SHRI-DOC-009', consultationType: 'Outpatient', consultationFee: 900, room: 'Room 6, Block A', role: 'Senior Consultant',
+      employeeId: 'SHRI-DOC-009', consultationType: 'Outpatient', consultationFee: 300, room: 'Room 6, Block A', role: 'Senior Consultant',
       start: sessionStart + 60 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 820,
     }),
     seedDoctor({
       providerId: 'dr-farah-ahmed', name: 'Dr. Farah Ahmed', gender: 'Female', dateOfBirth: '1988-04-19', mobile: '+91 98459 30558', handle: 'farah.ahmed',
       department: 'General Medicine', specialty: 'Family Medicine', qualification: 'MBBS, MD (Family Medicine)', registrationNumber: 'TNMC-90417', experienceYears: 7,
-      employeeId: 'SHRI-DOC-051', consultationType: 'Outpatient + Teleconsult', consultationFee: 550, room: 'Room 3, Block A', role: 'Associate Consultant',
+      employeeId: 'SHRI-DOC-051', consultationType: 'Outpatient + Teleconsult', consultationFee: 150, room: 'Room 3, Block A', role: 'Associate Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 120,
     }),
     seedDoctor({
       providerId: 'dr-ashwin-kamath', name: 'Dr. Ashwin Kamath', gender: 'Male', dateOfBirth: '1984-09-07', mobile: '+91 98460 12873', handle: 'ashwin.kamath',
       department: 'Orthopedics', specialty: 'Sports Medicine & Arthroscopy', qualification: 'MBBS, MS (Orthopaedics)', registrationNumber: 'KMC-63911', experienceYears: 10,
-      employeeId: 'SHRI-DOC-038', consultationType: 'Outpatient', consultationFee: 750, room: 'Room 9, Block C', role: 'Consultant',
+      employeeId: 'SHRI-DOC-038', consultationType: 'Outpatient', consultationFee: 200, room: 'Room 9, Block C', role: 'Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 20, days: 340,
     }),
     seedDoctor({
       providerId: 'dr-nandini-hegde', name: 'Dr. Nandini Hegde', gender: 'Female', dateOfBirth: '1980-12-03', mobile: '+91 98461 56024', handle: 'nandini.hegde',
       department: 'Orthopedics', specialty: 'Spine & Trauma', qualification: 'MBBS, MS (Orthopaedics), FNB (Spine)', registrationNumber: 'KMC-50734', experienceYears: 14,
-      employeeId: 'SHRI-DOC-027', consultationType: 'Outpatient', consultationFee: 800, room: 'Room 10, Block C', role: 'Consultant',
+      employeeId: 'SHRI-DOC-027', consultationType: 'Outpatient', consultationFee: 250, room: 'Room 10, Block C', role: 'Consultant',
       start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 30, days: 510,
     }),
     seedDoctor({
       providerId: 'dr-suresh-pillai', name: 'Dr. Suresh Pillai', gender: 'Male', dateOfBirth: '1969-03-28', mobile: '+91 98462 90317', handle: 'suresh.pillai',
       department: 'Neurosurgery', specialty: 'Spine Surgery', qualification: 'MBBS, MS, MCh (Neurosurgery)', registrationNumber: 'TNMC-47902', experienceYears: 25,
-      employeeId: 'SHRI-DOC-005', consultationType: 'Outpatient', consultationFee: 1100, room: 'Room 17, Block B', role: 'Senior Consultant',
+      employeeId: 'SHRI-DOC-005', consultationType: 'Outpatient', consultationFee: 300, room: 'Room 17, Block B', role: 'Senior Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 30, days: 900,
     }),
     seedDoctor({
       providerId: 'dr-divya-raghavan', name: 'Dr. Divya Raghavan', gender: 'Female', dateOfBirth: '1985-07-16', mobile: '+91 98463 22148', handle: 'divya.raghavan',
       department: 'Neurosurgery', specialty: 'Paediatric Neurosurgery', qualification: 'MBBS, MS, MCh (Neurosurgery)', registrationNumber: 'KMC-66205', experienceYears: 9,
-      employeeId: 'SHRI-DOC-049', consultationType: 'Outpatient + Teleconsult', consultationFee: 1150, room: 'Room 18, Block B', role: 'Consultant',
+      employeeId: 'SHRI-DOC-049', consultationType: 'Outpatient + Teleconsult', consultationFee: 250, room: 'Room 18, Block B', role: 'Consultant',
       // Starts after her morning theatre list.
       start: sessionStart + 90 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 230,
     }),
     seedDoctor({
       providerId: 'dr-arvind-shetty', name: 'Dr. Arvind Shetty', gender: 'Male', dateOfBirth: '1982-01-30', mobile: '+91 98464 71530', handle: 'arvind.shetty',
       department: 'Emergency Medicine', specialty: 'Acute Medicine', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'KMC-58840', experienceYears: 12,
-      employeeId: 'SHRI-DOC-033', consultationType: 'Outpatient', consultationFee: 700, room: 'Emergency Block, Bay 3', role: 'Consultant',
+      employeeId: 'SHRI-DOC-033', consultationType: 'Outpatient', consultationFee: 200, room: 'Emergency Block, Bay 3', role: 'Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 310,
     }),
     seedDoctor({
       providerId: 'dr-swetha-venkat', name: 'Dr. Swetha Venkat', gender: 'Female', dateOfBirth: '1990-10-11', mobile: '+91 98465 08623', handle: 'swetha.venkat',
       department: 'Emergency Medicine', specialty: 'Trauma Care', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'TNMC-93361', experienceYears: 6,
-      employeeId: 'SHRI-DOC-053', consultationType: 'Outpatient', consultationFee: 700, room: 'Emergency Block, Bay 4', role: 'Associate Consultant',
+      employeeId: 'SHRI-DOC-053', consultationType: 'Outpatient', consultationFee: 150, room: 'Emergency Block, Bay 4', role: 'Associate Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 95,
     }),
   ]
@@ -544,29 +544,11 @@ export function createSeedState(): AppState {
     return bill
   }
 
-  // Registering raises the registration fee's bill, and the patient pays it
-  // at the billing counter a few minutes later. The newest registration is
-  // still on its way to the counter — its payment is pending.
-  const registrationPaid = new Set<string>()
-  const newestRegistration = [...patients].sort((a, b) => b.createdAt - a.createdAt)[0]?.patientId
-  patients.forEach((p, index) => {
-    const pending = p.patientId === newestRegistration && now - p.createdAt < 30 * MINUTE
-    pushBill({
-      patientId: p.patientId,
-      items: [REGISTRATION_FEE],
-      createdAt: p.createdAt,
-      collections: pending ? [] : [{ amount: REGISTRATION_FEE.amount, method: index % 3 === 0 ? 'Card' : 'UPI', at: p.createdAt + 3 * MINUTE }],
-    })
-    registrationPaid.add(p.patientId)
-  })
-
-  /** A consultation's bill lines: the registration fee the first time, then
-   *  the doctor's own fee. */
-  const consultationItems = (patientId: string, providerId: string): PaymentItem[] => {
+  /** A consultation's bill line — the doctor's own fee, the only charge a
+   *  booking carries (registering is free). */
+  const consultationItems = (providerId: string): PaymentItem[] => {
     const provider = providerOf(providerId)
-    const items: PaymentItem[] = registrationPaid.has(patientId) ? [] : [REGISTRATION_FEE]
-    registrationPaid.add(patientId)
-    return [...items, { code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee }]
+    return [{ code: 'CONS-FEE', description: `Consultation — ${provider.name}`, amount: provider.consultationFee }]
   }
 
   // ---------------------------------------------------------- outpatients
@@ -682,7 +664,7 @@ export function createSeedState(): AppState {
 
     // A moved booking was paid for its first doctor; its line now names the
     // doctor the patient will see.
-    const items = consultationItems(p.patientId, from.providerId).map((item) =>
+    const items = consultationItems(from.providerId).map((item) =>
       item.code === 'CONS-FEE' ? { ...item, description: `Consultation — ${provider.name}` } : item,
     )
     pushBill({
@@ -780,7 +762,7 @@ export function createSeedState(): AppState {
     moved: { fromDay: 0, fromSlotIndex: 3, by: 'Doctor', note: 'Dr. Meera Shah on leave', at: daysAgo(2) },
   })
   // Saraswathi asked to see the diabetologist instead of Dr. Rahul Menon —
-  // she paid the ₹50 difference when the booking was moved.
+  // she paid the ₹100 difference when the booking was moved.
   book({
     patientId: 'SHRI-0052719', providerId: 'dr-vikram-das', day: 2, slotIndex: 2, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(3), reason: 'Sugar review',
     moved: { fromProviderId: 'dr-rahul-menon', fromDay: 2, fromSlotIndex: 4, by: 'Patient', note: 'Asked to see the diabetologist', at: daysAgo(1) },
@@ -1099,14 +1081,15 @@ export function createSeedState(): AppState {
 
   // Rate card for the enquiry/estimate desk. A real deployment reads this
   // from the hospital's tariff master; the rates themselves are never
-  // calculated or guessed here.
+  // calculated or guessed here. Consultations match what the department's
+  // doctors charge — a small fee (₹150–₹300), the only charge a visit has.
   const tariffs: Tariff[] = [
-    { code: 'CONS-GEN', name: 'General Medicine consultation', department: 'General Medicine', rate: 600 },
-    { code: 'CONS-NEU', name: 'Neurology consultation', department: 'Neurology', rate: 800 },
-    { code: 'CONS-CAR', name: 'Cardiology consultation', department: 'Cardiology', rate: 900 },
-    { code: 'CONS-ORT', name: 'Orthopedics consultation', department: 'Orthopedics', rate: 750 },
-    { code: 'CONS-NSG', name: 'Neurosurgery consultation', department: 'Neurosurgery', rate: 1200 },
-    { code: 'CONS-EMG', name: 'Emergency medicine consultation', department: 'Emergency Medicine', rate: 700 },
+    { code: 'CONS-GEN', name: 'General Medicine consultation', department: 'General Medicine', rate: 200 },
+    { code: 'CONS-NEU', name: 'Neurology consultation', department: 'Neurology', rate: 250 },
+    { code: 'CONS-CAR', name: 'Cardiology consultation', department: 'Cardiology', rate: 250 },
+    { code: 'CONS-ORT', name: 'Orthopedics consultation', department: 'Orthopedics', rate: 200 },
+    { code: 'CONS-NSG', name: 'Neurosurgery consultation', department: 'Neurosurgery', rate: 300 },
+    { code: 'CONS-EMG', name: 'Emergency medicine consultation', department: 'Emergency Medicine', rate: 200 },
     { code: 'INV-ECG', name: 'ECG', department: 'Cardiology', rate: 350 },
     { code: 'INV-ECHO', name: '2D Echocardiogram', department: 'Cardiology', rate: 2400 },
     { code: 'INV-MRI-B', name: 'MRI Brain (plain)', department: 'Neurology', rate: 7500 },

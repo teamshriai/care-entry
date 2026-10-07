@@ -179,7 +179,7 @@ export function GuestPassPage() {
                         setError(null)
                       }}
                       scope="inpatients"
-                      placeholder="Search an admitted patient by name, mobile or UHID"
+                      placeholder="Search an admitted patient by name, mobile, UHID or ABHA"
                       detail={stay?.wardLabel ? `${stay.wardLabel} · ${stay.bedNumber}` : undefined}
                     />
                   </Field>

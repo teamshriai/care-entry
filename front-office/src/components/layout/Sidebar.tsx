@@ -5,6 +5,8 @@ import { TONE_HEX } from '../../utils/toneHex'
 import { useSidebar } from '../../hooks/useSidebar'
 import { BrandMark } from './BrandMark'
 import { NAV_GROUPS } from './navigation'
+import { NavCount } from './NavCount'
+import { useNavBadges } from '../../hooks/useNavBadges'
 
 /**
  * The app's navigation from 768px up (DESIGN_SYSTEM §8.3 item states: the
@@ -19,33 +21,45 @@ import { NAV_GROUPS } from './navigation'
  */
 export function Sidebar() {
   const { expanded, isDesktop, toggle } = useSidebar()
+  const badges = useNavBadges()
 
   return (
     <aside
       data-expanded={expanded}
       className={cn(
         'hidden h-full shrink-0 flex-col border-r border-border-soft bg-surface-1 transition-[width] duration-200 ease-out md:flex print:hidden',
+        // A faint wash of colour, blue at the top to violet at the foot.
+        'bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-hue-blue)_6%,var(--color-surface-1))_0%,var(--color-surface-1)_38%,var(--color-surface-1)_62%,color-mix(in_oklab,var(--color-hue-violet)_6%,var(--color-surface-1))_100%)]',
         expanded ? 'w-60' : 'w-16',
       )}
     >
-      {/* The SHRI HEALTH mark leads back to the SHRI apps home. */}
-      <a
-        href="https://shri-ai.org"
-        aria-label="SHRI HEALTH Care Entry — shri-ai.org"
-        title="SHRI HEALTH"
-        className={cn(
-          'focus-ring flex h-16 shrink-0 items-center gap-2.5 border-b border-border-soft transition-colors hover:bg-surface-2',
-          expanded ? 'justify-start px-4' : 'justify-center px-2',
-        )}
-      >
-        <BrandMark className="h-8" />
-        {expanded ? (
-          <span className="min-w-0">
-            <span className="block whitespace-nowrap text-[15px] font-bold uppercase leading-tight tracking-[0.06em] text-ink">SHRI Health</span>
-            <span className="block text-xs font-medium leading-tight text-ink-subtle">Care Entry</span>
-          </span>
-        ) : null}
-      </a>
+      {/* The SHRI HEALTH mark (back to the SHRI apps home), with collapse /
+          expand beside it — desktop only; the tablet rail has no room to open. */}
+      <div className={cn('flex h-16 shrink-0 items-center border-b border-border-soft', expanded ? 'gap-1 pl-2 pr-2' : 'justify-center px-2')}>
+        <a
+          href="https://shri-ai.org"
+          aria-label="SHRI HEALTH Care Entry — shri-ai.org"
+          title="SHRI HEALTH"
+          className={cn(
+            'focus-ring flex min-w-0 items-center gap-2.5 rounded-lg py-1.5 transition-colors hover:bg-surface-2',
+            expanded ? 'flex-1 justify-start px-2' : 'justify-center px-1.5',
+          )}
+        >
+          <BrandMark className="h-8" />
+          {expanded ? (
+            <span className="min-w-0">
+              <span className="block whitespace-nowrap text-[15px] font-bold uppercase leading-tight tracking-[0.06em] text-ink">SHRI Health</span>
+              <span className="block text-xs font-medium leading-tight text-ink-subtle">Care Entry</span>
+            </span>
+          ) : null}
+        </a>
+        {isDesktop && expanded ? <CollapseButton expanded onToggle={toggle} /> : null}
+      </div>
+      {isDesktop && !expanded ? (
+        <div className="flex shrink-0 justify-center border-b border-border-soft py-2">
+          <CollapseButton expanded={false} onToggle={toggle} />
+        </div>
+      ) : null}
 
       <nav aria-label="Main navigation" className={cn('scrollbar-hide flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3', expanded ? 'px-2.5' : 'px-2')}>
         {NAV_GROUPS.map((group, index) => (
@@ -58,13 +72,15 @@ export function Sidebar() {
               )
             ) : null}
             <ul className="flex flex-col gap-0.5">
-              {group.items.map(({ path, label, icon: Icon, end, hue }) => (
+              {group.items.map(({ path, label, icon: Icon, end, hue }) => {
+                const badge = badges[path]
+                return (
                 <li key={path}>
                   <NavLink
                     to={path}
                     end={end}
-                    title={expanded ? undefined : label}
-                    aria-label={expanded ? undefined : label}
+                    title={expanded ? undefined : badge ? `${label} — ${badge.label}` : label}
+                    aria-label={expanded ? undefined : badge ? `${label}, ${badge.label}` : label}
                     className={({ isActive }) =>
                       cn(
                         'group focus-ring flex w-full items-center gap-2.5 rounded-lg text-sm font-medium transition-colors',
@@ -90,43 +106,53 @@ export function Sidebar() {
                           className="shrink-0 transition-transform duration-150 group-hover:scale-105"
                           style={{ color: TONE_HEX[hue] }}
                         />
-                        {expanded ? <span className="min-w-0 truncate">{label}</span> : null}
+                        {expanded ? <span className="min-w-0 flex-1 truncate">{label}</span> : null}
+                        {badge ? (
+                          expanded ? (
+                            <>
+                              <NavCount badge={badge} />
+                              <span className="sr-only">, {badge.label}</span>
+                            </>
+                          ) : (
+                            <NavCount badge={badge} dot />
+                          )
+                        ) : null}
                         {isActive ? <span className="sr-only">(current page)</span> : null}
                       </>
                     )}
                   </NavLink>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           </div>
         ))}
       </nav>
 
-      <div className={cn('shrink-0 border-t border-border-soft py-2', expanded ? 'px-2.5' : 'px-2')}>
-        {/* Collapse / expand — desktop only; the tablet rail has no room to open. */}
-        {isDesktop ? (
-          <button
-            type="button"
-            onClick={toggle}
-            aria-expanded={expanded}
-            aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            title={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            className={cn(
-              'focus-ring flex min-h-10 w-full items-center gap-2.5 rounded-lg text-sm font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink',
-              expanded ? 'justify-start px-2.5' : 'justify-center',
-            )}
-          >
-            {expanded ? <PanelLeftClose size={17} aria-hidden="true" /> : <PanelLeftOpen size={19} aria-hidden="true" />}
-            {expanded ? 'Collapse' : null}
-          </button>
-        ) : null}
-        {/* Which build this is — the time it was made, and its commit on hover. */}
-        {expanded ? (
-          <p className="px-2.5 pb-1 pt-1.5 text-2xs font-medium tabular-nums tracking-wide text-ink-subtle" title={`Build ${__BUILD_STAMP__} · commit ${__BUILD_COMMIT__}`}>
+      {/* Which build this is — the time it was made, and its commit on hover. */}
+      {expanded ? (
+        <div className="shrink-0 border-t border-border-soft px-2.5 py-2">
+          <p className="px-2.5 pb-1 pt-1 text-2xs font-medium tabular-nums tracking-wide text-ink-subtle" title={`Build ${__BUILD_STAMP__} · commit ${__BUILD_COMMIT__}`}>
             Version {__BUILD_STAMP__}
           </p>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </aside>
+  )
+}
+
+function CollapseButton({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  const label = expanded ? 'Collapse sidebar' : 'Expand sidebar'
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-label={label}
+      title={label}
+      className="focus-ring flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+    >
+      {expanded ? <PanelLeftClose size={18} aria-hidden="true" /> : <PanelLeftOpen size={19} aria-hidden="true" />}
+    </button>
   )
 }

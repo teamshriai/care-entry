@@ -20,6 +20,8 @@ import { todayKey } from '../domain/time'
 import { BILL_STATUS_LABEL, BILL_STATUS_TONE, formatRupees } from '../utils/billing'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
+import { Avatar } from '../components/ui/Avatar'
+import { initialsOf } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { Admission, Bed, Ward } from '../types/admission'
 import { PatientStatusIcons } from '../components/patient/PatientStatusIcons'
@@ -287,6 +289,11 @@ export function InpatientsPage() {
 function PatientCell({ patientId, name, detail, onOpen }: { patientId: string; name: string; detail: string; onOpen: () => void }) {
   const care = usePatientCareStatus()
   return (
+    <div className="flex min-w-0 items-center gap-2.5">
+      {/* In the table only — a phone card keeps the room for the name. */}
+      <span className="hidden shrink-0 tbl:inline-flex">
+        <Avatar name={name} initials={initialsOf(name)} size="sm" />
+      </span>
     <div className="min-w-0">
       <span className="flex min-w-0 items-center gap-1.5">
         <button
@@ -299,6 +306,7 @@ function PatientCell({ patientId, name, detail, onOpen }: { patientId: string; n
         <PatientStatusIcons status={care[patientId]} />
       </span>
       <span className="block truncate text-xs font-normal text-ink-subtle">{detail}</span>
+    </div>
     </div>
   )
 }

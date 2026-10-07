@@ -57,7 +57,7 @@ export function Step2Otp({
   }
 
   return (
-    <Card center>
+    <Card center tone="green">
       <StepNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
       <StepHeader icon="shieldCheck" title="Mobile verification" center />
       <StepSub className="mx-auto mb-7 max-w-md">

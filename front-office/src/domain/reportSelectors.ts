@@ -362,3 +362,20 @@ export function activityTrend(events: ActivityEvent[], range: ReportRange, scale
   }
   return points
 }
+
+/** Today's count of each activity, hour by hour (from 8 AM, or the first
+ *  activity, up to now) — the sparklines on the dashboard's figures. */
+export function getTodayTrends(state: AppState, now: number): Record<ActivityType, number[]> {
+  const today = { from: state.today, to: state.today }
+  const events = eventsInRange(getActivityEvents(state), today)
+  const out = {} as Record<ActivityType, number[]>
+  for (const { type } of ACTIVITY_TYPES) {
+    out[type] = activityTrend(
+      events.filter((e) => e.activityType === type),
+      today,
+      'hour',
+      now,
+    ).map((point) => point.value)
+  }
+  return out
+}

@@ -1,7 +1,7 @@
 import { Icon, IconBadge } from '../components/Icon';
 import type { IconName } from '../components/Icon';
 import { Badge } from '../ui/kit';
-import { tintedSurface, toneOf } from '../ui/tones';
+import { TONE_HEX, figureStyle, toneOf, toneVar } from '../ui/tones';
 
 export type IdMethod = 'aadhaar' | 'abha' | 'manual';
 
@@ -45,7 +45,9 @@ const METHODS: {
 /** Official ABDM portal where a patient without an ABHA can create one. */
 const ABHA_PORTAL = 'https://abha.abdm.gov.in/';
 
-/** Three "doors" (DESIGN_SYSTEM §14 entry cards), each washed in its subject's hue. */
+/** Three "doors" (DESIGN_SYSTEM §14 entry cards), each the pastel figure
+ *  surface of its subject's hue with a solid chip — the front office's
+ *  dashboard figures. */
 export function MethodChooser({ onPick }: { onPick: (m: IdMethod) => void }) {
   return (
     <>
@@ -55,29 +57,37 @@ export function MethodChooser({ onPick }: { onPick: (m: IdMethod) => void }) {
             key={m.key}
             type="button"
             onClick={() => onPick(m.key)}
-            style={tintedSurface(toneOf(m.icon), 0.045)}
-            className="focus-ring group flex min-w-0 flex-col items-start gap-1 rounded-xl border bg-surface-1 p-4 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-md sm:p-5"
+            style={figureStyle(toneOf(m.icon))}
+            className="focus-ring surface-raised surface-raised-hover group relative flex min-w-0 flex-col items-start gap-1 overflow-hidden rounded-xl border bg-surface-1 p-4 text-left sm:p-5"
           >
-            <span className="mb-2 flex w-full items-start justify-between gap-2">
-              <IconBadge name={m.icon} size={40} />
+            {/* A large, faint watermark of the icon in the card's hue. */}
+            <Icon
+              name={m.icon}
+              strokeWidth={1.5}
+              className="pointer-events-none absolute -bottom-4 -right-4 h-24 w-24 text-[var(--tone)] opacity-[0.07] dark:opacity-[0.1]"
+            />
+            <span className="relative mb-2 flex w-full items-start justify-between gap-2">
+              <span className="transition-transform duration-200 group-hover:scale-105">
+                <IconBadge name={m.icon} size={40} variant="solid" />
+              </span>
               {m.tag && <Badge tone={m.key === 'aadhaar' ? 'primary' : 'neutral'}>{m.tag}</Badge>}
             </span>
 
-            <span className="text-base font-semibold text-ink">{m.title}</span>
-            <span className="text-sm leading-relaxed text-ink-muted">{m.copy}</span>
+            <span className="relative text-base font-semibold text-ink">{m.title}</span>
+            <span className="relative text-sm leading-relaxed text-ink-muted">{m.copy}</span>
 
-            <span className="mt-3 flex flex-col gap-1.5 text-xs text-ink-muted">
+            <span className="relative mt-3 flex flex-col gap-1.5 text-xs text-ink-muted">
               <span className="flex items-center gap-1.5">
                 <Icon name="checkCircle" size={13} className="text-success-fg" />
                 {m.need}
               </span>
               <span className="flex items-center gap-1.5">
-                <Icon name="clock" size={13} className="text-ink-subtle" />
+                <Icon name="clock" size={13} style={{ color: TONE_HEX.orange }} />
                 {m.time}
               </span>
             </span>
 
-            <span className="mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-semibold text-primary-text">
+            <span className="ink-tone relative mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-semibold">
               Continue
               <svg
                 width="14"
@@ -99,8 +109,11 @@ export function MethodChooser({ onPick }: { onPick: (m: IdMethod) => void }) {
         ))}
       </div>
 
-      <p className="mt-5 flex items-start gap-2.5 rounded-lg border border-border-soft bg-surface-2 px-3.5 py-3 text-sm leading-relaxed text-ink-muted">
-        <Icon name="heartPulse" size={16} className="mt-0.5 text-ink-subtle" />
+      <p
+        style={toneVar('pink')}
+        className="tint-surface mt-5 flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-sm leading-relaxed text-ink-muted"
+      >
+        <Icon name="heartPulse" size={16} className="ink-tone mt-0.5" />
         <span>
           Without an ABHA account, one may be created free of charge on the ABDM portal and used to register here.{' '}
           <a

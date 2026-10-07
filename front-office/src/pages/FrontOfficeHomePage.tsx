@@ -1,4 +1,4 @@
-import type { ElementType } from 'react'
+import type { CSSProperties, ElementType } from 'react'
 import {
   AlertTriangle,
   BedDouble,
@@ -23,6 +23,7 @@ import { getDoctorTimeline } from '../domain/timelineSelectors'
 import { figureRowClass } from '../utils/figure'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
 import { useStoreValue } from '../hooks/useStore'
+import { getTodayTrends } from '../domain/reportSelectors'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
@@ -37,8 +38,7 @@ import { CheckInToggle } from '../components/appointment/CheckInToggle'
 import { formatRupees } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
 import { formatHeaderDateTime } from '../utils/format'
-import { cn } from '../utils/cn'
-import { TONE_STYLES } from '../utils/tone'
+import { TONE_VAR } from '../utils/tone'
 
 const ATTENTION_ICON: Record<NeedsAttentionItem['tone'], ElementType> = {
   critical: CircleAlert,
@@ -65,6 +65,7 @@ export function FrontOfficeHomePage() {
   const appointments = useStoreValue(getAppointmentsForDate)
   const queue = useStoreValue(getQueueView, now)
   const billing = useStoreValue(getBillingOverview)
+  const trends = useStoreValue(getTodayTrends, now)
   const inpatients = useStoreValue(getInpatientRows, now)
   const wards = useStoreValue(getWardSummaries)
   const timeline = useStoreValue(getDoctorTimeline, now)
@@ -150,6 +151,7 @@ export function FrontOfficeHomePage() {
             icon={CalendarClock}
             value={outpatients.counts.today}
             label="Outpatients today"
+            trend={trends.APPOINTMENT_SCHEDULED}
             hint={`${outpatients.counts['check-in']} to check in`}
             to="/patients/outpatients"
             title="Show everyone booked for today"
@@ -159,6 +161,7 @@ export function FrontOfficeHomePage() {
             icon={UserCheck}
             value={queue.waiting.length}
             label="Waiting for consultation"
+            trend={trends.PATIENT_CHECKED_IN}
             hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
             to="/patients/outpatients?filter=waiting"
             title="Show who is waiting for consultation"
@@ -168,6 +171,7 @@ export function FrontOfficeHomePage() {
             icon={BedDouble}
             value={inpatients.length}
             label="Inpatients"
+            trend={trends.PATIENT_ADMITTED}
             hint={`${critical} in ICU/ER · ${bedsFree} beds free`}
             to="/patients/inpatients"
             title="Show who is admitted, and the beds"
@@ -177,6 +181,7 @@ export function FrontOfficeHomePage() {
             icon={IndianRupee}
             value={formatRupees(billing.dueAmount)}
             label="Payment pending today"
+            trend={trends.PAYMENT_COMPLETED}
             hint={`${billing.dueCount} ${billing.dueCount === 1 ? 'bill' : 'bills'}${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
             to="/billing?filter=due"
             title="Bills raised today still to pay at the billing counter — opens every bill with payment pending"
@@ -186,6 +191,7 @@ export function FrontOfficeHomePage() {
             icon={UserPlus}
             value={registeredToday}
             label="Registered today"
+            trend={trends.PATIENT_REGISTERED}
             hint="New patient records"
             to="/patients?filter=today"
             title="Show the patients registered today"
@@ -239,14 +245,21 @@ export function FrontOfficeHomePage() {
               {needsAttention.length === 0 ? (
                 <EmptyState title="Nothing needs attention" description="Outstanding front-desk tasks appear here." />
               ) : (
-                <div className="divide-y divide-border-soft">
+                <div className="flex flex-col gap-1.5 p-2.5 sm:p-3">
                   {needsAttention.slice(0, ATTENTION_ROWS).map((item) => {
-                    const styles = TONE_STYLES[item.tone] ?? TONE_STYLES.neutral
                     const Icon = ATTENTION_ICON[item.tone]
+                    const hue = TONE_VAR[item.tone]
+                    // Each row tinted by how urgent it is, with a bar of the
+                    // hue on its leading edge — critical rose, warning amber.
+                    const tone = { '--tone': hue ? `var(--color-${hue})` : 'var(--color-ink-subtle)' } as CSSProperties
                     return (
-                      <div key={item.id} className="flex items-center gap-3 px-5 py-3">
-                        <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded-full', styles.bg)}>
-                          <Icon className={cn('h-3.5 w-3.5', styles.text)} strokeWidth={1.75} />
+                      <div
+                        key={item.id}
+                        style={tone}
+                        className="relative flex items-center gap-3 overflow-hidden rounded-lg border border-[color-mix(in_oklab,var(--tone)_22%,transparent)] bg-[linear-gradient(100deg,color-mix(in_oklab,var(--tone)_12%,var(--color-surface-1))_0%,color-mix(in_oklab,var(--tone)_4%,var(--color-surface-1))_70%)] py-2.5 pl-4 pr-3 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-[var(--tone)]"
+                      >
+                        <span className="chip-solid flex h-7 w-7 shrink-0 items-center justify-center rounded-full">
+                          <Icon className="h-3.5 w-3.5" strokeWidth={2} />
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-ink">{item.title}</p>
@@ -259,7 +272,7 @@ export function FrontOfficeHomePage() {
                     )
                   })}
                   {needsAttention.length > ATTENTION_ROWS ? (
-                    <p className="px-5 py-2.5 text-xs text-ink-subtle">+ {needsAttention.length - ATTENTION_ROWS} more, less urgent</p>
+                    <p className="px-1.5 pt-1 text-xs text-ink-subtle">+ {needsAttention.length - ATTENTION_ROWS} more, less urgent</p>
                   ) : null}
                 </div>
               )}

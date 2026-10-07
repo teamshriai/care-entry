@@ -178,7 +178,7 @@ function DoctorLine({
       ) : (
         <div
           ref={scroller}
-          className="scrollbar-hide -mx-4 min-w-0 snap-x snap-mandatory scroll-px-4 overflow-x-auto overscroll-x-contain px-4 [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] sm:-mx-5 sm:scroll-px-5 sm:px-5 lg:mx-0 lg:scroll-px-0 lg:px-0 lg:[mask-image:none]"
+          className="scrollbar-hide -mx-4 min-w-0 snap-x snap-mandatory scroll-px-4 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] sm:-mx-5 sm:scroll-px-5 sm:px-5 lg:mx-0 lg:scroll-px-0 lg:px-0 lg:[mask-image:none]"
           role="group"
           aria-label={`${provider.name}, today hour by hour`}
         >
@@ -200,7 +200,7 @@ function DoctorLine({
                   <span
                     className={cn(
                       'mt-1 whitespace-nowrap text-2xs tabular-nums',
-                      cell?.current ? 'font-semibold text-primary-text' : cell ? 'text-ink-subtle' : 'text-ink-subtle/50',
+                      cell?.current ? 'font-semibold text-primary-text' : 'text-ink-subtle',
                     )}
                   >
                     {cell?.current ? 'Now' : hourLabel(hour)}

@@ -88,6 +88,15 @@ export function ActivityAnalyticsPage() {
   const trendColor = activityType === 'ALL' ? 'var(--color-chart-1)' : TONE_HEX[ACTIVITY_INFO[activityType].hue]
 
   const counts = summary.counts
+  // Each summary card's own trend over the chosen period — its sparkline.
+  const sparkOf = (type: ActivityType) =>
+    activityTrend(
+      inPeriod.filter((e) => e.activityType === type),
+      range,
+      scale,
+      now,
+      period === 'week',
+    ).map((point) => point.value)
   const detailEvents = inPeriod.filter((e) => e.activityType === selected)
   const cancelledBookings = inPeriod.filter((e) => e.activityType === 'APPOINTMENT_SCHEDULED' && e.status === 'Cancelled').length
 
@@ -100,7 +109,7 @@ export function ActivityAnalyticsPage() {
         <section aria-label="Filters" className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-1 p-3 shadow-card lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <span className="text-xs font-semibold text-ink-muted">Date Range</span>
-            <div className="flex flex-wrap gap-1 rounded-xl border border-border-soft bg-surface-2 p-1" role="group" aria-label="Period">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-[color-mix(in_oklab,var(--color-hue-blue)_18%,var(--color-border-soft))] bg-[color-mix(in_oklab,var(--color-hue-blue)_7%,var(--color-surface-1))] p-1" role="group" aria-label="Period">
               {REPORT_PERIODS.map((option) => (
                 <button
                   key={option.key}
@@ -109,7 +118,9 @@ export function ActivityAnalyticsPage() {
                   onClick={() => setPeriod(option.key)}
                   className={cn(
                     'focus-ring min-h-11 rounded-lg px-3.5 text-sm font-medium transition-colors',
-                    option.key === period ? 'bg-surface-1 text-ink shadow-card' : 'text-ink-muted hover:text-ink',
+                    option.key === period
+                      ? 'bg-[image:var(--gradient-primary)] font-semibold text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_4px_12px_-6px_rgba(37,99,235,0.55)]'
+                      : 'text-ink-muted hover:bg-surface-1/70 hover:text-ink',
                   )}
                 >
                   {option.label}
@@ -169,10 +180,12 @@ export function ActivityAnalyticsPage() {
         <section aria-label="Operational Summary" className={figureRowClass('sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7')}>
           <StatCard
             selected={selected === 'PATIENT_REGISTERED'}
-            onSelect={() => setSelected('PATIENT_REGISTERED')} hue="teal" icon={UserPlus} value={counts.PATIENT_REGISTERED} label="Patients Registered" hint="New UHIDs created" />
+            onSelect={() => setSelected('PATIENT_REGISTERED')}
+            trend={sparkOf('PATIENT_REGISTERED')} hue="teal" icon={UserPlus} value={counts.PATIENT_REGISTERED} label="Patients Registered" hint="New UHIDs created" />
           <StatCard
             selected={selected === 'APPOINTMENT_SCHEDULED'}
             onSelect={() => setSelected('APPOINTMENT_SCHEDULED')}
+            trend={sparkOf('APPOINTMENT_SCHEDULED')}
             hue="blue"
             icon={CalendarPlus}
             value={counts.APPOINTMENT_SCHEDULED}
@@ -181,19 +194,24 @@ export function ActivityAnalyticsPage() {
           />
           <StatCard
             selected={selected === 'PATIENT_CHECKED_IN'}
-            onSelect={() => setSelected('PATIENT_CHECKED_IN')} hue="orange" icon={UserCheck} value={counts.PATIENT_CHECKED_IN} label="Patients Checked In" hint="Arrivals at the desk" />
+            onSelect={() => setSelected('PATIENT_CHECKED_IN')}
+            trend={sparkOf('PATIENT_CHECKED_IN')} hue="orange" icon={UserCheck} value={counts.PATIENT_CHECKED_IN} label="Patients Checked In" hint="Arrivals at the desk" />
           <StatCard
             selected={selected === 'GUEST_PASS_ISSUED'}
-            onSelect={() => setSelected('GUEST_PASS_ISSUED')} hue="indigo" icon={IdCard} value={counts.GUEST_PASS_ISSUED} label="Guest Passes Issued" hint="Visitors, doctors, staff" />
+            onSelect={() => setSelected('GUEST_PASS_ISSUED')}
+            trend={sparkOf('GUEST_PASS_ISSUED')} hue="indigo" icon={IdCard} value={counts.GUEST_PASS_ISSUED} label="Guest Passes Issued" hint="Visitors, doctors, staff" />
           <StatCard
             selected={selected === 'PATIENT_ADMITTED'}
-            onSelect={() => setSelected('PATIENT_ADMITTED')} hue="violet" icon={BedDouble} value={counts.PATIENT_ADMITTED} label="Admissions" hint="Patients admitted" />
+            onSelect={() => setSelected('PATIENT_ADMITTED')}
+            trend={sparkOf('PATIENT_ADMITTED')} hue="violet" icon={BedDouble} value={counts.PATIENT_ADMITTED} label="Admissions" hint="Patients admitted" />
           <StatCard
             selected={selected === 'PATIENT_DISCHARGED'}
-            onSelect={() => setSelected('PATIENT_DISCHARGED')} hue="pink" icon={LogOut} value={counts.PATIENT_DISCHARGED} label="Discharges" hint="Patients discharged" />
+            onSelect={() => setSelected('PATIENT_DISCHARGED')}
+            trend={sparkOf('PATIENT_DISCHARGED')} hue="pink" icon={LogOut} value={counts.PATIENT_DISCHARGED} label="Discharges" hint="Patients discharged" />
           <StatCard
             selected={selected === 'PAYMENT_COMPLETED'}
             onSelect={() => setSelected('PAYMENT_COMPLETED')}
+            trend={sparkOf('PAYMENT_COMPLETED')}
             hue="green"
             icon={IndianRupee}
             value={formatRupees(summary.paymentsAmount)}
@@ -226,7 +244,7 @@ export function ActivityAnalyticsPage() {
                     xTitle={scale === 'hour' ? 'Hour of the day' : period === 'week' ? 'Day' : 'Date'}
                     yTitle={activityType === 'ALL' ? 'Number of activities' : `Number of ${typeLabel.toLowerCase()}`}
                   />
-                  <div className="mt-3 flex flex-col gap-1.5 rounded-xl bg-surface-2 px-4 py-3 text-sm text-ink-muted">
+                  <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-[color-mix(in_oklab,var(--color-hue-violet)_20%,var(--color-border-soft))] bg-[linear-gradient(135deg,color-mix(in_oklab,var(--color-hue-violet)_9%,var(--color-surface-1)),color-mix(in_oklab,var(--color-hue-blue)_5%,var(--color-surface-1)))] px-4 py-3 text-sm text-ink-muted">
                     <p>
                       <span className="font-semibold text-ink">How to read this:</span> each dot is how many {typeLabel === 'All activities' ? 'activities (registrations, bookings, check-ins, passes, admissions, discharges and payments together)' : typeLabel.toLowerCase()} were recorded in that {unitWord}. The higher the dot, the busier the desk.
                     </p>
@@ -281,7 +299,7 @@ export function ActivityAnalyticsPage() {
                 rows={rows}
                 rowKey={(event) => event.id}
                 caption="Recent activity"
-                maxHeight="max-h-[32rem]"
+                listLimit={15}
                 columns={activityColumns(multiDay)}
               />
               {filtered.length > rows.length ? (

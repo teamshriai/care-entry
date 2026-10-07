@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { initialsOf } from '../../utils/format'
+import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
 import { AppointmentIllustration } from '../ui/illustrations/AppointmentIllustration'
@@ -85,7 +87,9 @@ export function OutpatientList({
                     : (row.token?.tokenNumber ?? 'Booked')}
               </p>
             </div>
-            <div className="min-w-0 flex-1 basis-48">
+            <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
+              {row.patient ? <Avatar name={row.patient.name} initials={initialsOf(row.patient.name)} size="sm" /> : null}
+              <div className="min-w-0 flex-1">
               <p className="flex min-w-0 items-center gap-1.5">
                 <button
                   type="button"
@@ -101,6 +105,7 @@ export function OutpatientList({
                 {row.provider?.room ?? 'In person'}{' '}
                 · {row.patient?.uhid}
               </p>
+              </div>
             </div>
             <div className="flex min-w-0 shrink-0 flex-col items-start gap-0.5 sm:w-56">
               <Badge tone={status.tone}>{status.label}</Badge>

@@ -17,7 +17,7 @@ import { PatientShell } from './ui/PatientShell';
 import { Assurance, AssuranceStrip, Badge, RailPanel, RailRow } from './ui/kit';
 import { useTheme } from './ui/useTheme';
 import { formatTime } from './portal/portalData';
-import { Icon } from './components/Icon';
+import { IconBadge } from './components/Icon';
 
 const STEP_ICONS: IconName[] = ['userCheck', 'shieldCheck', 'mapPin', 'idCard', 'brainPulse', 'clock', 'checkCircle'];
 
@@ -164,13 +164,14 @@ function App() {
       progress={pct}
       user={{
         name: patient ? patient.name : 'New patient',
+        person: !!patient,
         detail: patient ? encounterCode : 'Not signed in',
         badge: { label: isCompleted ? 'Complete' : 'Draft', done: isCompleted },
       }}
       theme={{ dark: theme.dark, onToggle: theme.toggle }}
       rail={
         <>
-          <RailPanel title="Record summary" aside={statusBadge}>
+          <RailPanel title="Record summary" tone="blue" aside={statusBadge}>
             <RailRow icon="userCheck" label="Name" value={patient?.name} />
             <RailRow icon="phone" label="Mobile" value={patient ? maskTail(patient.mobile) : undefined} />
             <RailRow icon="idCard" label="Patient ID" value={patient?.systemId} mono />
@@ -190,13 +191,13 @@ function App() {
             <RailRow icon="calendar" label="Submitted" value={completedAt || undefined} />
           </RailPanel>
 
-          <RailPanel title="Time dependency" accent aside={<span className="text-primary-text"><Icon name="clock" size={16} /></span>}>
+          <RailPanel title="Time dependency" accent tone="orange" aside={<IconBadge name="clock" size={28} variant="solid" />}>
             <p className="text-sm leading-relaxed text-ink-muted">
               Stroke treatment is time dependent. Your details are transmitted to the care team on completion.
             </p>
           </RailPanel>
 
-          <RailPanel title="Assistance">
+          <RailPanel title="Assistance" tone="teal" aside={<IconBadge name="stethoscope" size={28} tone="teal" />}>
             <p className="text-sm leading-relaxed text-ink-muted">
               Reception staff can assist with any question. Optional fields may be left blank.
             </p>

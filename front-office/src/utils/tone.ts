@@ -94,21 +94,21 @@ export const TONE_STYLES: Record<Tone, ToneStyle> = {
   },
 }
 
-/** The raw CSS custom property behind each accent tone (see shared/design-system.css) —
- *  shared by IconBadge, Card and StatFilter so they can mix
- *  tints/gradients/glows with `color-mix()` from one place.
- *  `neutral` has no accent by design. */
+/** The hue token behind each tone (`--color-hue-*` in shared/design-system.css)
+ *  — shared by IconBadge and Card so their tints, gradients and glows mix
+ *  from the same softened hues as the figures and chips. `neutral` has no
+ *  accent by design. */
 export const TONE_VAR: Partial<Record<Tone, string>> = {
-  critical: 'critical-fg',
-  warning: 'warning-fg',
-  stable: 'success-fg',
-  info: 'info-fg',
-  teal: 'accent-teal-fg',
-  indigo: 'accent-indigo-fg',
-  purple: 'therapy-fg',
-  cyan: 'accent-cyan-fg',
-  rose: 'accent-rose-fg',
-  brand: 'primary-text',
+  critical: 'hue-red',
+  warning: 'hue-amber',
+  stable: 'hue-green',
+  info: 'hue-blue',
+  teal: 'hue-teal',
+  indigo: 'hue-indigo',
+  purple: 'hue-violet',
+  cyan: 'hue-cyan',
+  rose: 'hue-pink',
+  brand: 'hue-blue',
 }
 
 // One colour language for every status in the app:

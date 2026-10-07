@@ -20,6 +20,7 @@ import { BillingPage } from './pages/BillingPage'
 import { InpatientsPage } from './pages/InpatientsPage'
 import { PaymentDetailPage } from './pages/PaymentDetailPage'
 import { PaymentReceiptPage } from './pages/PaymentReceiptPage'
+import { BillPrintHost } from './components/payment/BillPrintHost'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { todayKey } from './domain/time'
 import { useStoreValue } from './hooks/useStore'
@@ -86,6 +87,8 @@ function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
+        {/* "Print bill" prints from any page or flow, without leaving it. */}
+        <BillPrintHost />
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<FrontOfficeHomePage />} />

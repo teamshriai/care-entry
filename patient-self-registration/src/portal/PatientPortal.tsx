@@ -7,10 +7,11 @@ import { CONTACTS, DOCUMENTS, FAQ, MEDICATIONS, NOTICES, UPCOMING, VISITS, daysU
 import type { Notice } from './portalData';
 import type { MockPatient } from '../types';
 import { PatientShell } from '../ui/PatientShell';
-import { Badge, Button, ButtonRow, Card, RailPanel, RailRow, Reveal, Section, StepSub } from '../ui/kit';
+import { Avatar, Badge, Button, ButtonRow, Card, RailPanel, RailRow, Reveal, Section, StepSub } from '../ui/kit';
 import { inputClass } from '../ui/classes';
 import { cn } from '../ui/cn';
-import { TONE_HEX, tintedSurface, toneOf } from '../ui/tones';
+import { figureStyle, toneOf, toneVar } from '../ui/tones';
+import type { IconTone } from '../ui/tones';
 
 type SectionKey = 'overview' | 'appointments' | 'records' | 'medications' | 'assistance';
 
@@ -21,6 +22,9 @@ const NAV: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'medications', label: 'Medications', icon: 'pill' },
   { key: 'assistance', label: 'Assistance', icon: 'message' },
 ];
+
+/** Each report kind keeps its own hue in the records list. */
+const KIND_TONE: Record<string, IconTone> = { Radiology: 'violet', Pathology: 'teal', Inpatient: 'blue' };
 
 const TITLES: Record<SectionKey, string> = {
   overview: 'Overview',
@@ -58,18 +62,18 @@ export function PatientPortal({
       note="Sample data"
       heading={section === 'overview' ? `${greeting()}, ${firstName}` : TITLES[section]}
       headerExtra={<NoticeBell />}
-      user={{ name: patient.name, detail: patient.systemId, badge: { label: 'Signed in', done: true } }}
+      user={{ name: patient.name, detail: patient.systemId, badge: { label: 'Signed in', done: true }, person: true }}
       theme={{ dark: theme.dark, onToggle: theme.toggle }}
       rail={
         <>
-          <RailPanel title="Your details" aside={<Badge tone="success">Verified</Badge>}>
+          <RailPanel title="Your details" tone="blue" aside={<Badge tone="success">Verified</Badge>}>
             <RailRow icon="userCheck" label="Name" value={patient.name} />
             <RailRow icon="idCard" label="Patient ID" value={patient.systemId} mono />
             <RailRow icon="phone" label="Mobile" value={maskMobile(patient.mobile)} />
             <RailRow icon="calendar" label="Date of birth" value={patient.dob} />
           </RailPanel>
 
-          <RailPanel title="Care assistant" accent aside={<span className="text-primary-text"><Icon name="brainPulse" size={16} /></span>}>
+          <RailPanel title="Care assistant" accent tone="violet" aside={<IconBadge name="brainPulse" size={28} variant="solid" />}>
             <p className="text-sm leading-relaxed text-ink-muted">
               Ask about your appointments, medicines or reports and get an answer drawn from your record.
             </p>
@@ -83,9 +87,9 @@ export function PatientPortal({
       {section === 'overview' && (
         <div className="flex flex-col gap-4 sm:gap-5">
           {next && (
-            <Card>
+            <Card tone="indigo">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                <span className="ink-tone inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider">
                   <Icon name="calendar" size={14} /> Next appointment
                 </span>
                 <Badge tone="primary">{daysUntil(next.date) ?? 'Scheduled'}</Badge>
@@ -97,11 +101,12 @@ export function PatientPortal({
                   <p className="text-lg font-semibold tracking-tight text-ink sm:text-xl">
                     {formatDate(next.date)} · {formatTime(next.time)}
                   </p>
-                  <p className="mt-0.5 text-sm text-ink-muted">
+                  <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-muted">
+                    <Avatar name={next.clinician} size="xs" />
                     {next.department} · {next.clinician}
                   </p>
                   <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-subtle">
-                    <Icon name="mapPin" size={13} /> {next.location}
+                    <Icon name="mapPin" size={13} className="text-hue-teal" /> {next.location}
                   </p>
                 </div>
               </div>
@@ -115,18 +120,18 @@ export function PatientPortal({
             </Card>
           )}
 
-          <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto overscroll-x-contain px-4 py-1 [&>*]:w-[42%] [&>*]:min-w-[8.5rem] [&>*]:shrink-0 [&>*]:snap-start sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:p-0 sm:[&>*]:w-auto sm:[&>*]:min-w-0 lg:grid-cols-4">
+          <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 py-1 [&>*]:w-[42%] [&>*]:min-w-[8.5rem] [&>*]:shrink-0 [&>*]:snap-start sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:p-0 sm:[&>*]:w-auto sm:[&>*]:min-w-0 lg:grid-cols-4">
             <QuickTile icon="calendar" label="Appointments" value={`${UPCOMING.length} upcoming`} onClick={() => go('appointments')} />
             <QuickTile icon="file" label="Records" value={`${DOCUMENTS.length} available`} onClick={() => go('records')} />
             <QuickTile icon="pill" label="Medications" value={`${MEDICATIONS.length} active`} onClick={() => go('medications')} />
             <QuickTile icon="message" label="Assistance" value="Help & contacts" onClick={() => go('assistance')} />
           </div>
 
-          <Card>
+          <Card tone="orange">
             <PortalHeading icon="clock" title="Recent visits" />
             <LineList>
               {VISITS.map((v) => (
-                <LineRow key={v.id} lead={<LineDate>{formatDate(v.date)}</LineDate>} title={v.department} sub={`${v.clinician} · ${v.summary}`} />
+                <LineRow key={v.id} lead={<LineDate>{formatDate(v.date)}</LineDate>} title={v.department} person={v.clinician} sub={`${v.clinician} · ${v.summary}`} />
               ))}
             </LineList>
           </Card>
@@ -134,7 +139,7 @@ export function PatientPortal({
       )}
 
       {section === 'appointments' && (
-        <Card>
+        <Card tone="indigo">
           <PortalHeading icon="calendar" title="Appointments" />
           <StepSub>Upcoming bookings. Changes are confirmed by reception.</StepSub>
 
@@ -149,6 +154,7 @@ export function PatientPortal({
                   </LineDate>
                 }
                 title={a.department}
+                person={a.clinician}
                 sub={`${a.clinician} · ${a.location}`}
                 aside={<Badge tone={a.status === 'confirmed' ? 'success' : 'warning'}>{a.status === 'confirmed' ? 'Confirmed' : 'Awaiting'}</Badge>}
               />
@@ -158,7 +164,7 @@ export function PatientPortal({
           <Section title="Past visits" sub="The two most recent consultations.">
             <LineList flush>
               {VISITS.map((v) => (
-                <LineRow key={v.id} lead={<LineDate>{formatDate(v.date)}</LineDate>} title={v.department} sub={`${v.clinician} · ${v.summary}`} />
+                <LineRow key={v.id} lead={<LineDate>{formatDate(v.date)}</LineDate>} title={v.department} person={v.clinician} sub={`${v.clinician} · ${v.summary}`} />
               ))}
             </LineList>
           </Section>
@@ -166,7 +172,7 @@ export function PatientPortal({
       )}
 
       {section === 'records' && (
-        <Card>
+        <Card tone="amber">
           <PortalHeading icon="file" title="Records" />
           <StepSub>Reports released to you. Anyone collecting on your behalf needs your patient ID and their own photo identity.</StepSub>
 
@@ -174,7 +180,7 @@ export function PatientPortal({
             {DOCUMENTS.map((d) => (
               <LineRow
                 key={d.id}
-                lead={<DocIcon name="file" />}
+                lead={<DocIcon name="file" tone={KIND_TONE[d.kind]} />}
                 title={d.title}
                 sub={`${d.kind} · ${formatDate(d.date)} · ${d.size}`}
                 aside={
@@ -194,7 +200,7 @@ export function PatientPortal({
       )}
 
       {section === 'medications' && (
-        <Card>
+        <Card tone="pink">
           <PortalHeading icon="pill" title="Medications" />
           <StepSub>Current prescriptions. Refill requests are reviewed by the prescribing clinician.</StepSub>
 
@@ -213,14 +219,14 @@ export function PatientPortal({
       )}
 
       {section === 'assistance' && (
-        <Card>
+        <Card tone="violet">
           <PortalHeading icon="message" title="Assistance" />
           <StepSub>Ask the assistant, browse common questions, or contact the hospital.</StepSub>
 
           <Assistant patientName={firstName} />
 
           <Section title="Common questions" sub="Answers to what patients ask most often.">
-            <div className="divide-y divide-border-soft overflow-hidden rounded-xl border border-border-soft">
+            <div className="divide-y divide-border-soft overflow-hidden rounded-xl border border-[color-mix(in_oklab,var(--color-hue-violet)_22%,var(--color-border-soft))]">
               {FAQ.map((item) => (
                 <FaqRow key={item.q} question={item.q} answer={item.a} />
               ))}
@@ -244,19 +250,24 @@ export function PatientPortal({
 function PortalHeading({ icon, title }: { icon: IconName; title: string }) {
   return (
     <div className="flex min-h-11 items-center gap-3">
-      <IconBadge name={icon} size={36} />
+      <IconBadge name={icon} size={36} variant="solid" />
       <h2 className="text-lg font-semibold tracking-tight text-ink sm:text-xl">{title}</h2>
     </div>
   );
 }
 
-/** The solid date block (DESIGN_SYSTEM §9.3 "next item" card). */
+/** The solid date block (DESIGN_SYSTEM §9.3 "next item" card): a gradient
+ *  from indigo to blue, both deepened so the white date holds AA on them in
+ *  either theme, with a soft glow of the hue beneath. */
 function DateBlock({ date }: { date: string }) {
   const d = new Date(date);
   const valid = !isNaN(d.getTime());
   return (
-    <span className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-tile-blue shadow-card" aria-hidden="true">
-      <span className="text-2xs font-semibold uppercase tracking-wide text-tile-blue-fg/85">{valid ? d.toLocaleDateString('en-IN', { month: 'short' }) : ''}</span>
+    <span
+      className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-[linear-gradient(150deg,color-mix(in_oklab,var(--color-hue-indigo)_76%,black)_0%,color-mix(in_oklab,var(--color-hue-blue)_68%,black)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_10px_20px_-10px_color-mix(in_oklab,var(--color-hue-indigo)_85%,transparent)]"
+      aria-hidden="true"
+    >
+      <span className="text-2xs font-semibold uppercase tracking-wide text-tile-blue-fg/90">{valid ? d.toLocaleDateString('en-IN', { month: 'short' }) : ''}</span>
       <span className="text-2xl font-semibold leading-none text-tile-blue-fg">{valid ? d.getDate() : '—'}</span>
     </span>
   );
@@ -270,39 +281,51 @@ function LineDate({ children }: { children: ReactNode }) {
   return <span className="w-24 shrink-0 text-sm font-semibold tabular-nums text-ink sm:w-28">{children}</span>;
 }
 
-function LineRow({ lead, title, sub, aside }: { lead: ReactNode; title: string; sub: string; aside?: ReactNode }) {
+/** `person`: the clinician the line is about — their avatar leads the sub-line. */
+function LineRow({ lead, title, sub, person, aside }: { lead: ReactNode; title: string; sub: string; person?: string; aside?: ReactNode }) {
+  const named = person && /^dr\.?\s/i.test(person);
   return (
     <li className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
       {lead}
       <span className="min-w-0 flex-1 basis-48">
         <span className="block text-sm font-semibold text-ink">{title}</span>
-        <span className="mt-0.5 block text-sm text-ink-muted">{sub}</span>
+        <span className="mt-0.5 flex items-start gap-1.5 text-sm text-ink-muted">
+          {named ? <Avatar name={person} size="xs" className="-my-0.5" /> : null}
+          <span className="min-w-0">{sub}</span>
+        </span>
       </span>
       {aside ? <span className="ml-auto shrink-0">{aside}</span> : null}
     </li>
   );
 }
 
-function DocIcon({ name }: { name: IconName }) {
-  return <IconBadge name={name} size={36} />;
+function DocIcon({ name, tone }: { name: IconName; tone?: IconTone }) {
+  return <IconBadge name={name} size={36} tone={tone} />;
 }
 
+/** A destination as a dashboard figure (the front office's KPI tile): the
+ *  pastel surface of its hue, a solid chip, a faint watermark of the icon and
+ *  the count in the hue's ink. */
 function QuickTile({ icon, label, value, onClick }: { icon: IconName; label: string; value: string; onClick: () => void }) {
-  const tone = toneOf(icon);
   return (
     <button
       type="button"
       onClick={onClick}
-      style={tintedSurface(tone, 0.045)}
-      className="focus-ring group flex min-h-24 min-w-0 flex-col items-start gap-1.5 rounded-xl border bg-surface-1 p-3 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-md sm:min-h-28 sm:gap-2 sm:p-4"
+      style={figureStyle(toneOf(icon))}
+      className="focus-ring surface-raised surface-raised-hover group relative flex min-h-24 min-w-0 flex-col items-start gap-1.5 overflow-hidden rounded-xl border bg-surface-1 p-3 text-left sm:min-h-28 sm:gap-2 sm:p-4"
     >
-      <span className="transition-transform group-hover:scale-105">
-        <IconBadge name={icon} size={36} />
+      <Icon
+        name={icon}
+        strokeWidth={1.5}
+        className="pointer-events-none absolute -bottom-3 -right-3 h-20 w-20 text-[var(--tone)] opacity-[0.07] dark:opacity-[0.1]"
+      />
+      <span className="relative transition-transform duration-200 group-hover:scale-105">
+        <IconBadge name={icon} size={36} variant="solid" />
       </span>
-      <span className="text-sm font-semibold text-ink">{label}</span>
-      <span className="flex w-full items-center justify-between gap-1 text-xs text-ink-muted">
+      <span className="relative text-sm font-semibold text-ink">{label}</span>
+      <span className="ink-tone relative flex w-full items-center justify-between gap-1 text-xs font-medium">
         {value}
-        <span style={{ color: TONE_HEX[tone] }} className="opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100">
+        <span className="opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100">
           <Icon name="chevron" size={14} className="-rotate-90" />
         </span>
       </span>
@@ -313,15 +336,15 @@ function QuickTile({ icon, label, value, onClick }: { icon: IconName; label: str
 function FaqRow({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={cn('bg-surface-1', open && 'bg-surface-2/50')}>
+    <div style={toneVar('violet')} className={cn('bg-surface-1', open && 'bg-[color-mix(in_oklab,var(--tone)_6%,var(--color-surface-1))]')}>
       <button
         type="button"
-        className="focus-ring flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
+        className="focus-ring flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-ink transition-colors hover:bg-[color-mix(in_oklab,var(--tone)_7%,var(--color-surface-1))]"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
         <span>{question}</span>
-        <Icon name="chevron" size={16} className={cn('text-ink-subtle transition-transform duration-200', open && 'rotate-180')} />
+        <Icon name="chevron" size={16} className={cn('transition-transform duration-200', open ? 'ink-tone rotate-180' : 'text-ink-subtle')} />
       </button>
       {open && <p className="px-4 pb-4 text-sm leading-relaxed text-ink-muted motion-safe:animate-[fadeIn_200ms_ease-out]">{answer}</p>}
     </div>
@@ -331,12 +354,13 @@ function FaqRow({ question, answer }: { question: string; answer: string }) {
 function ContactTile({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   return (
     <a
-      className="focus-ring flex min-h-14 min-w-0 items-center gap-3 rounded-xl border border-border-soft bg-surface-1 p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-md"
+      style={figureStyle(toneOf(icon), 0.8)}
+      className="focus-ring surface-raised surface-raised-hover flex min-h-14 min-w-0 items-center gap-3 rounded-xl border bg-surface-1 p-3.5"
       href={`tel:${value.replace(/\s/g, '')}`}
     >
-      <IconBadge name={icon} size={36} />
+      <IconBadge name={icon} size={36} variant="solid" />
       <span className="min-w-0">
-        <span className="block text-xs text-ink-subtle">{label}</span>
+        <span className="ink-tone block text-xs font-medium">{label}</span>
         <span className="block truncate text-sm font-semibold tabular-nums text-ink">{value}</span>
       </span>
     </a>
@@ -525,24 +549,29 @@ function Assistant({ patientName }: { patientName: string }) {
   }
 
   return (
-    <Reveal className="mt-5 overflow-hidden rounded-xl border border-border-soft bg-surface-1">
-      <div className="flex items-center gap-3 border-b border-border-soft px-4 py-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-sky text-accent-sky-fg">
-          <Icon name="brainPulse" size={16} />
-        </span>
+    <Reveal className="mt-5 overflow-hidden rounded-xl border border-[color-mix(in_oklab,var(--color-hue-violet)_24%,var(--color-border-soft))] bg-surface-1">
+      <div className="flex items-center gap-3 border-b border-border-soft bg-[radial-gradient(90%_160%_at_0%_0%,color-mix(in_oklab,var(--color-hue-violet)_12%,transparent)_0%,transparent_60%)] px-4 py-3">
+        <IconBadge name="brainPulse" size={32} variant="solid" />
         <span className="min-w-0">
           <span className="block text-sm font-semibold text-ink">Care assistant</span>
           <span className="block text-xs text-ink-subtle">Answers drawn from your record. Not a substitute for clinical advice.</span>
         </span>
       </div>
 
-      <div ref={threadRef} role="log" aria-live="polite" className="flex max-h-80 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-surface-2/50 p-4">
+      <div
+        ref={threadRef}
+        role="log"
+        aria-live="polite"
+        className="flex max-h-80 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-hue-violet)_6%,var(--color-surface-1)),color-mix(in_oklab,var(--color-hue-blue)_5%,var(--color-surface-1)))] p-4"
+      >
         {turns.map((t) => (
           <div
             key={t.id}
             className={cn(
               'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed motion-safe:animate-[slideUp_220ms_var(--ease-premium)_both]',
-              t.role === 'you' ? 'self-end rounded-br-md bg-primary-600 text-on-primary' : 'self-start rounded-bl-md border border-border-soft bg-surface-1 text-ink',
+              t.role === 'you'
+                ? 'self-end rounded-br-md bg-[image:var(--gradient-primary)] text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_4px_12px_-6px_rgba(37,99,235,0.5)]'
+                : 'self-start rounded-bl-md border border-[color-mix(in_oklab,var(--color-hue-violet)_18%,var(--color-border-soft))] bg-surface-1 text-ink shadow-card-sm',
             )}
           >
             {t.text}
@@ -555,7 +584,8 @@ function Assistant({ patientName }: { patientName: string }) {
           <button
             key={t.label}
             type="button"
-            className="focus-ring min-h-11 rounded-lg border border-border-soft bg-surface-2 px-3 py-2 text-left text-sm text-ink-muted transition-colors hover:border-border-strong hover:text-ink"
+            style={toneVar('violet')}
+            className="ink-tone focus-ring min-h-11 rounded-lg border border-[color-mix(in_oklab,var(--tone)_24%,var(--color-border-soft))] bg-[color-mix(in_oklab,var(--tone)_7%,var(--color-surface-1))] px-3 py-2 text-left text-sm font-medium transition-colors hover:border-[color-mix(in_oklab,var(--tone)_50%,var(--color-border-soft))] hover:bg-[color-mix(in_oklab,var(--tone)_12%,var(--color-surface-1))]"
             onClick={() => ask(t.label)}
           >
             {t.label}

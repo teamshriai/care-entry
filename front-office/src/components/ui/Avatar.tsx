@@ -1,14 +1,21 @@
+import type { CSSProperties } from 'react'
 import { cn } from '../../utils/cn'
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl'
 
-// Initials fallback (DESIGN_SYSTEM §10.7): white bold text on one of the
-// three solid tiles, chosen by a hash of the FULL name so two people who
-// share initials still differ, and the same person is always the same colour.
+// Initials fallback (DESIGN_SYSTEM §10.7): a pastel circle with the
+// initials in the hue's ink, the hue chosen by a hash of the FULL name — so
+// two people who share initials still differ, and the same person is always
+// the same colour on every page. Red is left out: it means "urgent" here.
 const PALETTE = [
-  'bg-tile-blue text-tile-blue-fg',
-  'bg-tile-teal text-tile-teal-fg',
-  'bg-tile-violet text-tile-violet-fg',
+  'var(--color-hue-blue)',
+  'var(--color-hue-teal)',
+  'var(--color-hue-violet)',
+  'var(--color-hue-pink)',
+  'var(--color-hue-orange)',
+  'var(--color-hue-green)',
+  'var(--color-hue-indigo)',
+  'var(--color-hue-cyan)',
 ]
 
 const SIZES: Record<AvatarSize, string> = {
@@ -53,12 +60,19 @@ export function Avatar({
   className?: string
 }) {
   const key = withoutHonorifics(name ?? '') || initials || '?'
-  const palette = PALETTE[hashIndex(key.toLowerCase(), PALETTE.length)]
+  const hue = PALETTE[hashIndex(key.toLowerCase(), PALETTE.length)]
 
   return (
     <span
       aria-hidden="true"
-      className={cn('inline-flex shrink-0 select-none items-center justify-center rounded-full font-bold', SIZES[size], palette, className)}
+      style={{ '--tone': hue } as CSSProperties}
+      className={cn(
+        'ink-tone inline-flex shrink-0 select-none items-center justify-center rounded-full font-bold',
+        'bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_26%,var(--color-surface-1)),color-mix(in_oklab,var(--tone)_12%,var(--color-surface-1)))]',
+        'shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tone)_28%,transparent)]',
+        SIZES[size],
+        className,
+      )}
     >
       {initials}
     </span>

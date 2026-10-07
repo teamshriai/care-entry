@@ -1,69 +1,96 @@
 import { useMemo, useState } from 'react'
+import type { CSSProperties, ElementType } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, UserRoundPlus } from 'lucide-react'
+import { LayoutGrid, Search, UserRoundPlus } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { DoctorIllustration } from '../components/ui/illustrations/DoctorIllustration'
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
+import { SoftIconTile } from '../components/ui/IconTile'
+import { DoctorSlotCard } from '../components/clinician/DoctorSlotCard'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useFlow } from '../flows/useFlow'
-import { getDoctorRows, getDepartments, getSpecialties } from '../domain/selectors'
+import { getDirectorySuggestions, getDoctorRows, getToday } from '../domain/selectors'
+import type { DoctorSuggestion } from '../domain/selectors'
+import { departmentIcon, departmentTone } from '../utils/departments'
+import { TONE_HEX } from '../utils/toneHex'
+import type { IconTone } from '../utils/toneHex'
 import { cn } from '../utils/cn'
-import type { DoctorRow, Provider } from '../types/doctor'
+import type { DoctorRow } from '../types/doctor'
 
 const AVAILABILITY_FILTERS = ['All', 'Bookable now', 'Available', 'Fully booked', 'Unavailable'] as const
 type AvailabilityFilter = (typeof AVAILABILITY_FILTERS)[number]
 
-function matchesAvailability(row: DoctorRow, filter: AvailabilityFilter): boolean {
+const ALL = 'All specialities'
+
+function matchesAvailability(row: DoctorRow | undefined, filter: AvailabilityFilter): boolean {
   if (filter === 'All') return true
+  if (!row) return false
   if (filter === 'Bookable now') return Boolean(row.nextSlot)
   if (filter === 'Available') return row.status === 'Available'
   if (filter === 'Fully booked') return row.status === 'Fully booked'
-  if (filter === 'Unavailable') return ['On leave', 'Not scheduled', 'Inactive'].includes(row.status)
-  return true
+  return ['On leave', 'Not scheduled', 'Inactive'].includes(row.status)
 }
 
+/**
+ * Doctors — every doctor as the booking page shows them: who they are, their
+ * fee and room, and their own days and open times. Classified by speciality
+ * (one section per department, or one at a time from the chips), searchable,
+ * and filtered by availability. Tapping a time starts booking it for a
+ * patient; tapping the doctor opens their profile.
+ */
 export function DoctorDirectoryPage() {
   const navigate = useNavigate()
   const now = useNow(30000)
+  const today = useStoreValue(getToday)
   const { openFlow } = useFlow()
 
   const [query, setQuery] = useState('')
-  const [department, setDepartment] = useState('All departments')
-  const [specialty, setSpecialty] = useState('All specialties')
+  const [speciality, setSpeciality] = useState(ALL)
   const [availability, setAvailability] = useState<AvailabilityFilter>('All')
 
+  const doctors = useStoreValue(getDirectorySuggestions, now)
   const rows = useStoreValue(getDoctorRows, now)
-  const departments = useStoreValue(getDepartments)
-  const specialties = useStoreValue(getSpecialties)
 
-  const filtered = useMemo(() => {
+  // Search and availability narrow everyone; the speciality chips then
+  // count and pick from what is left.
+  const matching = useMemo(() => {
+    const byId = new Map(rows.map((row) => [row.provider.providerId, row]))
     const term = query.trim().toLowerCase()
-    return rows.filter((row) => {
+    return doctors.filter(({ provider }) => {
       const matchesTerm =
-        term.length === 0 ||
-        row.provider.name.toLowerCase().includes(term) ||
-        row.provider.specialty.toLowerCase().includes(term) ||
-        row.provider.department.toLowerCase().includes(term)
-      const matchesDepartment = department === 'All departments' || row.provider.department === department
-      const matchesSpecialty = specialty === 'All specialties' || row.provider.specialty === specialty
-      return matchesTerm && matchesDepartment && matchesSpecialty && matchesAvailability(row, availability)
+        !term ||
+        provider.name.toLowerCase().includes(term) ||
+        provider.specialty.toLowerCase().includes(term) ||
+        provider.department.toLowerCase().includes(term)
+      return matchesTerm && matchesAvailability(byId.get(provider.providerId), availability)
     })
-  }, [rows, query, department, specialty, availability])
+  }, [doctors, rows, query, availability])
 
-  // Scheduling picks the patient, then when — now as a walk-in, or a time
-  // to book — inside the flow; the doctor is all this page settles.
-  function handleBook(provider: Provider) {
-    openFlow('schedule', { doctor: provider.providerId })
+  const groups = useMemo(() => {
+    const map = new Map<string, DoctorSuggestion[]>()
+    for (const doctor of matching) {
+      const list = map.get(doctor.provider.department) ?? []
+      list.push(doctor)
+      map.set(doctor.provider.department, list)
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+  }, [matching])
+
+  const departments = useMemo(() => [...new Set(doctors.map((d) => d.provider.department))].sort(), [doctors])
+  const shown = speciality === ALL ? groups : groups.filter(([department]) => department === speciality)
+  const shownCount = shown.reduce((sum, [, list]) => sum + list.length, 0)
+  const countOf = (department: string) => groups.find(([d]) => d === department)?.[1].length ?? 0
+
+  function book(providerId: string, date: string, slot: string) {
+    openFlow('schedule', { doctor: providerId, date, slot })
   }
 
   return (
     <div>
       <PageHeader
-        title="Doctor Directory"
-        subtitle="Live availability by department and specialty — operational information only, no clinical detail."
+        title="Doctors"
+        subtitle="Every doctor's open times by speciality — tap a time to book it for a patient."
         illustration={<DoctorIllustration className="h-8 w-8" />}
         illustrationTone="indigo"
         actions={
@@ -74,44 +101,20 @@ export function DoctorDirectoryPage() {
         }
       />
 
-      <div className="mt-5 sm:mt-6">
-        <Card accentTone="indigo">
-          <div className="flex flex-col gap-3 border-b border-border-soft p-4 xl:flex-row xl:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border-soft bg-surface-1 px-3 transition-colors hover:border-border-strong focus-within:border-primary-600 focus-within:ring-4 focus-within:ring-primary-600/10">
-              <Search className="h-4 w-4 shrink-0 text-ink-subtle" strokeWidth={1.75} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search doctor, specialty or department"
-                aria-label="Search doctors"
-                className="min-h-11 w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-subtle"
-              />
-            </div>
-            <select
-              value={department}
-              onChange={(event) => setDepartment(event.target.value)}
-              aria-label="Department"
-              className="focus-ring min-h-11 rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink"
-            >
-              <option>All departments</option>
-              {departments.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
-            <select
-              value={specialty}
-              onChange={(event) => setSpecialty(event.target.value)}
-              aria-label="Specialty"
-              className="focus-ring min-h-11 w-full min-w-0 rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink sm:max-w-[14rem]"
-            >
-              <option>All specialties</option>
-              {specialties.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
+      {/* Find and narrow. */}
+      <div className="surface-raised mt-4 flex flex-col gap-3 rounded-xl border border-border-soft bg-surface-1 p-3 sm:mt-5 sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border-soft bg-surface-1 px-3 transition-colors focus-within:border-primary-600 focus-within:ring-4 focus-within:ring-primary-600/10 hover:border-border-strong">
+            <Search className="h-4 w-4 shrink-0 text-ink-subtle" strokeWidth={1.75} aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search doctor, speciality or department"
+              aria-label="Search doctors"
+              className="min-h-11 w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-subtle"
+            />
           </div>
-
-          <div className="flex flex-wrap items-center gap-2 border-b border-border-soft px-4 py-3" role="group" aria-label="Availability">
+          <div className="scrollbar-hide scroll-fade-x -mx-1 -my-1 flex gap-1.5 overflow-x-auto overflow-y-hidden px-1 py-1 lg:mx-0 lg:px-0" role="group" aria-label="Availability">
             {AVAILABILITY_FILTERS.map((option) => (
               <button
                 key={option}
@@ -119,27 +122,123 @@ export function DoctorDirectoryPage() {
                 aria-pressed={availability === option}
                 onClick={() => setAvailability(option)}
                 className={cn(
-                  'focus-ring min-h-11 rounded-full border px-3.5 text-sm font-medium transition-colors',
+                  'focus-ring tap-reach inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-semibold transition-colors',
                   availability === option
-                    ? 'border-primary-600 bg-primary-600 text-on-primary shadow-card'
+                    ? 'border-transparent bg-[image:var(--gradient-primary)] text-on-primary shadow-card-sm'
                     : 'border-border-soft bg-surface-1 text-ink-muted hover:border-border-strong hover:text-ink',
                 )}
               >
                 {option}
               </button>
             ))}
-            <span className="ml-auto text-xs text-ink-muted">
-              {filtered.length} of {rows.length} doctors
-            </span>
           </div>
+        </div>
 
-          <DoctorAvailabilityTable
-            rows={filtered}
-            onBook={handleBook}
-            onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
-          />
-        </Card>
+        {/* Classified by speciality. */}
+        <div className="flex flex-col gap-1.5 border-t border-border-soft pt-3">
+          <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-ink-subtle">By speciality</p>
+          <div className="scrollbar-hide scroll-fade-x -mx-1 -my-1 flex gap-1.5 overflow-x-auto overflow-y-hidden px-1 py-1 sm:flex-wrap sm:overflow-visible" role="group" aria-label="Speciality">
+            <SpecialityChip label="All" count={matching.length} icon={LayoutGrid} hue="blue" active={speciality === ALL} onClick={() => setSpeciality(ALL)} />
+            {departments.map((department) => (
+              <SpecialityChip
+                key={department}
+                label={department}
+                count={countOf(department)}
+                icon={departmentIcon(department)}
+                hue={departmentTone(department)}
+                active={speciality === department}
+                onClick={() => setSpeciality(department)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-4 text-xs text-ink-muted" aria-live="polite">
+        {shownCount} of {doctors.length} doctors{speciality === ALL ? '' : ` · ${speciality}`}
+      </p>
+
+      {/* One section per speciality. */}
+      <div className="mt-2 flex flex-col gap-6">
+        {shown.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border-soft px-4 py-10 text-center text-sm text-ink-subtle">
+            No doctors match — try another search or filter.
+          </p>
+        ) : (
+          shown.map(([department, list]) => {
+            const bookable = list.filter((d) => d.bookable).length
+            return (
+              <section key={department} aria-label={department}>
+                <header className="mb-3 flex items-center gap-3">
+                  <SoftIconTile icon={departmentIcon(department)} tone={departmentTone(department)} size="md" />
+                  <div className="min-w-0">
+                    <h2 className="text-base font-bold tracking-tight text-ink">{department}</h2>
+                    <p className="text-xs text-ink-muted">
+                      {list.length} {list.length === 1 ? 'doctor' : 'doctors'} · {bookable} with open times
+                    </p>
+                  </div>
+                </header>
+                {/* The speciality's doctors one below the other, each a long
+                    row — who on the left, their days and times on the right. */}
+                <ul aria-label={`${department} doctors`} className="flex flex-col gap-3">
+                  {list.map((doctor, index) => (
+                    <li key={doctor.provider.providerId} className="min-w-0">
+                      <DoctorSlotCard
+                        suggestion={doctor}
+                        today={today}
+                        now={now}
+                        soonest={index === 0 && doctor.bookable}
+                        selectedDate={null}
+                        selectedSlot={null}
+                        onPick={book}
+                        onOpen={(providerId) => navigate(`/doctors/${providerId}`)}
+                        wide
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          })
+        )}
       </div>
     </div>
+  )
+}
+
+function SpecialityChip({
+  label,
+  count,
+  icon: Icon,
+  hue,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  icon: ElementType
+  hue: IconTone
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        'focus-ring tap-reach inline-flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border pl-2 pr-2.5 text-xs font-semibold transition-colors',
+        active ? 'border-ink bg-ink text-surface-1' : 'border-border-soft bg-surface-1 text-ink hover:border-border-strong',
+      )}
+    >
+      <Icon size={14} strokeWidth={2} aria-hidden="true" style={active ? undefined : { color: TONE_HEX[hue] }} />
+      {label}
+      <span
+        style={active ? undefined : ({ '--tone': TONE_HEX[hue] } as CSSProperties)}
+        className={cn('rounded-full px-1.5 text-2xs tabular-nums', active ? 'bg-surface-1/20' : 'ink-tone bg-[color-mix(in_oklab,var(--tone)_14%,var(--color-surface-1))]')}
+      >
+        {count}
+      </span>
+    </button>
   )
 }

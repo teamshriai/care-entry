@@ -1,7 +1,7 @@
 // Front Office Payments — a mock/in-memory billing and collection layer.
 // This is deliberately NOT a finance/accounting system: one Payment record
-// is one administrative bill (registration fee, consultation, a service
-// charge, …), collected in one or more transactions, with an optional single
+// is one administrative bill (a consultation, an admission, an estimate's
+// services, …), collected in one or more transactions, with an optional single
 // refund. No real payment gateway, no card/bank/UPI credentials are ever
 // held here — only the simulated RESULT of a collection.
 

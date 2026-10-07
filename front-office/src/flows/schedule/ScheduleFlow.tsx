@@ -1,13 +1,10 @@
-import { useState } from 'react'
-import type { ElementType } from 'react'
-import { ArrowRight, Bone, Brain, Building2, CalendarCheck2, CalendarClock, CalendarPlus, Check, HeartPulse, Pencil, Siren, Stethoscope, Video, XCircle } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Printer, ArrowRight, Building2, CalendarCheck2, CalendarPlus, Check, Pencil, Sparkles, Video, XCircle } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
-import { AckCard } from '../../components/flow/AckCard'
-import { BillAtCounter } from '../../components/payment/BillAtCounter'
 import { PatientSearch } from '../../components/patient/PatientSearch'
-import { SlotBoard } from '../../components/clinician/SlotBoard'
-import { DateStrip } from '../../components/clinician/DateStrip'
-import { DoctorChoiceList } from '../../components/clinician/DoctorChoiceList'
+import { DoctorSlotCard } from '../../components/clinician/DoctorSlotCard'
+import { AppointmentPeople, AppointmentSummary, AppointmentWhen } from '../../components/appointment/AppointmentSummary'
+import { BillStatusBadge } from '../../components/payment/BillStatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
 import { Modal } from '../../components/ui/Modal'
@@ -19,54 +16,35 @@ import {
   getAvailableSlots,
   getConsultationBillItems,
   getDepartmentSummaries,
-  getDoctorDateStrip,
   getDoctorSuggestions,
   getPaymentById,
   getPatientById,
   getProviderById,
-  getSlotBoard,
   getToday,
 } from '../../domain/selectors'
 import { bookAppointment, cancelAppointment } from '../../domain/actions'
 import { sendToBillingCounter } from '../../domain/billingCounter'
+import { printBill } from '../../utils/printBill'
 import { billNumberFor, formatRupees, isBillDue, sumItems } from '../../utils/billing'
 import { dayWithDate, relativeDayLabel } from '../../utils/dates'
 import { modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
 import { Quadrant, StepRail, Waiting } from '../../components/flow/Quadrant'
 import { SoftIconTile } from '../../components/ui/IconTile'
-import type { IconTone } from '../../utils/toneHex'
+import { departmentIcon, departmentTone } from '../../utils/departments'
 import type { FlowProps } from '../registry'
 import type { Patient } from '../../types/patient'
 import type { ConsultMode } from '../../types/appointment'
 import type { AppState } from '../../types/store'
 import type { Payment } from '../../types/payment'
+import type { Provider } from '../../types/doctor'
 import { inputClass } from '../../utils/formClasses'
 import { formatTime } from '../../domain/time'
 
-const DEPARTMENT_ICON: Record<string, ElementType> = {
-  Neurology: Brain,
-  Cardiology: HeartPulse,
-  'General Medicine': Stethoscope,
-  Orthopedics: Bone,
-  Neurosurgery: Brain,
-  'Emergency Medicine': Siren,
-}
-
-/** Each department's own hue — its tile, the same everywhere it appears. */
-const DEPARTMENT_TONE: Record<string, IconTone> = {
-  Neurology: 'violet',
-  Cardiology: 'pink',
-  'General Medicine': 'teal',
-  Orthopedics: 'amber',
-  Neurosurgery: 'indigo',
-  'Emergency Medicine': 'red',
-}
-
-/** What the acknowledgement shows once the payment has gone through. */
+/** The booking as it was made — what the confirmation reads back. */
 interface Done {
-  doctorName: string
-  room: string | null
+  patient: Patient
+  provider: Provider
   appointmentId: string
   date: string
   slot: string
@@ -74,21 +52,35 @@ interface Done {
   bill: Payment
 }
 
+/** How long the booking's confirmation stays before closing by itself. */
+const ACK_MS = 10000
+
+/** A doctor and a time, chosen together. */
+interface Pick {
+  providerId: string
+  date: string
+  slot: string
+}
+
 /**
- * Schedule — booking an appointment: department → the department's doctors
- * → a time to book (in person or teleconsult) → confirm and send the bill. All
- * four choices sit on one full-screen page — patient top-left, department
- * top-right, doctor bottom-left, time bottom-right — each editable at any time,
- * with the confirmation along the bottom. Nothing is chosen for the desk.
- * (`?flow=consult`, the old Start Consultation, opens it too.)
+ * Schedule — booking an appointment: patient → department → Doctor
+ * Availability (each of the department's doctors with their own times, in
+ * one list) → review → book; the patient pays at the billing counter.
+ * Once the patient and department are known, the soonest doctor's earliest
+ * time is chosen as a smart choice, said so, and changeable with one tap.
+ * Every step stays editable. (`?flow=consult`, the old Start Consultation,
+ * opens it too.)
  */
 export function ScheduleFlow(props: FlowProps) {
   return <AppointmentFlow {...props} />
 }
 
-/** The doctor's first day with a free slot — where the booking times open. */
-function firstOpenDay(state: AppState, providerId: string, now: number): string | null {
-  return getDoctorDateStrip(state, providerId, now).find((day) => day.state === 'open')?.date ?? null
+/** The smart choice: the department's soonest doctor at their earliest free
+ *  time — or, with `providerId`, that doctor's earliest free time. */
+function soonestPick(state: AppState, department: string, now: number, providerId?: string): Pick | null {
+  const doctor = getDoctorSuggestions(state, department, now).find((s) => s.bookable && (!providerId || s.provider.providerId === providerId))
+  const next = doctor?.nextSlots[0]
+  return doctor && next ? { providerId: doctor.provider.providerId, date: next.date, slot: next.slot } : null
 }
 
 interface Start {
@@ -97,24 +89,32 @@ interface Start {
   date: string | null
   slot: string | null
   mode: ConsultMode
+  /** The start was a smart choice, not the opening page's. */
+  smart: boolean
 }
 
 /** What the page that opened the flow already settled. A doctor page names
- *  the doctor, so the flow opens on their times; a slot is kept only when
- *  the page named one and it is still free. */
+ *  the doctor, and a slot is kept only when the page named one and it is
+ *  still free. With the patient known, whatever is still open is filled in
+ *  as a smart choice. */
 function startFrom(params: FlowProps['params'], now: number): Start {
   const state = getState()
   const doctor = params.doctor ? getProviderById(state, params.doctor) : null
   const usable = doctor && doctor.status === 'Active' ? doctor : null
   const department = usable?.department ?? params.dept ?? null
-  if (!usable) return { department, providerId: null, date: null, slot: null, mode: 'In person' }
-  const named = Boolean(params.date && params.slot && getAvailableSlots(state, usable.providerId, now, params.date).includes(params.slot))
+  const named = Boolean(usable && params.date && params.slot && getAvailableSlots(state, usable.providerId, now, params.date).includes(params.slot))
+  if (usable && named) {
+    return { department, providerId: usable.providerId, date: params.date!, slot: params.slot!, mode: modesFor(usable)[0], smart: false }
+  }
+  const pick = params.uhid && department ? soonestPick(state, department, now, usable?.providerId) : null
+  const chosen = pick ? getProviderById(state, pick.providerId) : usable
   return {
     department,
-    providerId: usable.providerId,
-    date: named ? params.date! : firstOpenDay(state, usable.providerId, now),
-    slot: named ? params.slot! : null,
-    mode: modesFor(usable)[0],
+    providerId: pick?.providerId ?? usable?.providerId ?? null,
+    date: pick?.date ?? null,
+    slot: pick?.slot ?? null,
+    mode: chosen ? modesFor(chosen)[0] : 'In person',
+    smart: Boolean(pick),
   }
 }
 
@@ -139,24 +139,50 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   // and only its own Book Appointment books. After booking, Cancel asks once.
   const [reviewing, setReviewing] = useState(false)
   const [askCancel, setAskCancel] = useState(false)
+  // The smart choice on show — cleared the moment the desk picks another.
+  const [smart, setSmart] = useState<Pick | null>(() => (start.smart && start.providerId && start.date && start.slot ? { providerId: start.providerId, date: start.date, slot: start.slot } : null))
   const { notify } = useToast()
   const doneBill = useStoreValue(getPaymentById, done?.bill.paymentId ?? '')
 
   const departments = useStoreValue(getDepartmentSummaries, now)
   const provider = useStoreValue(getProviderById, providerId ?? '')
   const suggestions = useStoreValue(getDoctorSuggestions, department ?? '', now)
-  const dateStrip = useStoreValue(getDoctorDateStrip, providerId ?? '', now)
-  const slotEntries = useStoreValue(getSlotBoard, providerId ?? '__none__', now, date ?? today)
   const billItems = useStoreValue(getConsultationBillItems, patientId, providerId ?? '')
   const total = sumItems(billItems)
   const modes = provider ? modesFor(provider) : (['In person'] as ConsultMode[])
 
   const ready = Boolean(patient && department && provider && date && slot) && billItems.length > 0
 
+  /** Choose a doctor and a time together. `viaSmart` marks the smart choice,
+   *  so its note shows; any pick by hand clears it. */
+  function applyPick(pick: Pick, viaSmart: boolean) {
+    setError(null)
+    if (pick.providerId !== providerId) {
+      const chosen = getProviderById(getState(), pick.providerId)
+      setProviderId(pick.providerId)
+      setConsultMode(chosen ? modesFor(chosen)[0] : 'In person')
+    }
+    setDate(pick.date)
+    setSlot(pick.slot)
+    setSmart(viaSmart ? pick : null)
+  }
+
+  /** With the patient and the department known and no time chosen yet, take
+   *  the soonest doctor's earliest free time — or, when a doctor is already
+   *  named (opened from their page), that doctor's. */
+  function pickSoonest(dep: string, doctorId?: string) {
+    const pick = soonestPick(getState(), dep, now, doctorId)
+    if (pick) applyPick(pick, true)
+  }
+
   function choosePatient(next: Patient) {
     setPatientId(next.patientId)
     setChangingPatient(false)
     if (!department) reveal('book-department')
+    else if (!slot) {
+      pickSoonest(department, providerId ?? undefined)
+      reveal('book-availability')
+    }
   }
 
   /** On a stacked layout (below 1024px), bring the next step into view once a
@@ -167,7 +193,8 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
     window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
   }
 
-  // A department only narrows the doctors — it chooses none of them.
+  // A department shows its doctors; with the patient known, the soonest of
+  // them is chosen at their earliest time.
   function chooseDepartment(next: string) {
     setError(null)
     if (next !== department) {
@@ -175,42 +202,24 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
       setProviderId(null)
       setDate(null)
       setSlot(null)
+      setSmart(null)
+      if (patient) pickSoonest(next)
     }
-    reveal('book-doctor')
+    reveal('book-availability')
   }
 
-  // A doctor opens their times on their first open day, with nothing chosen.
-  function chooseDoctor(next: string) {
-    setError(null)
-    if (next !== providerId) {
-      const chosen = getProviderById(getState(), next)
-      setProviderId(next)
-      setDate(firstOpenDay(getState(), next, now))
-      setSlot(null)
-      setConsultMode(chosen ? modesFor(chosen)[0] : 'In person')
-    }
-    reveal('book-time')
-  }
-
-  function chooseDate(next: string) {
-    setDate(next)
-    setSlot(null)
-  }
-
-  // Only a time that is still free can be chosen — the board disables the
-  // rest, and this guards against a time taken since the board was drawn.
-  function chooseSlot(next: string) {
-    if (!providerId || !date) return
-    if (!getAvailableSlots(getState(), providerId, Date.now(), date).includes(next)) {
-      setError(`${formatTime(next)} has just been taken or has passed — choose another time.`)
-      setSlot(null)
+  // Only a time that is still free can be chosen — the cards disable the
+  // rest, and this guards against a time taken since they were drawn.
+  function pickTime(nextProvider: string, nextDate: string, nextSlot: string) {
+    if (!getAvailableSlots(getState(), nextProvider, Date.now(), nextDate).includes(nextSlot)) {
+      setError(`${formatTime(nextSlot)} has just been taken or has passed — choose another time.`)
+      if (nextProvider === providerId && nextDate === date && nextSlot === slot) setSlot(null)
       return
     }
-    setError(null)
-    setSlot(next)
+    applyPick({ providerId: nextProvider, date: nextDate, slot: nextSlot }, false)
   }
 
-  // Booking raises the bill and sends it to the billing counter — Care Entry
+  // Booking raises the bill for the patient to pay at the billing counter — Care Entry
   // takes no money. The booking is confirmed once the counter records it.
   function book() {
     setReviewing(false)
@@ -228,8 +237,8 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
       })
       sendToBillingCounter(result.bill.paymentId)
       setDone({
-        doctorName: provider.name,
-        room: provider.room,
+        patient,
+        provider,
         appointmentId: result.appointment.appointmentId,
         date,
         slot,
@@ -251,7 +260,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
     if (!done) return
     try {
       cancelAppointment({ appointmentId: done.appointmentId, by: 'Patient', note: 'Cancelled at the desk after booking' })
-      notify('Appointment cancelled', { detail: `${done.doctorName} · ${dayWithDate(done.date, today)}, ${formatTime(done.slot)}` })
+      notify('Appointment cancelled', { detail: `${done.provider.name} · ${dayWithDate(done.date, today)}, ${formatTime(done.slot)}` })
       onClose()
     } catch (err) {
       setAskCancel(false)
@@ -264,43 +273,70 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
     : 'Choose the patient'
 
   // ------------------------------------------------------------ acknowledgement
+  // A short, calm confirmation for the patient: who, with whom, when. It
+  // closes by itself after ten seconds (a bar shows the time running out —
+  // no countdown), or at once with Done; Cancel undoes the booking. The
+  // timer waits while the cancel question is open.
   if (done) {
-    const teleconsult = done.mode === 'Teleconsult'
+    const fee = doneBill ?? done.bill
     return (
       <FlowSheet title="Schedule Appointment" subtitle={subtitle} icon={CalendarPlus} onClose={onClose} size="full">
-        {/* Full screen like the booking page itself, with the confirmation centred. */}
-        <div className="flex min-h-full items-center justify-center py-6">
-          <div className="w-full max-w-xl rounded-2xl border border-border bg-surface-1 px-6 shadow-card">
-            <AckCard
-              title="Appointment Booked"
-              icon={CalendarCheck2}
-              onDone={onClose}
-              footer={
-                <>
-                  <Button variant="danger" onClick={() => setAskCancel(true)} className="sm:min-w-36">
-                    <XCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                    Cancel
-                  </Button>
-                  <Button onClick={onClose} className="sm:min-w-36">
-                    <Check className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                    Done
-                  </Button>
-                </>
-              }
+        <div className="flex min-h-full items-center justify-center py-4 sm:py-8">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border-soft bg-surface-1 shadow-modal">
+            {/* The outcome, for the patient. */}
+            <div
+              role="status"
+              aria-live="polite"
+              className="px-5 pb-3 pt-5 text-center sm:px-6 sm:pb-4 sm:pt-6"
+              style={{ backgroundImage: 'radial-gradient(120% 100% at 50% 0%, color-mix(in oklab, var(--color-success-fg) 13%, transparent) 0%, transparent 70%)' }}
             >
-              <p className="text-base font-semibold text-ink">{done.doctorName}</p>
-              <p>
-                {dayWithDate(done.date, today)} · <span className="whitespace-nowrap font-semibold text-ink">{formatTime(done.slot)}</span>
+              <span
+                className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-fg text-surface-1 shadow-[0_8px_20px_-8px_var(--color-success-fg)] ring-[6px] ring-success-bg"
+                aria-hidden="true"
+              >
+                <Check className="h-6 w-6" strokeWidth={3} />
+              </span>
+              <h3 className="mt-3.5 text-lg font-bold tracking-tight text-ink">Appointment booked</h3>
+              <p className="mt-0.5 text-sm text-ink-muted">
+                <span className="font-semibold text-ink">{done.patient.name}</span> is all set with{' '}
+                <span className="font-semibold text-ink">{done.provider.name}</span>.
               </p>
-              <p className="inline-flex items-center gap-1.5">
-                {teleconsult ? <Video className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" /> : <Building2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />}
-                {teleconsult ? 'Teleconsult — the patient joins by video' : `In person${done.room ? ` · ${done.room}` : ''}`}
-              </p>
-              <p>
-                {done.appointmentId.toUpperCase()} · <span className="font-medium text-ink">confirmed once the bill is paid at the billing counter</span>
-              </p>
-              <BillAtCounter paymentId={done.bill.paymentId} className="mt-1 w-full" />
-            </AckCard>
+              <span className="mt-2.5 inline-flex items-center rounded-full border border-border-soft bg-surface-1 px-2.5 py-0.5 text-2xs font-semibold tabular-nums tracking-wide text-ink-muted">
+                {done.appointmentId.toUpperCase()}
+              </span>
+            </div>
+
+            {/* When, who, and the fee — the essentials, read back. */}
+            <div className="flex flex-col gap-2.5 px-4 pb-4 sm:px-6 sm:pb-5">
+              <AppointmentWhen provider={done.provider} date={done.date} slot={done.slot} mode={done.mode} today={today} />
+              <AppointmentPeople patient={done.patient} provider={done.provider} />
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-border-soft px-3.5 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink">Consultation fee</p>
+                  <p className="text-xs text-ink-muted">Paid at the billing counter</p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="text-base font-bold tabular-nums text-ink">{formatRupees(fee.totalAmount)}</span>
+                  <BillStatusBadge payment={fee} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 border-t border-border-soft bg-surface-2/40 px-5 py-3.5 sm:flex sm:px-6">
+              <Button variant="danger" onClick={() => setAskCancel(true)} className="sm:flex-none">
+                <XCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                Cancel
+              </Button>
+              <Button variant="secondary" onClick={() => printBill(done.bill.paymentId)} className="sm:ml-auto sm:flex-none">
+                <Printer className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                Print bill
+              </Button>
+              <Button onClick={onClose} className="order-first col-span-2 sm:order-none sm:min-w-28 sm:flex-none">
+                <Check className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+                Done
+              </Button>
+            </div>
+            <AutoClose ms={ACK_MS} paused={askCancel} onDone={onClose} />
           </div>
         </div>
         <Modal
@@ -309,7 +345,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           title="Cancel this appointment?"
           description={
             <>
-              {done.doctorName} · <span className="whitespace-nowrap">{dayWithDate(done.date, today)}</span>,{' '}
+              {done.patient.name} with {done.provider.name} · <span className="whitespace-nowrap">{dayWithDate(done.date, today)}</span>,{' '}
               <span className="whitespace-nowrap">{formatTime(done.slot)}</span>
             </>
           }
@@ -327,16 +363,16 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           <p className="text-sm text-ink-muted">
             {doneBill && doneBill.paidAmount > 0 ? (
               <>
-                {formatRupees(doneBill.paidAmount)} was already paid at the billing counter for{' '}
+                {done.patient.name} has already paid {formatRupees(doneBill.paidAmount)} for{' '}
                 <span className="whitespace-nowrap">{billNumberFor(doneBill)}</span>. A cancellation by the patient keeps the consultation fee.
               </>
             ) : doneBill && isBillDue(doneBill) ? (
               <>
-                The time is freed for other patients, and{' '}
+                The time is freed, and {done.patient.name} won’t need to pay{' '}
                 <span className="whitespace-nowrap">
                   {billNumberFor(doneBill)} ({formatRupees(doneBill.balance)})
-                </span>{' '}
-                is withdrawn from the billing counter.
+                </span>
+                .
               </>
             ) : (
               'The time is freed for other patients.'
@@ -348,15 +384,17 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   }
 
   // ---------------------------------------------------------------- one page
-  const timeSummary = date && slot ? `${relativeDayLabel(date, today)} ${formatTime(slot)}${consultMode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined
+  const timeSummary =
+    provider && date && slot ? `${provider.name} · ${relativeDayLabel(date, today)} ${formatTime(slot)}${consultMode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined
+  const smartShown = Boolean(smart && smart.providerId === providerId && smart.date === date && smart.slot === slot)
+  const soonestId = suggestions.find((s) => s.bookable)?.provider.providerId ?? null
   const showPatientSearch = !patient || changingPatient
 
   // The first thing still to do — highlighted, and named in the review bar.
   const steps = [
     { label: 'Patient', done: Boolean(patient), target: 'book-patient', next: 'choose the patient' },
     { label: 'Department', done: Boolean(department), target: 'book-department', next: 'choose a department' },
-    { label: 'Doctor', done: Boolean(provider), target: 'book-doctor', next: 'choose a doctor' },
-    { label: 'Time', done: Boolean(date && slot), target: 'book-time', next: 'choose a time' },
+    { label: 'Doctor & time', done: Boolean(provider && date && slot), target: 'book-availability', next: 'choose a doctor and a time' },
   ]
   const currentIndex = steps.findIndex((step) => !step.done)
   const rail = steps.map((step, index) => ({ ...step, current: index === currentIndex }))
@@ -368,7 +406,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         {/* Review — the booking as one sentence, or the next thing to do. */}
         <div className="min-w-0" aria-live="polite">
           {ready && patient && provider && date && slot ? (
-            <p className="text-sm leading-relaxed text-ink-muted">
+            <p className="text-sm leading-relaxed text-ink-muted max-sm:line-clamp-2 max-sm:text-xs">
               <span className="font-semibold text-ink">{patient.name}</span> with <span className="font-semibold text-ink">{provider.name}</span>{' '}
               <span className="whitespace-nowrap">({department})</span> ·{' '}
               <span className="whitespace-nowrap font-semibold text-ink">
@@ -383,7 +421,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
               </span>
               <span>
                 <span className="font-semibold text-ink">Next: {steps[currentIndex]?.next ?? 'confirm'}</span>
-                <span className="hidden sm:inline"> — {steps.filter((step) => step.done).length} of 4 chosen</span>
+                <span className="hidden sm:inline"> — {steps.filter((step) => step.done).length} of 3 chosen</span>
               </span>
             </p>
           )}
@@ -413,7 +451,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         )}
         <div className="flex items-center justify-between gap-3 xl:justify-end">
           <div className="min-w-0 flex-1 text-left xl:flex-none xl:text-right">
-            <p className="max-w-[16rem] truncate text-xs text-ink-muted" title={billItems.map((i) => `${i.description} ${formatRupees(i.amount)}`).join(' + ')}>
+            <p className="hidden max-w-[16rem] truncate text-xs text-ink-muted sm:block" title={billItems.map((i) => `${i.description} ${formatRupees(i.amount)}`).join(' + ')}>
               {billItems.length ? billItems.map((i) => i.description).join(' + ') : 'Bill total'}
             </p>
             <p className="text-lg font-bold tabular-nums tracking-tight text-ink">{formatRupees(total)}</p>
@@ -426,7 +464,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
       </div>
       <p className="hidden text-xs text-ink-subtle sm:block">
         {ready
-          ? 'The bill goes to the billing counter; the booking is confirmed once the payment is received.'
+          ? `${patient?.name ?? 'The patient'} pays at the billing counter; the appointment is confirmed as soon as it is paid.`
           : 'Every choice stays editable — tap any section to change it.'}
       </p>
     </div>
@@ -441,12 +479,12 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           own — the sheet itself never does). Narrower: one column, same order. */}
       <div className="flex flex-col xl:h-full">
       <StepRail steps={rail} />
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,2.2fr)] xl:grid-rows-[auto_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)] lg:grid-rows-[auto_minmax(0,1fr)] xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
         {/* Top-left · Patient */}
-        <Quadrant id="book-patient" step={1} title="Patient" done={Boolean(patient)} current={currentIndex === 0} scrollFrom="xl" className="lg:col-start-1 xl:row-start-1">
+        <Quadrant id="book-patient" step={1} title="Patient" done={Boolean(patient)} current={currentIndex === 0} scrollFrom="xl" className="lg:col-start-1 lg:row-start-1">
           {showPatientSearch ? (
             <div className="flex flex-col gap-2">
-              <PatientSearch mode="pick" inline onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile or UHID" />
+              <PatientSearch mode="pick" inline onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile, UHID or ABHA" />
               {patient ? (
                 <button type="button" onClick={() => setChangingPatient(false)} className="self-start text-xs font-semibold text-primary-text hover:underline">
                   Keep {patient.name}
@@ -485,8 +523,8 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         </Quadrant>
 
         {/* Top-right · Department */}
-        <Quadrant id="book-department" step={2} title="Department" done={Boolean(department)} current={currentIndex === 1} scrollFrom="xl" className="lg:col-start-1 xl:row-start-2">
-          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 xl:grid-cols-1" role="group" aria-label="Departments">
+        <Quadrant id="book-department" step={2} title="Department" done={Boolean(department)} current={currentIndex === 1} scrollFrom="xl" className="lg:col-start-1 lg:row-start-2 lg:self-start xl:self-stretch">
+          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-1" role="group" aria-label="Departments">
             {departments.map(({ department: dep, doctors, bookable, next }) => {
               const selected = dep === department
               return (
@@ -502,7 +540,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
                       : 'border-border-soft bg-surface-1 shadow-card-sm hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-md',
                   )}
                 >
-                  <SoftIconTile icon={DEPARTMENT_ICON[dep] ?? Stethoscope} tone={DEPARTMENT_TONE[dep] ?? 'blue'} size="md" />
+                  <SoftIconTile icon={departmentIcon(dep)} tone={departmentTone(dep)} size="md" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold text-ink">{dep}</span>
                     <span className="block truncate text-xs text-ink-muted">
@@ -521,77 +559,84 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           </div>
         </Quadrant>
 
-        {/* Bottom-left · Doctor */}
+        {/* Right · Doctor Availability — each doctor with their own times. */}
         <Quadrant
-          id="book-doctor"
+          id="book-availability"
           step={3}
-          title="Doctor"
-          done={Boolean(provider)}
+          title="Doctor Availability"
+          done={Boolean(provider && date && slot)}
           current={currentIndex === 2}
-          scrollFrom="xl"
-          className="lg:col-start-1 xl:col-start-2 xl:row-span-2 xl:row-start-1"
-          summary={provider ? `${provider.name} · ${formatRupees(provider.consultationFee)}` : undefined}
-        >
-          {department ? (
-            <DoctorChoiceList suggestions={suggestions} selectedId={providerId} onChoose={chooseDoctor} today={today} />
-          ) : (
-            <Waiting>Choose a department to see its doctors.</Waiting>
-          )}
-        </Quadrant>
-
-        {/* Bottom-right · Time */}
-        <Quadrant
-          id="book-time"
-          step={4}
-          title="Date & time"
-          done={Boolean(date && slot)}
-          current={currentIndex === 3}
           summary={timeSummary}
           scrollFrom="xl"
-          className="lg:sticky lg:top-0 lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-start xl:static xl:col-start-3 xl:row-span-2 xl:self-stretch"
+          className="lg:col-start-2 lg:row-span-2 lg:row-start-1"
         >
-          {!provider ? (
-            <Waiting>Choose a doctor to see their open times.</Waiting>
+          {!department ? (
+            <Waiting>Choose a department to see its doctors and their open times.</Waiting>
           ) : (
             <div className="flex flex-col gap-3">
-              {modes.length > 1 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-ink-muted">How</span>
-                  <div className="inline-flex flex-wrap gap-1 rounded-xl border border-border-soft bg-surface-2 p-1" role="group" aria-label="How the patient is seen">
-                    {modes.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        aria-pressed={option === consultMode}
-                        onClick={() => setConsultMode(option)}
-                        className={cn(
-                          'focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium transition-colors',
-                          option === consultMode ? 'bg-surface-1 text-ink shadow-card' : 'text-ink-muted hover:text-ink',
-                        )}
-                      >
-                        {option === 'Teleconsult' ? (
-                          <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                        ) : (
-                          <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                        )}
-                        {option}
-                      </button>
-                    ))}
-                  </div>
+              {smartShown && provider && date && slot ? (
+                <div
+                  role="status"
+                  className="flex items-start gap-2.5 rounded-xl border border-success-fg/25 bg-success-bg px-3 py-2.5 text-sm"
+                >
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" strokeWidth={2} aria-hidden="true" />
+                  <p className="min-w-0 text-ink">
+                    <span className="font-semibold text-success-fg">Smart choice</span> · {provider.name},{' '}
+                    <span className="whitespace-nowrap font-semibold">
+                      {relativeDayLabel(date, today)} {formatTime(slot)}
+                    </span>{' '}
+                    <span className="text-ink-muted">— the soonest open time in {department}. Tap any other time to change it.</span>
+                  </p>
                 </div>
-              ) : modes[0] === 'Teleconsult' ? (
-                <p className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
-                  <Video className="h-3.5 w-3.5 text-therapy-fg" strokeWidth={1.75} aria-hidden="true" />
-                  Teleconsult only — the patient joins by video.
-                </p>
               ) : null}
-              {date ? (
-                <>
-                  <DateStrip days={dateStrip} selected={date} onSelect={chooseDate} today={today} />
-                  <SlotBoard entries={slotEntries} selectedSlot={slot} onSelect={chooseSlot} emptyMessage="No session on this day." />
-                </>
+              {suggestions.length === 0 ? (
+                <p className="text-sm text-ink-muted">No doctors in this department.</p>
               ) : (
-                <p className="text-sm text-ink-muted">No open time with this doctor in the next two weeks — choose another doctor.</p>
+                <ul className="flex flex-col gap-3" aria-label="Doctors">
+                  {suggestions.map((suggestion) => {
+                    const chosen = suggestion.provider.providerId === providerId && Boolean(slot)
+                    return (
+                      <li key={suggestion.provider.providerId}>
+                        <DoctorSlotCard
+                          suggestion={suggestion}
+                          today={today}
+                          now={now}
+                          soonest={suggestion.provider.providerId === soonestId}
+                          selectedDate={chosen ? date : null}
+                          selectedSlot={chosen ? slot : null}
+                          onPick={pickTime}
+                        >
+                          {chosen && modes.length > 1 ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-medium text-ink-muted">How</span>
+                              <div className="inline-flex flex-wrap gap-1 rounded-xl border border-border-soft bg-surface-2 p-1" role="group" aria-label="How the patient is seen">
+                                {modes.map((option) => (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    aria-pressed={option === consultMode}
+                                    onClick={() => setConsultMode(option)}
+                                    className={cn(
+                                      'focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors',
+                                      option === consultMode ? 'bg-surface-1 text-ink shadow-card' : 'text-ink-muted hover:text-ink',
+                                    )}
+                                  >
+                                    {option === 'Teleconsult' ? (
+                                      <Video className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                                    ) : (
+                                      <Building2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+                                    )}
+                                    {option}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </DoctorSlotCard>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
             </div>
           )}
@@ -602,81 +647,57 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         <Modal
           open={reviewing}
           onClose={() => setReviewing(false)}
-          title="Review the appointment"
-          description="Check every detail with the patient before booking."
-          className="sm:max-w-lg"
+          title="Review appointment"
+          description={`Please read this back to ${patient.name} before booking.`}
+          className="sm:max-w-xl"
           footer={
             <>
-              <Button variant="secondary" onClick={() => setReviewing(false)}>
+              <Button variant="secondary" onClick={() => setReviewing(false)} className="max-sm:flex-1">
                 Go back
               </Button>
-              <Button onClick={book} disabled={!ready}>
+              <Button onClick={book} disabled={!ready} className="max-sm:flex-1">
                 <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                 Book Appointment
               </Button>
             </>
           }
         >
-          <div className="flex flex-col gap-4">
-            {/* When — the detail most worth reading back, set apart. */}
-            <div className="flex items-center gap-3 rounded-xl border border-primary-200/70 bg-primary-50/70 px-4 py-3 dark:border-primary-500/25 dark:bg-primary-500/10">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[image:var(--gradient-primary)] text-on-primary shadow-card-sm">
-                <CalendarClock className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-base font-bold tracking-tight text-ink">
-                  {dayWithDate(date, today)}, <span className="whitespace-nowrap">{formatTime(slot)}</span>
-                </p>
-                <p className="text-xs text-ink-muted">
-                  {consultMode === 'Teleconsult' ? 'Teleconsult — the patient joins by video' : `In person${provider.room ? ` · ${provider.room}` : ''}`}
-                </p>
-              </div>
-            </div>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-sm">
-              <dt className="text-ink-muted">Patient</dt>
-              <dd className="min-w-0 text-ink">
-                <span className="font-semibold">{patient.name}</span>
-                <span className="flex flex-wrap gap-x-1.5 text-xs text-ink-muted">
-                  {[patient.uhid, patient.age ? `${patient.age} ${patient.sex.charAt(0)}` : null, patient.mobile].filter(Boolean).map((part, index) => (
-                    <span key={index} className="whitespace-nowrap">
-                      {index ? '· ' : ''}
-                      {part}
-                    </span>
-                  ))}
-                </span>
-              </dd>
-              <dt className="text-ink-muted">Doctor</dt>
-              <dd className="min-w-0 text-ink">
-                <span className="font-semibold">{provider.name}</span>
-                <span className="block text-xs text-ink-muted">{provider.specialty}</span>
-              </dd>
-              <dt className="text-ink-muted">Department</dt>
-              <dd className="text-ink">{department}</dd>
-              {reason.trim() ? (
-                <>
-                  <dt className="text-ink-muted">Reason</dt>
-                  <dd className="break-words text-ink">{reason.trim()}</dd>
-                </>
-              ) : null}
-            </dl>
-            <div className="rounded-xl border border-border-soft bg-surface-2/60 px-4 py-3">
-              <ul className="flex flex-col gap-1 text-sm">
-                {billItems.map((item, index) => (
-                  <li key={`${item.description}-${index}`} className="flex justify-between gap-3 text-ink-muted">
-                    <span className="min-w-0">{item.description}</span>
-                    <span className="tabular-nums">{formatRupees(item.amount)}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 flex justify-between gap-3 border-t border-border-soft pt-2 font-semibold text-ink">
-                <span>Total</span>
-                <span className="tabular-nums">{formatRupees(total)}</span>
-              </p>
-            </div>
-            <p className="text-xs text-ink-subtle">The bill goes to the billing counter; the appointment is confirmed once it is paid.</p>
-          </div>
+          <AppointmentSummary
+            patient={patient}
+            provider={provider}
+            date={date}
+            slot={slot}
+            mode={consultMode}
+            reason={reason.trim() || null}
+            items={billItems}
+            today={today}
+          />
         </Modal>
       ) : null}
     </FlowSheet>
+  )
+}
+
+/**
+ * A bar that runs out over `ms`, then calls `onDone` — the confirmation's
+ * quiet timer. While `paused` it stops and resets, so it starts over once
+ * the pause ends.
+ */
+function AutoClose({ ms, paused, onDone }: { ms: number; paused: boolean; onDone: () => void }) {
+  const done = useRef(onDone)
+  useEffect(() => {
+    done.current = onDone
+  })
+  useEffect(() => {
+    if (paused) return undefined
+    const timer = window.setTimeout(() => done.current(), ms)
+    return () => window.clearTimeout(timer)
+  }, [ms, paused])
+  return (
+    <div className="h-1 w-full bg-surface-3" aria-hidden="true">
+      {paused ? null : (
+        <div className="h-full origin-left bg-[image:var(--gradient-primary)]" style={{ animation: `ackProgress ${ms}ms linear forwards` }} />
+      )}
+    </div>
   )
 }

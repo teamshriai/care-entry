@@ -29,7 +29,7 @@ export function Step1Review({
   const sourceLabel = origin.source === 'aadhaar' ? 'Aadhaar' : origin.source === 'abha' ? 'ABHA' : 'Entered manually';
 
   return (
-    <Card>
+    <Card tone="blue">
       <StepNav onNext={onNext} />
       <StepHeader icon="userCheck" title="Your details" />
       <StepSub>These details were captured at the start of this registration.</StepSub>

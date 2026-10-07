@@ -27,7 +27,7 @@ export function DateStrip({
   const tomorrow = addDaysToKey(today, 1)
   const open = tintedChip('blue')
   return (
-    <div className="scrollbar-hide scroll-fade-x -mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 py-1" role="group" aria-label="Day">
+    <div className="scrollbar-hide scroll-fade-x -mx-1 flex snap-x gap-1.5 overflow-x-auto overflow-y-hidden px-1 py-1" role="group" aria-label="Day">
       {days.map((day) => {
         const selectable = day.state === 'open'
         const isSelected = day.date === selected

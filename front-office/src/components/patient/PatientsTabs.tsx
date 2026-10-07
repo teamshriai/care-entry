@@ -26,7 +26,7 @@ export function PatientsTabs() {
   ]
 
   return (
-    <nav aria-label="Patients" className="scrollbar-hide flex gap-1 overflow-x-auto border-b border-border-soft">
+    <nav aria-label="Patients" className="scrollbar-hide flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border-soft">
       {tabs.map(({ to, label, icon: Icon, count, end, title }) => (
         <NavLink
           key={to}
@@ -47,7 +47,9 @@ export function PatientsTabs() {
               <span
                 className={cn(
                   'rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums',
-                  isActive ? 'bg-primary-100 text-primary-text' : 'bg-surface-2 text-ink-muted',
+                  isActive
+                    ? 'bg-[image:var(--gradient-primary)] text-on-primary shadow-card-sm'
+                    : 'bg-[color-mix(in_oklab,var(--color-hue-blue)_12%,var(--color-surface-1))] text-[color-mix(in_oklab,var(--color-hue-blue)_var(--tone-ink-amount),var(--tone-ink-mix))]',
                 )}
               >
                 {count}

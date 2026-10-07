@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Avatar } from '../ui/Avatar'
+import { initialsOf } from '../../utils/format'
 import { Activity, ListChecks } from 'lucide-react'
 import type { ActivityEvent, ActivityType } from '../../domain/reportSelectors'
 import { timeLabel } from '../../utils/activityFormat'
@@ -35,7 +37,18 @@ const text = (value: string | undefined | null) => (value ? value : dash)
 const statusBadge = (event: ActivityEvent) => <Badge tone={event.status === 'Completed' ? 'stable' : 'neutral'}>{event.status}</Badge>
 
 const at = (header: string): Column => ({ header, cell: (e, withDate) => timeLabel(e.timestamp, withDate) })
-const patient: Column = { header: 'Patient', cell: (e) => <span className="font-medium text-ink">{text(e.patientName)}</span> }
+const patient: Column = {
+  header: 'Patient',
+  cell: (e) =>
+    e.patientName ? (
+      <span className="flex min-w-0 items-center gap-2">
+        <Avatar name={e.patientName} initials={initialsOf(e.patientName)} size="xs" />
+        <span className="truncate font-medium text-ink">{e.patientName}</span>
+      </span>
+    ) : (
+      <span className="font-medium text-ink">{text(e.patientName)}</span>
+    ),
+}
 const patientId = (header = 'Patient ID'): Column => ({ header, cell: (e) => <span className="tabular-nums">{text(e.uhid ?? e.patientId)}</span> })
 const doctor: Column = { header: 'Doctor', cell: (e) => text(e.doctorName) }
 const status: Column = { header: 'Status', cell: statusBadge }
@@ -133,7 +146,7 @@ export function ActivityDetails({
             rows={rows}
             rowKey={(event) => event.id}
             caption={DETAIL_TITLE[type]}
-            maxHeight="max-h-[28rem]"
+            listLimit={15}
             columns={columns.map(
               (column, index): TableColumn<ActivityEvent> => ({
                 key: column.header,

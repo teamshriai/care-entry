@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Receipt as ReceiptIcon, Send } from 'lucide-react'
+import { Printer, Receipt as ReceiptIcon } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -9,11 +9,11 @@ import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { getPaymentById } from '../domain/selectors'
-import { isAtBillingCounter, sendToBillingCounter } from '../domain/billingCounter'
 import { formatClock } from '../utils/format'
 import { formatDateKey } from '../utils/dates'
 import { todayKey } from '../domain/time'
 import { billNumberFor, formatRupees, isBillDue } from '../utils/billing'
+import { printBill } from '../utils/printBill'
 
 function timestampLabel(ts: number): string {
   return `${formatDateKey(todayKey(new Date(ts)))} · ${formatClock(ts)}`
@@ -21,7 +21,8 @@ function timestampLabel(ts: number): string {
 
 /** One bill's full picture, to view: its items, every payment the billing
  *  counter recorded against it, and its status. Care Entry takes no money —
- *  a bill with payment pending can only be sent to the billing counter. */
+ *  a bill with payment pending is printed for the patient to pay at the
+ *  billing counter. */
 export function PaymentDetailPage() {
   const { paymentId } = useParams<{ paymentId: string }>()
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export function PaymentDetailPage() {
 
   const payment = useStoreValue(getPaymentById, paymentId ?? '')
 
-  const [sent, setSent] = useState(false)
+  const [printed, setPrinted] = useState(false)
 
   if (!payment) {
     return (
@@ -52,13 +53,12 @@ export function PaymentDetailPage() {
   }
 
   const due = isBillDue(payment)
-  const atCounter = sent || isAtBillingCounter(payment.paymentId)
 
-  function send() {
+  function print() {
     if (!payment) return
-    sendToBillingCounter(payment.paymentId)
-    setSent(true)
-    notify('Sent to the billing counter', { detail: `${billNumberFor(payment)} · ${formatRupees(payment.balance)}` })
+    printBill(payment.paymentId)
+    setPrinted(true)
+    notify(`Bill printed — ${payment.patientName} pays at the billing counter`, { detail: `${billNumberFor(payment)} · ${formatRupees(payment.balance)}` })
   }
 
   const linkedTo = payment.admissionId
@@ -182,14 +182,14 @@ export function PaymentDetailPage() {
                   {due ? (
                     <>
                       <p className="text-sm text-ink-muted">
-                        {atCounter ? 'With the billing counter — the status updates when the payment is received.' : 'The patient pays this at the billing counter.'}
+                        {printed
+                          ? `Bill printed — ${payment.patientName} pays at the billing counter. The status updates here once it is paid.`
+                          : `${payment.patientName} pays ${formatRupees(payment.balance)} at the billing counter — print the bill for them to take there.`}
                       </p>
-                      {atCounter ? null : (
-                        <Button variant="secondary" onClick={send}>
-                          <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
-                          Send to billing counter
-                        </Button>
-                      )}
+                      <Button variant={printed ? 'outline' : 'secondary'} onClick={print}>
+                        <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        {printed ? 'Print again' : 'Print bill'}
+                      </Button>
                     </>
                   ) : payment.status === 'Paid' || payment.status === 'Partially Paid' ? (
                     <p className="text-sm font-medium text-success-fg">Payment received at the billing counter.</p>

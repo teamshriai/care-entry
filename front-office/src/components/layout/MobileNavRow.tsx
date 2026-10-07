@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Languages } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { NavCount } from './NavCount'
+import { useNavBadges } from '../../hooks/useNavBadges'
 import { TONE_HEX } from '../../utils/toneHex'
 import { LANGUAGES, setLanguage, useLanguage } from '../../hooks/useLanguage'
 import type { LanguageCode } from '../../hooks/useLanguage'
@@ -20,6 +22,7 @@ export function MobileNavRow() {
   const row = useRef<HTMLUListElement>(null)
   const [edges, setEdges] = useState({ start: false, end: true })
   const languageCode = useLanguage()
+  const badges = useNavBadges()
 
   const measure = useCallback(() => {
     const el = row.current
@@ -53,10 +56,11 @@ export function MobileNavRow() {
         ref={row}
         onScroll={measure}
         style={{ WebkitMaskImage: fade, maskImage: fade } as CSSProperties}
-        className="scrollbar-hide flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto overscroll-x-contain px-4 py-2"
+        className="scrollbar-hide flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 py-2"
       >
         {NAV_ITEMS.map(({ path, label, icon: Icon, end, hue }) => {
           const active = isActivePath({ path, end }, pathname)
+          const badge = badges[path]
           return (
             <li key={path} className="shrink-0 snap-start">
               <NavLink
@@ -71,6 +75,16 @@ export function MobileNavRow() {
               >
                 <Icon size={15} strokeWidth={active ? 2.2 : 1.9} aria-hidden="true" style={active ? undefined : { color: TONE_HEX[hue] }} />
                 {label}
+                {badge ? (
+                  <>
+                    {active ? (
+                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/25 px-1.5 text-2xs font-bold tabular-nums">{badge.count}</span>
+                    ) : (
+                      <NavCount badge={badge} />
+                    )}
+                    <span className="sr-only">, {badge.label}</span>
+                  </>
+                ) : null}
               </NavLink>
             </li>
           )

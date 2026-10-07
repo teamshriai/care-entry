@@ -333,7 +333,7 @@ export function RegisterDoctorPage() {
                     value={form.consultationFee}
                     onChange={(e) => update('consultationFee', e.target.value.replace(/[^0-9]/g, ''))}
                     inputMode="numeric"
-                    placeholder="800"
+                    placeholder="200"
                     className={inputClass}
                   />
                 </Field>

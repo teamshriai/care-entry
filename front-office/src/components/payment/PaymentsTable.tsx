@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { initialsOf } from '../../utils/format'
+import { Avatar } from '../ui/Avatar'
 import { Link } from 'react-router-dom'
 import { Receipt } from 'lucide-react'
 import { EmptyState } from '../ui/EmptyState'
@@ -57,15 +59,21 @@ export function PaymentsTable({
       mobile: 'title',
       sortValue: (payment) => payment.patientName,
       cell: (payment) => (
-        <>
-          <span className="flex min-w-0 items-center gap-1.5 text-ink tbl:max-w-[14rem]">
-            <span className="truncate" title={payment.patientName}>
-              {payment.patientName}
-            </span>
-            <PatientStatusIcons status={care[payment.patientId]} />
+        <span className="flex min-w-0 items-center gap-2.5">
+          {/* In the table only — a phone card keeps the room for the name. */}
+          <span className="hidden shrink-0 tbl:inline-flex">
+            <Avatar name={payment.patientName} initials={initialsOf(payment.patientName)} size="sm" />
           </span>
-          <span className="block text-2xs font-normal text-ink-subtle">{payment.patientId}</span>
-        </>
+          <span className="min-w-0">
+            <span className="flex min-w-0 items-center gap-1.5 text-ink tbl:max-w-[14rem]">
+              <span className="truncate" title={payment.patientName}>
+                {payment.patientName}
+              </span>
+              <PatientStatusIcons status={care[payment.patientId]} />
+            </span>
+            <span className="block text-2xs font-normal text-ink-subtle">{payment.patientId}</span>
+          </span>
+        </span>
       ),
     },
     {

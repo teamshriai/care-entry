@@ -11,8 +11,6 @@ import { Avatar } from '../components/ui/Avatar'
 import { AckCard } from '../components/flow/AckCard'
 import { AgeConfirm, FieldError } from '../components/patient/AgeConfirm'
 import { CreateAbhaLink } from '../components/patient/CreateAbhaLink'
-import { BillAtCounter } from '../components/payment/BillAtCounter'
-import { sendToBillingCounter } from '../domain/billingCounter'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
@@ -65,8 +63,7 @@ export function RegisterPatientPage() {
   // never while the desk is still typing its first character.
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [error, setError] = useState<string | null>(null)
-  const [created, setCreated] = useState<{ patient: Patient; billId: string } | null>(null)
-  const registered = created?.patient ?? null
+  const [registered, setRegistered] = useState<Patient | null>(null)
 
   const duplicateQuery = useMemo(() => ({ name: form.name, mobile: form.mobile, abhaId: form.abhaId }), [form.name, form.mobile, form.abhaId])
   const duplicates = useStoreValue(findPossibleDuplicatesFor, duplicateQuery)
@@ -83,6 +80,8 @@ export function RegisterPatientPage() {
   const invalid = (Object.keys(errors) as FieldKey[]).filter((key) => errors[key])
   const ready = invalid.length === 0 && (!needsAgeConfirm || form.ageConfirmed)
   const shown = (key: FieldKey) => (touched[key] ? errors[key] : null)
+  // A typed ABHA already on another record is flagged at once, not on blur.
+  const abhaShown = form.abhaId.trim() ? (shown('abhaId') ?? (abhaHolder ? errors.abhaId : null)) : null
 
   function update<K extends keyof PatientFormState>(field: K, value: PatientFormState[K]) {
     setForm((current) => ({
@@ -101,10 +100,8 @@ export function RegisterPatientPage() {
     setTouched({ name: true, age: true, sex: true, mobile: true, abhaId: true })
     if (!ready) return
     try {
-      const result = registerPatient(form)
-      // The registration fee is paid at the billing counter, not here.
-      sendToBillingCounter(result.bill.paymentId)
-      setCreated({ patient: result.patient, billId: result.bill.paymentId })
+      // Registering is free — it only creates the record and its UHID.
+      setRegistered(registerPatient(form))
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -149,7 +146,6 @@ export function RegisterPatientPage() {
               {registered.age} yrs · {registered.sex} · {registered.mobile}
             </p>
             {registered.abhaId ? <p>ABHA {registered.abhaId}</p> : null}
-            {created ? <BillAtCounter paymentId={created.billId} className="mt-1 w-full" /> : null}
           </AckCard>
         </Card>
       </div>
@@ -158,7 +154,7 @@ export function RegisterPatientPage() {
 
   return (
     <div>
-      <PageHeader title="Register Patient" subtitle="Create a new patient record and allocate a UHID. The registration fee is billed to the billing counter." />
+      <PageHeader title="Register Patient" subtitle="Welcome a new patient — create their record and UHID." />
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)] mt-4 sm:mt-5">
         <Card accentTone="teal" className="min-w-0">
@@ -242,11 +238,20 @@ export function RegisterPatientPage() {
               <Field
                 label="ABHA address or number"
                 htmlFor="reg-abha"
-                error={form.abhaId.trim() ? shown('abhaId') ?? (abhaHolder ? errors.abhaId : null) : null}
+                error={abhaShown}
                 hint={
-                  connectivity.abha === 'unavailable'
-                    ? 'Optional. ABHA lookup is unavailable — enter it by hand or link it later. Registration is never blocked.'
-                    : 'Optional'
+                  <>
+                    {/* Matches abhaError: a 14-digit number, or an address of 8–18 characters @abdm. Made-up values — never a real patient’s. */}
+                    <span className="block">
+                      e.g. <span className="font-medium text-ink-muted tabular-nums">12-3456-7890-1234</span> or{' '}
+                      <span className="font-medium text-ink-muted">priya.kumar@abdm</span>
+                    </span>
+                    <span className="mt-0.5 block">
+                      {connectivity.abha === 'unavailable'
+                        ? 'Optional. ABHA lookup is unavailable — type it in or link it later. The patient is never held up.'
+                        : 'Optional — links the patient’s health records from other hospitals.'}
+                    </span>
+                  </>
                 }
               >
                 {/* Kept short, so the Create ABHA popup has room to open on its right. */}
@@ -258,8 +263,9 @@ export function RegisterPatientPage() {
                     onBlur={touch('abhaId')}
                     placeholder="name@abdm or 14-digit number"
                     autoComplete="off"
-                    aria-invalid={Boolean(form.abhaId.trim() && (shown('abhaId') || abhaHolder))}
-                    className={cn(inputClass, form.abhaId.trim() && (shown('abhaId') || abhaHolder) && errorClass)}
+                    aria-invalid={Boolean(abhaShown)}
+                    aria-describedby={abhaShown ? 'reg-abha-error' : 'reg-abha-hint'}
+                    className={cn(inputClass, abhaShown && errorClass)}
                   />
                   {/* No ABHA yet? The patient can create one with ABDM. */}
                   {form.abhaId.trim() ? null : <CreateAbhaLink />}
@@ -288,7 +294,7 @@ export function RegisterPatientPage() {
             <Card accentTone="warning" className="border-warning-fg/25 bg-warning-bg/40">
               <CardHeader
                 title="Possible existing patient found"
-                subtitle="Matched on mobile number, name or ABHA. Confirm before creating a second record."
+                subtitle="Matched on mobile number, name or ABHA. Check with the patient before creating a second record."
               />
               <div className="divide-y divide-border-soft">
                 {duplicates.map((candidate) => (
@@ -317,8 +323,8 @@ export function RegisterPatientPage() {
               <CardBody>
                 <p className="text-sm font-medium text-ink">Duplicate check</p>
                 <p className="mt-1 text-sm text-ink-muted">
-                  As you type a name, mobile number or ABHA, existing records that look like the same person appear here so a
-                  second UHID is never created by accident.
+                  As you type the patient’s name, mobile number or ABHA, any record that may already be theirs appears here — so
+                  each patient keeps one record and one complete history.
                 </p>
               </CardBody>
             </Card>
@@ -351,7 +357,13 @@ function Field({
         {label} {required ? <span className="text-critical-fg">*</span> : null}
       </label>
       <div className="mt-1.5">{children}</div>
-      {error ? <FieldError message={error} /> : hint ? <p className="mt-1 text-xs text-ink-subtle">{hint}</p> : null}
+      {error ? (
+        <FieldError id={htmlFor ? `${htmlFor}-error` : undefined} message={error} />
+      ) : hint ? (
+        <p id={htmlFor ? `${htmlFor}-hint` : undefined} className="mt-1 text-xs text-ink-subtle">
+          {hint}
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -4,8 +4,19 @@ import type { ReactNode } from 'react';
 import { Icon } from '../components/Icon';
 import type { IconName } from '../components/Icon';
 import { cn } from './cn';
+import { Avatar, Badge } from './kit';
+import { TONE_HEX, toneOf, toneVar } from './tones';
 import { useSidebar } from './useSidebar';
 import logo from '../logo.png';
+
+/** A soft tile in a hue (reads `--tone`): its pastel gradient, the glyph in its ink. */
+const SOFT_TILE =
+  'ink-tone bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_22%,transparent),color-mix(in_oklab,var(--tone)_10%,transparent))] dark:bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_28%,transparent),color-mix(in_oklab,var(--tone)_14%,transparent))]';
+
+/** The progress track (sunken, a breath of blue) and its blue-to-violet bar. */
+const TRACK = 'bg-[color-mix(in_oklab,var(--color-hue-blue)_10%,var(--color-surface-3))]';
+const BAR =
+  'bg-[linear-gradient(90deg,var(--color-hue-blue),var(--color-hue-indigo)_55%,var(--color-hue-violet))] shadow-[0_0_8px_-1px_color-mix(in_oklab,var(--color-hue-violet)_55%,transparent)]';
 
 export interface ShellNavItem {
   key: string;
@@ -17,6 +28,15 @@ export interface ShellNavItem {
   /** Already completed (a registration step behind the current one). */
   done?: boolean;
   onSelect: () => void;
+}
+
+export interface ShellUser {
+  name: string;
+  detail: string;
+  badge: { label: string; done: boolean };
+  /** `name` is a real person's (their initials in the avatar), not a
+   *  placeholder such as "New patient". */
+  person?: boolean;
 }
 
 export interface ShellAction {
@@ -63,7 +83,7 @@ export function PatientShell({
   /** 0–100, for a stepper. */
   progress?: number;
   headerExtra?: ReactNode;
-  user: { name: string; detail: string; badge: { label: string; done: boolean } };
+  user: ShellUser;
   theme: { dark: boolean; onToggle: () => void };
   rail?: ReactNode;
   children: ReactNode;
@@ -87,6 +107,8 @@ export function PatientShell({
       <aside
         className={cn(
           'sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border-soft bg-surface-1 transition-[width] duration-200 ease-out md:flex print:hidden',
+          // A faint wash of colour, blue at the top to violet at the foot (as the front office).
+          'bg-[linear-gradient(180deg,color-mix(in_oklab,var(--color-hue-blue)_6%,var(--color-surface-1))_0%,var(--color-surface-1)_38%,var(--color-surface-1)_62%,color-mix(in_oklab,var(--color-hue-violet)_6%,var(--color-surface-1))_100%)]',
           expanded ? 'w-60' : 'w-16',
         )}
       >
@@ -123,10 +145,17 @@ export function PatientShell({
                     item.locked && 'cursor-not-allowed opacity-45 hover:bg-transparent hover:text-ink-muted',
                   )}
                 >
+                  {/* The tile: the gradient when current, green when done, grey while
+                      locked, otherwise a soft tint of the place's own hue. */}
                   <span
+                    style={toneVar(item.done && !item.active ? 'green' : toneOf(item.icon))}
                     className={cn(
                       'flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] transition-colors',
-                      item.active ? 'bg-[image:var(--gradient-primary)] text-on-primary shadow-card-sm' : item.done ? 'bg-success-bg text-success-fg' : 'bg-surface-2 text-ink-subtle',
+                      item.active
+                        ? 'bg-[image:var(--gradient-primary)] text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_3px_8px_-3px_rgba(37,99,235,0.55)]'
+                        : item.locked
+                          ? 'bg-surface-2 text-ink-subtle'
+                          : SOFT_TILE,
                     )}
                   >
                     {item.done && !item.active ? <Icon name="checkCircle" size={15} strokeWidth={2.4} /> : <Icon name={item.icon} size={15} />}
@@ -175,7 +204,7 @@ export function PatientShell({
 
       {/* ── Header + page ──────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-border-soft bg-surface-1/80 shadow-[0_1px_0_0_var(--surface-highlight)_inset] backdrop-blur-xl backdrop-saturate-150 print:hidden">
+        <header className="sticky top-0 z-30 border-b border-border-soft bg-surface-1/80 bg-[linear-gradient(90deg,color-mix(in_oklab,var(--color-hue-blue)_6%,transparent)_0%,transparent_38%,transparent_62%,color-mix(in_oklab,var(--color-hue-violet)_6%,transparent)_100%)] shadow-[0_1px_0_0_var(--surface-highlight)_inset] backdrop-blur-xl backdrop-saturate-150 print:hidden">
           <div className="flex h-14 items-center gap-2 px-4 min-[360px]:gap-3 sm:h-16 sm:px-5 xl:px-6">
             <img src={logo} alt="" width={153} height={256} className="h-7 w-auto shrink-0 select-none md:hidden" draggable={false} />
             <h1 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-ink sm:text-xl">{heading}</h1>
@@ -188,9 +217,9 @@ export function PatientShell({
                   aria-valuenow={progress}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  className="h-2 w-28 overflow-hidden rounded-full bg-surface-3"
+                  className={cn('h-2 w-28 overflow-hidden rounded-full', TRACK)}
                 >
-                  <div className="h-full rounded-full bg-primary-600 transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} />
+                  <div className={cn('h-full rounded-full transition-[width] duration-300 ease-out', BAR)} style={{ width: `${progress}%` }} />
                 </div>
                 <span className="w-9 text-xs font-semibold tabular-nums text-ink-muted">{progress}%</span>
               </div>
@@ -210,8 +239,8 @@ export function PatientShell({
                 Step {activeIndex + 1} of {nav.length} · <span className="font-semibold text-ink">{active.label}</span>
               </span>
               {progress !== undefined ? (
-                <span className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-surface-3 sm:w-32" aria-hidden="true">
-                  <span className="block h-full rounded-full bg-primary-600 transition-[width] duration-300 ease-out" style={{ width: `${progress}%` }} />
+                <span className={cn('h-1.5 w-20 shrink-0 overflow-hidden rounded-full sm:w-32', TRACK)} aria-hidden="true">
+                  <span className={cn('block h-full rounded-full transition-[width] duration-300 ease-out', BAR)} style={{ width: `${progress}%` }} />
                 </span>
               ) : null}
             </div>
@@ -248,7 +277,7 @@ function ShellActionButton({ action, expanded }: { action: ShellAction; expanded
   );
   const body = (
     <>
-      <Icon name={action.icon} size={17} />
+      <Icon name={action.icon} size={17} style={{ color: TONE_HEX[toneOf(action.icon)] }} />
       <span className={expanded ? 'truncate' : 'sr-only'}>{action.label}</span>
     </>
   );
@@ -312,7 +341,7 @@ function AccountMenu({
   actions,
   note,
 }: {
-  user: { name: string; detail: string; badge: { label: string; done: boolean } };
+  user: ShellUser;
   actions: ShellAction[];
   note: string;
 }) {
@@ -351,9 +380,7 @@ function AccountMenu({
         aria-label={`Account menu, ${user.name}`}
         className="focus-ring flex min-h-11 min-w-11 max-w-full items-center justify-center gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-surface-2"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-text">
-          <Icon name="userCheck" size={16} />
-        </span>
+        <Avatar name={user.person ? user.name : undefined} />
         <span className="hidden min-w-0 max-w-[160px] text-left xl:block">
           <span className="block truncate text-sm font-medium leading-tight text-ink">{user.name}</span>
           <span className="block truncate text-xs leading-tight text-ink-subtle">{user.detail}</span>
@@ -370,14 +397,9 @@ function AccountMenu({
           <div className="border-b border-border-soft px-3.5 py-3">
             <p className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate text-sm font-semibold text-ink">{user.name}</span>
-              <span
-                className={cn(
-                  'shrink-0 rounded-md border px-2 py-0.5 text-2xs font-semibold',
-                  user.badge.done ? 'border-success-fg/25 bg-success-bg text-success-fg' : 'border-warning-fg/25 bg-warning-bg text-warning-fg',
-                )}
-              >
+              <Badge tone={user.badge.done ? 'success' : 'warning'} className="shrink-0">
                 {user.badge.label}
-              </span>
+              </Badge>
             </p>
             <p className="mt-0.5 truncate font-mono text-xs text-ink-subtle">{user.detail}</p>
           </div>
@@ -385,7 +407,7 @@ function AccountMenu({
             const className = 'focus-ring flex min-h-11 w-full items-center gap-2.5 px-3.5 text-left text-sm text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink';
             return action.href ? (
               <a key={action.label} role="menuitem" href={action.href} className={className}>
-                <Icon name={action.icon} size={16} />
+                <Icon name={action.icon} size={16} style={{ color: TONE_HEX[toneOf(action.icon)] }} />
                 {action.label}
               </a>
             ) : (
@@ -399,7 +421,7 @@ function AccountMenu({
                 }}
                 className={className}
               >
-                <Icon name={action.icon} size={16} />
+                <Icon name={action.icon} size={16} style={{ color: TONE_HEX[toneOf(action.icon)] }} />
                 {action.label}
               </button>
             );
@@ -445,7 +467,7 @@ function SectionRow({ nav, label }: { nav: ShellNavItem[]; label: string }) {
         ref={row}
         onScroll={measure}
         style={{ WebkitMaskImage: fade, maskImage: fade } as CSSProperties}
-        className="scrollbar-hide flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto overscroll-x-contain px-4 py-2"
+        className="scrollbar-hide flex snap-x scroll-px-4 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 py-2"
       >
         {nav.map((item) => (
           <li key={item.key} className="shrink-0 snap-start">
@@ -460,7 +482,7 @@ function SectionRow({ nav, label }: { nav: ShellNavItem[]; label: string }) {
                   : 'border-border-soft bg-surface-1 text-ink-muted shadow-card-sm hover:text-ink',
               )}
             >
-              <Icon name={item.icon} size={15} strokeWidth={item.active ? 2.2 : 1.9} />
+              <Icon name={item.icon} size={15} strokeWidth={item.active ? 2.2 : 1.9} style={item.active ? undefined : { color: TONE_HEX[toneOf(item.icon)] }} />
               {item.label}
             </button>
           </li>

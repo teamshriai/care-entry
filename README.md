@@ -90,9 +90,9 @@ Each app's `src/index.css` imports it and adds only its own keyframes. Component
   10 minutes after the booked time) the fee is kept. A move keeps the booking and its history and
   never refunds; a patient who moves to a dearer doctor is billed the difference, while a doctor's move
   absorbs it. Doctor leave on a booked day first moves or cancels that day's bookings.
-- **Care Entry never takes money.** Billing is its own department. Care Entry raises the bill —
-  registration fee on Create Patient, consultation on Schedule Appointment, a fee difference on a
-  reschedule, the first day on a self-pay admission, an estimate, counter charges — and sends the
+- **Care Entry never takes money.** Billing is its own department. Registering a patient is free;
+  Care Entry raises the bill — a modest consultation fee on Schedule Appointment, a fee difference on a
+  reschedule, the first day on a self-pay admission, an estimate — and sends the
   patient to the **billing counter**. Each bill then shows the counter's status: **Payment
   received** (green), **Payment pending** (yellow) or **Payment failed** (red). A booking is
   confirmed, and can be checked in, once its payment is received; a discharge waits for the final

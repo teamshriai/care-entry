@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { CORRECT_OTP, MAX_OTP_ATTEMPTS, MOBILE_ERROR, MOCK_PATIENTS, dobBounds, dobError, formatAadhaar, generateSystemId, isValidMobile, maskAadhaar, maskMobile } from '../data';
-import { IconBadge } from './Icon';
 import { MethodChooser, type IdMethod } from '../identity/MethodChooser';
 import { IdentityVerify } from '../identity/IdentityVerify';
 import type { DemoIdentity, RegistrationOrigin } from '../identity/identityData';
 import type { Gender, MockPatient } from '../types';
 import {
   Alert,
+  Avatar,
   BackButton,
   Button,
   ButtonRow,
@@ -23,6 +23,8 @@ import {
 } from '../ui/kit';
 import { formGridClass, inputClass } from '../ui/classes';
 import { OtpInput } from '../ui/OtpInput';
+import { toneVar } from '../ui/tones';
+import type { IconTone } from '../ui/tones';
 
 function ageFromDob(dobStr: string): number | null {
   if (!dobStr) return null;
@@ -237,11 +239,15 @@ export function Step1Search({
   /** Retrieved fields are read-only unless the patient has opened them for correction. */
   const locked = !!identity && !editing;
 
+  /** The card takes the hue of what it is asking for: signing in (blue), a
+   *  code (green), identity (violet) or ABHA (pink). */
+  const cardTone: IconTone = view === 'signin' ? 'blue' : view === 'otp' ? 'green' : view === 'verify' && method === 'abha' ? 'pink' : 'violet';
+
   const matchHeading =
     results.length === 1 ? 'Confirm your identity to continue.' : `${results.length} matching records found. Select your record:`;
 
   return (
-    <Card>
+    <Card tone={cardTone}>
       {view !== 'verify' && view !== 'otp' && (
         <>
           {view !== 'signin' && (
@@ -355,8 +361,8 @@ export function Step1Search({
             this record.
           </StepSub>
 
-          <div className="mt-5 flex min-w-0 items-center gap-3 rounded-xl border border-border-soft bg-surface-2 p-3.5">
-            <IconBadge name="userCheck" size={36} />
+          <div style={toneVar('blue')} className="tint-surface mt-5 flex min-w-0 items-center gap-3 rounded-xl border p-3.5">
+            <Avatar name={pending.name} size="md" />
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-ink">{pending.name}</div>
               <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ink-muted">

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { cn } from '../../utils/cn'
-import { TONE_STYLES } from '../../utils/tone'
+import { TONE_VAR } from '../../utils/tone'
 import type { Tone } from '../../utils/tone'
 
 export function PageHeader({
@@ -30,7 +30,7 @@ export function PageHeader({
    *  title, instead of stacking them under it. For one compact action. */
   pinActions?: boolean
 }) {
-  const styles = TONE_STYLES[illustrationTone ?? 'brand']
+  const tileStyle = { '--tone': `var(--color-${TONE_VAR[illustrationTone ?? 'brand'] ?? 'hue-blue'})` } as CSSProperties
   // Compact (staff) page-title recipe, DESIGN_SYSTEM §3.4. It sits inside the
   // shell's page container, so it carries no padding of its own.
   return (
@@ -43,7 +43,10 @@ export function PageHeader({
       >
         <div className="flex min-w-0 items-start gap-3.5">
           {illustration ? (
-            <div className={cn('hidden h-12 w-12 shrink-0 items-center justify-center rounded-[14px] sm:flex', styles.bg, styles.text)}>
+            <div
+              style={tileStyle}
+              className="ink-tone hidden h-12 w-12 shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_28%,var(--color-surface-1)),color-mix(in_oklab,var(--tone)_10%,var(--color-surface-1)))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tone)_26%,transparent),0_6px_16px_-8px_color-mix(in_oklab,var(--tone)_60%,transparent)] sm:flex"
+            >
               {illustration}
             </div>
           ) : null}

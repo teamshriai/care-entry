@@ -62,7 +62,7 @@ function chipLook(kind: ChipKind): { className: string; style?: CSSProperties } 
 function Legend() {
   const items: ChipKind[] = ['free', 'earliest', 'selected', 'booked', 'over']
   return (
-    <ul className="scrollbar-hide flex items-center gap-x-3.5 overflow-x-auto pb-0.5" aria-label="Legend">
+    <ul className="scrollbar-hide flex items-center gap-x-3.5 overflow-x-auto overflow-y-hidden pb-0.5" aria-label="Legend">
       {items.map((kind) => {
         const look = chipLook(kind)
         return (

@@ -110,7 +110,7 @@ export interface RailStep {
  *  (on a phone the sections are stacked). */
 export function StepRail({ steps }: { steps: RailStep[] }) {
   return (
-    <ol className="scrollbar-hide -mx-1 mb-3 flex items-center gap-1 overflow-x-auto px-1 pb-0.5" aria-label="Booking steps">
+    <ol className="scrollbar-hide -mx-1 -mt-1 mb-2 flex items-center gap-1 overflow-x-auto overflow-y-hidden px-1 py-1" aria-label="Booking steps">
       {steps.map((step, index) => (
         <li key={step.label} className="flex shrink-0 items-center gap-1">
           {index > 0 ? <span aria-hidden="true" className={cn('h-px w-4 sm:w-8', steps[index - 1].done ? 'bg-success-fg/50' : 'bg-border')} /> : null}

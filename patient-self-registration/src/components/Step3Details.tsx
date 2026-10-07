@@ -53,7 +53,7 @@ export function Step3Details({
   }
 
   return (
-    <Card>
+    <Card tone="teal">
       <StepNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
       <StepHeader icon="mapPin" title="Contact & address" />
       <StepSub>Contact details for your record.</StepSub>

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { cn } from '../ui/cn';
 import { TONE_HEX, toneOf } from '../ui/tones';
+import type { IconTone } from '../ui/tones';
 
 const PATHS = {
   userCheck: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 11l2 2 4-4',
@@ -44,11 +45,14 @@ export function Icon({
   size = 18,
   strokeWidth = 2,
   className,
+  style,
 }: {
   name: IconName;
   size?: number;
   strokeWidth?: number;
   className?: string;
+  /** e.g. `{ color: TONE_HEX[tone] }` for a glyph in its subject's hue. */
+  style?: CSSProperties;
 }) {
   return (
     <svg
@@ -63,6 +67,7 @@ export function Icon({
       aria-hidden="true"
       focusable="false"
       className={cn('shrink-0', className)}
+      style={style}
     >
       {PATHS[name].split(' M').map((d, i) => (
         <path key={i} d={i === 0 ? d : 'M' + d} />
@@ -72,17 +77,37 @@ export function Icon({
 }
 
 /**
- * The soft icon tile (DESIGN_SYSTEM §12.1 SoftIconTile): 12% of the
- * subject's hue (18% in dark), the glyph a shade darker in light and the pure
- * hue in dark. The recurring per-section motif.
+ * The icon tile in its subject's hue (DESIGN_SYSTEM §12.1), in two weights:
+ *
+ *   soft  (default) a pastel gradient of the hue with the glyph in the hue's
+ *         readable ink — small inline icons, list rows, notices.
+ *   solid a gradient chip in the hue with a white glyph (`chip-solid`) —
+ *         section and step headings, figure tiles: where colour leads.
+ *
+ * `tone` overrides the subject's own hue (ui/tones.ts SUBJECT_TONE).
  */
-export function IconBadge({ name, size = 36 }: { name: IconName; size?: number }) {
-  const radius = size <= 30 ? 8 : size <= 38 ? 10 : 14;
+export function IconBadge({
+  name,
+  size = 36,
+  variant = 'soft',
+  tone,
+}: {
+  name: IconName;
+  size?: number;
+  variant?: 'soft' | 'solid';
+  tone?: IconTone;
+}) {
+  const radius = size <= 30 ? 8 : size <= 38 ? 10 : size <= 42 ? 12 : 14;
   return (
     <span
       aria-hidden="true"
-      style={{ '--tone': TONE_HEX[toneOf(name)], width: size, height: size, minWidth: size, borderRadius: radius } as CSSProperties}
-      className="inline-flex shrink-0 items-center justify-center bg-[color-mix(in_oklab,var(--tone)_12%,transparent)] text-[color-mix(in_oklab,var(--tone)_72%,black)] dark:bg-[color-mix(in_oklab,var(--tone)_18%,transparent)] dark:text-[var(--tone)]"
+      style={{ '--tone': TONE_HEX[tone ?? toneOf(name)], width: size, height: size, minWidth: size, borderRadius: radius } as CSSProperties}
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center',
+        variant === 'solid'
+          ? 'chip-solid'
+          : 'ink-tone bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_22%,transparent),color-mix(in_oklab,var(--tone)_10%,transparent))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tone)_16%,transparent)] dark:bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_28%,transparent),color-mix(in_oklab,var(--tone)_14%,transparent))]',
+      )}
     >
       <Icon name={name} size={Math.round(size * 0.5)} />
     </span>

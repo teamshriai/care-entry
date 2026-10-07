@@ -6,6 +6,7 @@ import { Alert, BackButton, Button, ButtonRow, CheckCard, Field, Reveal, SampleC
 import { inputClass } from '../ui/classes';
 import { OtpInput } from '../ui/OtpInput';
 import { cn } from '../ui/cn';
+import { toneVar } from '../ui/tones';
 
 /**
  * Credential entry followed by a one-time code, for either Aadhaar or ABHA.
@@ -150,7 +151,8 @@ export function IdentityVerify({
             </TextButton>
 
             {showNotice && (
-              <Reveal className="mt-2 rounded-xl border border-border-soft bg-surface-2 p-4">
+              <Reveal className="mt-2">
+                <div style={toneVar('green')} className="tint-surface rounded-xl border p-4">
                 <dl className="grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
                   <dt className="font-semibold text-ink">Purpose</dt>
                   <dd className="text-ink-muted">Identification and registration for this hospital visit only.</dd>
@@ -185,6 +187,7 @@ export function IdentityVerify({
                     This build contacts no UIDAI or ABDM service. Lookups read a local sample table and no real identity data is transmitted or stored.
                   </dd>
                 </dl>
+                </div>
               </Reveal>
             )}
           </div>

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { KeyboardEvent, ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode, CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IndianRupee, ReceiptText, Search, ShieldCheck, UserPlus } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
@@ -14,6 +14,7 @@ import { PatientStatusIcons } from './PatientStatusIcons'
 import { billNumberFor, formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
 import { cn } from '../../utils/cn'
+import { abhaKind } from '../../utils/validation'
 import type { Patient, PatientSearchMatch } from '../../types/patient'
 import type { Payment } from '../../types/payment'
 
@@ -171,7 +172,7 @@ export function PatientSearch(props: PatientSearchProps) {
   }
 
   const placeholder =
-    props.mode === 'pick' && props.placeholder ? props.placeholder : 'Search name, mobile, UHID, ABHA or bill no.'
+    props.mode === 'pick' && props.placeholder ? props.placeholder : 'Search name, mobile, UHID, ABHA ID / number or bill no.'
   const showList = open && (options.length > 0 || query.trim().length > 0)
 
   let lastSection = ''
@@ -246,7 +247,7 @@ export function PatientSearch(props: PatientSearchProps) {
         <div
           className={cn(
             'overflow-y-auto rounded-xl border border-border-soft bg-surface-1 pb-1.5',
-            inline ? 'max-h-[min(22rem,55vh)] overscroll-contain shadow-card-sm' : 'absolute left-0 right-0 top-full z-40 mt-1.5 max-h-[min(28rem,70vh)] shadow-card-lg',
+            inline ? 'max-h-[min(22rem,55vh)] shadow-card-sm' : 'absolute left-0 right-0 top-full z-40 mt-1.5 max-h-[min(28rem,70vh)] shadow-card-lg',
           )}
         >
           <ul id={listId} role="listbox" aria-label="Patients">
@@ -302,11 +303,13 @@ function PatientRow({
           <span
             className={cn(
               'flex items-center gap-1 truncate text-xs',
-              matchedOn === 'ABHA' ? 'font-semibold text-primary-text' : 'text-ink-subtle',
+              matchedOn === 'ABHA ID' || matchedOn === 'ABHA number' ? 'font-semibold text-primary-text' : 'text-ink-subtle',
             )}
           >
             <ShieldCheck className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
-            <span className="truncate">ABHA {patient.abhaId}</span>
+            <span className="truncate">
+              {abhaKind(patient.abhaId)} {patient.abhaId}
+            </span>
           </span>
         ) : null}
       </span>
@@ -330,8 +333,8 @@ function PatientRow({
 function BillRow({ bill }: { bill: Payment }) {
   return (
     <>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2">
-        <ReceiptText className="h-4 w-4 text-ink-muted" strokeWidth={1.75} aria-hidden="true" />
+      <span style={{ '--tone': 'var(--color-hue-amber)' } as CSSProperties} className="chip-solid flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+        <ReceiptText className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-ink">{billNumberFor(bill)}</span>

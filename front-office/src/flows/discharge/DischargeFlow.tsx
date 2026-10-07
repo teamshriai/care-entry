@@ -16,7 +16,7 @@ import { getActiveGuestPasses, getPatientById, getPaymentById } from '../../doma
 import { getAdmissionById, previewDischargeBill } from '../../domain/admissionSelectors'
 import { getCurrentAdmissionForPatient } from '../../domain/patientSelectors'
 import { dischargeAdmission, repriceAdmissionBill } from '../../domain/admissionActions'
-import { sendToBillingCounter } from '../../domain/billingCounter'
+import { printBill } from '../../utils/printBill'
 import { todayKey } from '../../domain/time'
 import { BILL_STATUS_LABEL, BILL_STATUS_TONE, billNumberFor, billServicesSummary, formatRupees } from '../../utils/billing'
 import { formatClock } from '../../utils/format'
@@ -57,7 +57,8 @@ interface Discharged {
  * Discharge, over the page it was opened from, laid out like Schedule
  * Appointment: one full-screen page — the patient (and their stay) top-left,
  * the final bill top-right, how the patient is leaving along the bottom. The
- * bill is re-priced to today and sent to the billing counter until it is paid
+ * bill is re-priced to today and printed for the patient to pay at the billing
+ * counter until it is paid
  * (an insured stay is settled by the insurer); then "Patient Discharged" and
  * the bed is free.
  */
@@ -89,15 +90,15 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
     setError(null)
   }
 
-  // The stay is re-priced to this moment, then the final bill goes to the
-  // billing counter (or the insurer) — Care Entry takes no money. Discharge
-  // opens once the counter records the payment.
-  const [sentBillId, setSentBillId] = useState<string | null>(null)
-  function sendFinalBill() {
+  // The stay is re-priced to this moment, then the final bill is printed for
+  // the patient to pay at the billing counter (or for the insurer to settle) —
+  // Care Entry takes no money. Discharge opens once the counter records the payment.
+  const [printedBillId, setPrintedBillId] = useState<string | null>(null)
+  function printFinalBill() {
     if (!admission) return
     const bill = repriceAdmissionBill(admission.admissionId, now)
-    sendToBillingCounter(bill.paymentId)
-    setSentBillId(bill.paymentId)
+    printBill(bill.paymentId)
+    setPrintedBillId(bill.paymentId)
   }
 
   function discharge() {
@@ -170,7 +171,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                   scope="inpatients"
                   onPick={choosePatient}
                   autoFocus
-                  placeholder="Search an admitted patient by name, mobile or UHID"
+                  placeholder="Search an admitted patient by name, mobile, UHID or ABHA"
                 />
                 {patient ? (
                   <button type="button" onClick={() => setPicking(false)} className="self-start text-xs font-semibold text-primary-text hover:underline">
@@ -233,14 +234,24 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                     <span className="text-sm font-semibold text-ink">{formatRupees(preview.balance)} still due</span>
                     <Badge tone={BILL_STATUS_TONE[preview.billStatus]}>{BILL_STATUS_LABEL[preview.billStatus]}</Badge>
                   </div>
-                  {sentBillId ? (
-                    <p className="text-sm text-ink-muted">
-                      Final bill sent to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)} — discharge opens once the
-                      payment is received.
-                    </p>
+                  {printedBillId ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="min-w-0 flex-1 basis-60 text-sm text-ink-muted">
+                        Final bill printed —{' '}
+                        {selfPay
+                          ? `${patient?.name ?? 'the patient'} pays at the billing counter`
+                          : `${admission.insuranceProvider ?? admission.paymentType} settles it through the billing counter`}
+                        . Discharge opens once it is paid.
+                      </p>
+                      <Button size="sm" variant="ghost" onClick={printFinalBill}>
+                        <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        Print again
+                      </Button>
+                    </div>
                   ) : (
-                    <Button onClick={sendFinalBill}>
-                      Send final bill to {selfPay ? 'the billing counter' : (admission.insuranceProvider ?? admission.paymentType)}
+                    <Button onClick={printFinalBill}>
+                      <Printer className="h-4 w-4" strokeWidth={1.75} />
+                      Print final bill
                     </Button>
                   )}
                 </div>

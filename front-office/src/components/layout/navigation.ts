@@ -41,7 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // One place for patients — everyone, outpatients and inpatients are its
       // tabs, and a patient's profile lives under it too.
       { label: 'Patients', path: '/patients', icon: Users, hue: 'teal', description: 'Everyone, outpatients and inpatients' },
-      { label: 'Billing', path: '/billing', icon: IndianRupee, hue: 'amber', description: 'Bills sent to the billing counter' },
+      { label: 'Billing', path: '/billing', icon: IndianRupee, hue: 'amber', description: 'Patients’ bills and payments at the billing counter' },
       { label: 'Doctors', path: '/doctors', icon: Stethoscope, hue: 'green', description: 'Directory, schedules and leave' },
       { label: 'Activity & Analytics', path: '/activity-analytics', icon: ChartNoAxesCombined, hue: 'violet', description: 'Desk activity, trends and performance' },
     ],

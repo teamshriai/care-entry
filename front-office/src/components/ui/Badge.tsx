@@ -38,7 +38,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex max-w-full select-none items-center whitespace-nowrap border font-semibold',
+        'inline-flex max-w-full select-none items-center whitespace-nowrap border font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.5)] dark:shadow-none',
         SIZES[size],
         styles.bg,
         styles.border,
@@ -46,7 +46,9 @@ export function Badge({
         className,
       )}
     >
-      {dot ? <span aria-hidden="true" className={cn('h-1.5 w-1.5 shrink-0 rounded-full', styles.dot)} /> : null}
+      {dot ? (
+        <span aria-hidden="true" className={cn('h-1.5 w-1.5 shrink-0 rounded-full shadow-[0_0_0_3px_color-mix(in_oklab,currentColor_16%,transparent)]', styles.dot)} />
+      ) : null}
       <span className="inline-flex min-w-0 items-center gap-1 truncate">{children ?? status}</span>
     </span>
   )

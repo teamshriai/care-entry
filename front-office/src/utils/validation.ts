@@ -81,6 +81,12 @@ export function abhaError(value: string | null | undefined): string | null {
   return digits.length === 14 ? null : 'An ABHA number has 14 digits (xx-xxxx-xxxx-xxxx).'
 }
 
+/** Which kind of ABHA a value is: the ABHA ID (address, name@abdm) or the
+ *  14-digit ABHA number. */
+export function abhaKind(value: string): 'ABHA ID' | 'ABHA number' {
+  return value.includes('@') ? 'ABHA ID' : 'ABHA number'
+}
+
 /** How an ABHA is stored: addresses in lower case, numbers as xx-xxxx-xxxx-xxxx. */
 export function normalizeAbha(value: string): string {
   const text = value.trim().toLowerCase()

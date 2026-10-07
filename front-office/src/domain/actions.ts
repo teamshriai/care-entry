@@ -33,7 +33,7 @@ import {
   normalizeName,
   sexError,
 } from '../utils/validation'
-import { REGISTRATION_FEE, formatRupees } from '../utils/billing'
+import { formatRupees } from '../utils/billing'
 import { formatDateKey } from '../utils/dates'
 import { NO_SHOW_GRACE_MINUTES, appointmentStatusLabel, modesFor } from '../utils/appointment'
 import type { AppState } from '../types/store'
@@ -157,7 +157,9 @@ function assertAbhaFree(state: AppState, abhaId: string, exceptPatientId?: strin
   }
 }
 
-export function registerPatient(input: RegisterPatientInput): { patient: Patient; bill: Payment } {
+/** Creates the patient record and allocates its UHID. Registering is free —
+ *  no bill is raised; the only charge at the front desk is a consultation. */
+export function registerPatient(input: RegisterPatientInput): Patient {
   assertPatientFields(input)
   const { name, age, sex, mobile } = input
   const abhaId = input.abhaId?.trim() ? normalizeAbha(input.abhaId) : null
@@ -190,11 +192,8 @@ export function registerPatient(input: RegisterPatientInput): { patient: Patient
     },
     [{ text: 'New patient registered', meta: `${patient.name} · ${uhid}` }],
   )
-  // The one-time registration fee is billed as the record is made; the
-  // patient pays it at the billing counter.
-  const billed = applyNewBill(registered, { patientId: uhid, items: [REGISTRATION_FEE] }, patient.createdAt)
-  setState(billed.state)
-  return { patient, bill: billed.value }
+  setState(registered)
+  return patient
 }
 
 // ------------------------------------------------------------ appointments
@@ -239,8 +238,8 @@ function applyBooking(
   return { state: next, value: appointment }
 }
 
-/** A consultation's bill — registration fee the first time, then the
- *  doctor's own fee — raised like every other bill. */
+/** A consultation's bill — the doctor's consultation fee, the one charge
+ *  of a booking — raised like every other bill. */
 function applyConsultationBill(
   state: AppState,
   { patientId, providerId, appointmentId = null }: { patientId: string; providerId: string; appointmentId?: string | null },

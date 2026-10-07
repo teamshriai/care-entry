@@ -28,12 +28,16 @@ export function IconBadge({
   /** Adds a very subtle scale-up when an ancestor with the Tailwind `group`
    *  class is hovered — for the dashboard tiles that are themselves clickable. */
   interactive = false,
+  /** `solid`: a gradient chip in the hue with a white glyph — for headings
+   *  that should carry colour. `soft` (default): a quiet tint. */
+  variant = 'soft',
   className = '',
 }: {
   icon: ElementType
   tone?: Tone
   size?: 'xs' | 'sm' | 'md'
   interactive?: boolean
+  variant?: 'soft' | 'solid'
   className?: string
 }) {
   const varName = TONE_VAR[tone] ?? 'ink-subtle'
@@ -46,8 +50,10 @@ export function IconBadge({
       aria-hidden="true"
       style={style}
       className={cn(
-        'inline-flex shrink-0 items-center justify-center bg-[color-mix(in_oklab,var(--tone)_12%,transparent)] text-[var(--tone)]',
-        '[[data-theme=dark]_&]:bg-[color-mix(in_oklab,var(--tone)_18%,transparent)]',
+        'inline-flex shrink-0 items-center justify-center',
+        variant === 'solid'
+          ? 'chip-solid'
+          : 'ink-tone bg-[color-mix(in_oklab,var(--tone)_14%,transparent)] [[data-theme=dark]_&]:bg-[color-mix(in_oklab,var(--tone)_20%,transparent)]',
         CONTAINER_SIZE[size],
         interactive && 'transition-transform duration-150 group-hover:scale-105',
         className,

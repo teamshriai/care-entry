@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Receipt, Plus, Minus, Trash2, Search, Send } from 'lucide-react'
+import { Receipt, Plus, Minus, Trash2, Search, Printer } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -10,7 +10,7 @@ import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
 import { BillAtCounter } from '../components/payment/BillAtCounter'
-import { sendToBillingCounter } from '../domain/billingCounter'
+import { printBill } from '../utils/printBill'
 import { getTariffs, getDepartments, getActiveEstimateForPatient, getBillForEstimate, getPatientById } from '../domain/selectors'
 import { addEstimateItem, createPaymentBill, updateEstimateItemQuantity, removeEstimateItem } from '../domain/actions'
 import { billNumberFor, formatRupees } from '../utils/billing'
@@ -72,9 +72,9 @@ export function EnquiryEstimatePage() {
     removeEstimateItem({ estimateId: estimate.estimateId, code })
   }
 
-  // Care Entry takes no money: the estimate is raised as a bill and the
-  // patient pays it at the billing counter.
-  function sendToCounter() {
+  // Care Entry takes no money: the estimate is raised as a bill, printed, and
+  // the patient pays it at the billing counter.
+  function raiseAndPrintBill() {
     if (!estimate || !patient) return
     try {
       const bill = createPaymentBill({
@@ -82,8 +82,8 @@ export function EnquiryEstimatePage() {
         items: estimate.items.map((item) => ({ code: item.code, description: item.name, amount: item.rate * (item.quantity ?? 1) })),
         estimateId: estimate.estimateId,
       })
-      sendToBillingCounter(bill.paymentId)
-      notify('Bill sent to the billing counter', { detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}` })
+      printBill(bill.paymentId)
+      notify(`Bill printed — ${patient.name} pays at the billing counter`, { detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}` })
     } catch (err) {
       notify('Could not raise the bill', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
     }
@@ -269,7 +269,7 @@ export function EnquiryEstimatePage() {
                 ) : null}
 
                 <p className="text-xs text-ink-subtle">
-                  An estimate is not an invoice — sending it raises the bill, paid at the billing counter.
+                  An estimate is not an invoice — when the patient is ready, print the bill and they pay it at the billing counter.
                 </p>
 
                 {patient ? (
@@ -280,9 +280,9 @@ export function EnquiryEstimatePage() {
                           Print Estimate
                         </Button>
                         {canBill && estimate ? (
-                          <Button size="sm" onClick={sendToCounter}>
-                            <Send className="h-3.5 w-3.5" strokeWidth={1.75} />
-                            Send {formatRupees(estimate.total)} to the billing counter
+                          <Button size="sm" onClick={raiseAndPrintBill}>
+                            <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+                            Print bill · {formatRupees(estimate.total)}
                           </Button>
                         ) : null}
                         {estimateBill ? <BillAtCounter paymentId={estimateBill.paymentId} className="w-full" /> : null}

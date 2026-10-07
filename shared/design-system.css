@@ -139,6 +139,23 @@
   --color-chart-1: #2563eb;
   --color-chart-2: #eb6834;
 
+  /* ── Hues ──────────────────────────────────────────────────────────
+     The platform's colour: every destination, figure, chip, avatar and
+     tinted surface takes one of these. Softened mid-saturation hues, never
+     neon — pastel surfaces, gradient chips and readable ink on a tint are
+     all derived from them with color-mix() (see .chip-solid, .tint-surface
+     and .ink-tone below), so there is one source per hue and per theme. */
+  --color-hue-blue: #4c7cf0;
+  --color-hue-indigo: #6670e8;
+  --color-hue-violet: #8b6cf0;
+  --color-hue-pink: #e8689a;
+  --color-hue-red: #e5616a;
+  --color-hue-orange: #f08a4b;
+  --color-hue-amber: #e7a93b;
+  --color-hue-green: #2fb37a;
+  --color-hue-teal: #20a9a0;
+  --color-hue-cyan: #2ba8d8;
+
   /* ── Type scale — one step larger than a consumer app; 14px floor ──── */
   --text-2xs: 0.75rem;
   --text-xs: 0.8125rem;
@@ -214,9 +231,15 @@
   --gradient-primary: linear-gradient(180deg, #3b7bf5 0%, #2563eb 55%, #1f55d6 100%);
   /* The hairline of light along a raised surface's top edge. */
   --surface-highlight: rgba(255, 255, 255, 0.85);
-  /* A faint ambient glow on the ground, top-right blue and top-left teal. */
-  --ground-glow-a: rgba(37, 99, 235, 0.07);
-  --ground-glow-b: rgba(48, 176, 199, 0.06);
+  /* A soft ambient mesh on the ground: blue top-right, violet top-left,
+     teal lower-left — colour without a busy page. */
+  --ground-glow-a: rgba(76, 124, 240, 0.11);
+  --ground-glow-b: rgba(139, 108, 240, 0.075);
+  --ground-glow-c: rgba(32, 169, 160, 0.07);
+  /* Readable text on a hue tint: the hue mixed toward black (light) or
+     white (dark). */
+  --tone-ink-mix: black;
+  --tone-ink-amount: 62%;
 }
 
 :root[data-theme='dark'] {
@@ -292,6 +315,17 @@
   --color-chart-1: #5b8fe8;
   --color-chart-2: #d95926;
 
+  --color-hue-blue: #6d95f2;
+  --color-hue-indigo: #8189ec;
+  --color-hue-violet: #a189f2;
+  --color-hue-pink: #ec82ab;
+  --color-hue-red: #ec7b82;
+  --color-hue-orange: #f2a06b;
+  --color-hue-amber: #ebb85c;
+  --color-hue-green: #4cc290;
+  --color-hue-teal: #3dbdb3;
+  --color-hue-cyan: #4dbbe3;
+
   /* Non-optional: light shadows are invisible over #1D232D. */
   --shadow-card-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.35);
   --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.4), 0 4px 12px -4px rgba(0, 0, 0, 0.35);
@@ -300,8 +334,11 @@
   --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.7);
   --gradient-primary: linear-gradient(180deg, #4572d6 0%, #2f5fbf 100%);
   --surface-highlight: rgba(255, 255, 255, 0.045);
-  --ground-glow-a: rgba(58, 106, 204, 0.12);
-  --ground-glow-b: rgba(48, 176, 199, 0.06);
+  --ground-glow-a: rgba(80, 120, 220, 0.13);
+  --ground-glow-b: rgba(140, 110, 230, 0.08);
+  --ground-glow-c: rgba(40, 170, 160, 0.06);
+  --tone-ink-mix: white;
+  --tone-ink-amount: 72%;
   --shadow-glow: 0 0 0 3px rgba(127, 169, 240, 0.22);
 }
 
@@ -355,7 +392,8 @@ html[data-high-contrast='true'][data-theme='dark'] {
     background-color: var(--color-bg);
     background-image:
       radial-gradient(70rem 36rem at 100% -12rem, var(--ground-glow-a), transparent 70%),
-      radial-gradient(56rem 30rem at -10% -8rem, var(--ground-glow-b), transparent 70%);
+      radial-gradient(56rem 30rem at -10% -8rem, var(--ground-glow-b), transparent 70%),
+      radial-gradient(60rem 40rem at 10% 115%, var(--ground-glow-c), transparent 70%);
     background-attachment: fixed;
     color: var(--color-ink);
     transition: background-color 0.2s var(--ease-smooth), color 0.2s var(--ease-smooth);
@@ -485,6 +523,42 @@ html[data-high-contrast='true'][data-theme='dark'] {
 }
 
 @layer components {
+  /* ── Hue helpers — set `--tone` (e.g. var(--color-hue-teal)) ───────── */
+  /* A solid gradient chip: an icon tile, an avatar, a count. */
+  .chip-solid {
+    color: #fff;
+    background-image: linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--tone) 86%, white) 0%,
+      var(--tone) 45%,
+      color-mix(in oklab, var(--tone) 80%, black) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      0 6px 14px -7px color-mix(in oklab, var(--tone) 75%, transparent);
+  }
+  /* A pastel surface in the hue — a card, a row, a box. */
+  .tint-surface {
+    background-image: linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--tone) 15%, var(--color-surface-1)) 0%,
+      color-mix(in oklab, var(--tone) 5%, var(--color-surface-1)) 70%
+    );
+    border-color: color-mix(in oklab, var(--tone) 28%, var(--color-border-soft));
+  }
+  /* A flat soft tint, for small fills (pills, wells, rows). */
+  .tint-soft {
+    background-color: color-mix(in oklab, var(--tone) 11%, var(--color-surface-1));
+  }
+  /* Text in the hue that stays readable on its tint (AA). */
+  .ink-tone {
+    color: color-mix(in oklab, var(--tone) var(--tone-ink-amount), var(--tone-ink-mix));
+  }
+  /* A hairline accent along a card's top edge. */
+  .accent-line {
+    background-image: linear-gradient(90deg, var(--tone), color-mix(in oklab, var(--tone) 35%, transparent) 70%, transparent);
+  }
+
   .auth-input {
     @apply w-full rounded-xl border border-border bg-surface-1/80 py-3 pl-10 pr-3 text-sm text-ink outline-none transition placeholder:text-ink-subtle focus:border-primary-500 focus:bg-surface-1 focus:ring-4;
     --tw-ring-color: color-mix(in oklab, var(--color-focus) 22%, transparent);

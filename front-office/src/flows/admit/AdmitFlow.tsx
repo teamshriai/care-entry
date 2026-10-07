@@ -4,7 +4,7 @@ import { FlowSheet } from '../../components/flow/FlowSheet'
 import { AckCard } from '../../components/flow/AckCard'
 import { Quadrant, SummaryItem, Waiting } from '../../components/flow/Quadrant'
 import { BillAtCounter } from '../../components/payment/BillAtCounter'
-import { sendToBillingCounter } from '../../domain/billingCounter'
+import { printBill } from '../../utils/printBill'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { MobileInput } from '../../components/ui/MobileInput'
 import { Button } from '../../components/ui/Button'
@@ -75,7 +75,7 @@ function detailsComplete(d: Details): boolean {
  * one full-screen page — patient top-left, ward & bed top-right, the admission
  * details bottom-left, the first-day bill bottom-right — each editable at any
  * time, with the confirmation along the bottom. A self-pay patient's bill
- * goes to the billing counter; then "Patient Admitted". The profile shows the
+ * is printed for them to pay at the billing counter; then "Patient Admitted". The profile shows the
  * inpatient tag the moment it closes.
  */
 export function AdmitFlow({ params, onClose }: FlowProps) {
@@ -143,9 +143,9 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
         insuranceProvider: details.insuranceProvider,
         policyNumber: details.policyNumber,
       })
-      // A self-pay patient pays the first day at the billing counter; an
-      // insured stay's bill goes to its payer at discharge.
-      if (result.admission.paymentType === 'Self Pay') sendToBillingCounter(result.bill.paymentId)
+      // A self-pay patient pays the first day at the billing counter, with the
+      // bill printed here; an insured stay's bill goes to its payer at discharge.
+      if (result.admission.paymentType === 'Self Pay') printBill(result.bill.paymentId)
       setDone(result)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -203,14 +203,14 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
           </div>
           <Button size="lg" onClick={admit} disabled={!ready}>
             {selfPay ? <BedDouble className="h-4 w-4" strokeWidth={1.75} /> : <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />}
-            {selfPay ? 'Admit & send bill' : `Admit — bill ${details.insuranceProvider || details.paymentType}`}
+            {selfPay ? 'Admit & print bill' : `Admit — bill ${details.insuranceProvider || details.paymentType}`}
           </Button>
         </div>
       </div>
       <p className="text-xs text-ink-muted">
         {ready
           ? selfPay
-            ? 'The first-day bill goes to the billing counter. The bed charge accrues daily; the final bill is settled at discharge.'
+            ? `The first-day bill prints for ${patient?.name ?? 'the patient'} to pay at the billing counter. The bed charge accrues daily; the final bill is settled at discharge.`
             : 'The bill goes to the payer and is settled at discharge.'
           : 'Choose the patient, a free bed and complete the details to admit.'}
       </p>
@@ -225,7 +225,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
           <div className="flex flex-col gap-3">
             {showPatientSearch ? (
               <div className="flex flex-col gap-2">
-                <PatientSearch mode="pick" onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile or UHID" />
+                <PatientSearch mode="pick" onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile, UHID or ABHA" />
                 {patient ? (
                   <button type="button" onClick={() => setChangingPatient(false)} className="self-start text-xs font-semibold text-primary-text hover:underline">
                     Keep {patient.name}

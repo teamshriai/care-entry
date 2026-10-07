@@ -81,7 +81,10 @@ export function PatientsPage() {
       sortValue: (row) => row.patient.name,
       cell: ({ patient }) => (
         <div className="flex min-w-0 items-center gap-2.5">
-          <Avatar name={patient.name} initials={initialsOf(patient.name)} size="sm" />
+          {/* In the table only — a phone card keeps the room for the name. */}
+          <span className="hidden shrink-0 tbl:inline-flex">
+            <Avatar name={patient.name} initials={initialsOf(patient.name)} size="sm" />
+          </span>
           <div className="min-w-0">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate font-medium text-ink tbl:whitespace-nowrap">{patient.name}</span>
@@ -133,7 +136,7 @@ export function PatientsPage() {
     <div>
       <PageHeader
         title="Patients"
-        subtitle="Every registered patient, newest first. Open one to schedule, bill, admit or discharge."
+        subtitle="Every registered patient, newest first. Open one to schedule an appointment, admit or discharge."
         illustration={<PatientIllustration className="h-8 w-8" />}
         illustrationTone="teal"
         tabs={<PatientsTabs />}

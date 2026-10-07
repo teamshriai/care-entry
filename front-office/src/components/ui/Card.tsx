@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, CSSProperties, ElementType, ReactNode } from 'react'
 import { cn } from '../../utils/cn'
 import { IconBadge } from './IconBadge'
 import { TONE_VAR } from '../../utils/tone'
@@ -28,12 +28,19 @@ export function Card({
     quiet: 'border border-border-soft bg-surface-2',
   }
   const accentVar = accentTone ? TONE_VAR[accentTone] : undefined
-  const edge = accentVar ? `color-mix(in oklab, var(--color-${accentVar}) 16%, var(--color-border-soft))` : undefined
+  const edge = accentVar ? `color-mix(in oklab, var(--color-${accentVar}) 24%, var(--color-border-soft))` : undefined
 
   return (
     <div
-      className={cn('min-w-0 rounded-xl', emphasisStyles[emphasis], accentVar && 'card-accent', className)}
-      style={accentVar ? { borderColor: edge, ...style } : style}
+      className={cn(
+        'min-w-0 rounded-xl',
+        emphasisStyles[emphasis],
+        // A soft gradient line of the hue along the top edge.
+        accentVar &&
+          'card-accent relative before:pointer-events-none before:absolute before:inset-x-4 before:top-0 before:h-[2px] before:rounded-full before:[background-image:linear-gradient(90deg,transparent,var(--tone)_25%,color-mix(in_oklab,var(--tone)_40%,transparent)_75%,transparent)] print:before:hidden',
+        className,
+      )}
+      style={accentVar ? ({ borderColor: edge, '--tone': `var(--color-${accentVar})`, ...style } as CSSProperties) : style}
       {...props}
     >
       <CardAccent.Provider value={accentVar}>{children}</CardAccent.Provider>
@@ -69,12 +76,17 @@ export function CardHeader({
       // A wash of the card's hue that fades out across the header.
       style={
         accentVar
-          ? { backgroundImage: `linear-gradient(100deg, color-mix(in oklab, var(--color-${accentVar}) 9%, transparent) 0%, transparent 65%)` }
+          ? {
+              backgroundImage: [
+                `radial-gradient(90% 160% at 0% 0%, color-mix(in oklab, var(--color-${accentVar}) 13%, transparent) 0%, transparent 60%)`,
+                `linear-gradient(100deg, color-mix(in oklab, var(--color-${accentVar}) 6%, transparent) 0%, transparent 75%)`,
+              ].join(', '),
+            }
           : undefined
       }
     >
       <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
-        {Icon ? <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size="xs" /> : null}
+        {Icon ? <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size="xs" variant={iconTone && iconTone !== 'neutral' ? 'solid' : 'soft'} /> : null}
         <div className="min-w-0">
           <h3 className="break-words text-sm font-semibold tracking-[-0.01em] text-ink">{title}</h3>
           {subtitle ? <p className="mt-0.5 text-xs leading-snug text-ink-subtle">{subtitle}</p> : null}

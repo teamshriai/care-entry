@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from 'react'
+import type { CSSProperties, ElementType, ReactNode } from 'react'
 import { cn } from '../../utils/cn'
 
 /** The empty state (DESIGN_SYSTEM §10.10): a calm message and the next action. */
@@ -24,8 +24,11 @@ export function EmptyState({
       {illustration ? (
         <div className="mb-4 text-ink-subtle">{illustration}</div>
       ) : Icon ? (
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2">
-          <Icon size={22} className="text-ink-subtle" aria-hidden="true" />
+        <div
+          style={{ '--tone': 'var(--color-hue-blue)' } as CSSProperties}
+          className="ink-tone mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[linear-gradient(145deg,color-mix(in_oklab,var(--tone)_22%,var(--color-surface-1)),color-mix(in_oklab,var(--tone)_8%,var(--color-surface-1)))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--tone)_22%,transparent)]"
+        >
+          <Icon size={22} aria-hidden="true" />
         </div>
       ) : null}
       <p className="text-base font-semibold text-ink">{title}</p>

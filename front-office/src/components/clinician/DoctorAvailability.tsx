@@ -75,7 +75,7 @@ export function DoctorAvailability({
       />
 
       {/* Departments — wrap on a wide screen, scroll sideways on a phone. */}
-      <div role="group" aria-label="Department" className="scrollbar-hide scroll-fade-x flex gap-1.5 overflow-x-auto border-b border-border-soft px-3.5 py-2.5 sm:px-4 lg:flex-wrap lg:px-5 lg:[mask-image:none]">
+      <div role="group" aria-label="Department" className="scrollbar-hide scroll-fade-x flex gap-1.5 overflow-x-auto overflow-y-hidden border-b border-border-soft px-3.5 py-2.5 sm:px-4 lg:flex-wrap lg:px-5 lg:[mask-image:none]">
         {[['All', timeline.strips.length] as const, ...departments].map(([name, count]) => (
           <button
             key={name}
@@ -88,13 +88,13 @@ export function DoctorAvailability({
             className={chip(department === name)}
           >
             {name}
-            <span className={cn('tabular-nums', department === name ? 'text-on-primary/80' : 'text-ink-subtle')}>{count}</span>
+            <span className={cn('tabular-nums', department === name ? 'rounded-full bg-black/20 px-1.5 text-on-primary' : 'text-ink-subtle')}>{count}</span>
           </button>
         ))}
       </div>
 
       {/* How to read it. */}
-      <div className="scrollbar-hide overflow-x-auto border-b border-border-soft bg-surface-2/50 px-3.5 py-2 sm:px-4 lg:px-5">
+      <div className="scrollbar-hide overflow-x-auto overflow-y-hidden border-b border-border-soft bg-[color-mix(in_oklab,var(--color-hue-blue)_5%,var(--color-surface-1))] px-3.5 py-2 sm:px-4 lg:px-5">
         <HourLegend className="w-max lg:w-auto" />
       </div>
 

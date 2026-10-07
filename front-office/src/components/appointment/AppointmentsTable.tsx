@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { Avatar } from '../ui/Avatar'
+import { initialsOf } from '../../utils/format'
 import { Link } from 'react-router-dom'
 import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
@@ -69,7 +71,14 @@ export function AppointmentsTable({
       mobile: 'title',
       sortValue: (a) => a.patient?.name ?? '',
       cell: (a) => (
-        <>
+        <span className="flex min-w-0 items-center gap-2.5">
+          {a.patient ? (
+            // In the table only — a phone card keeps the room for the name.
+            <span className="hidden shrink-0 tbl:inline-flex">
+              <Avatar name={a.patient.name} initials={initialsOf(a.patient.name)} size="sm" />
+            </span>
+          ) : null}
+          <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-1.5 text-ink tbl:max-w-[14rem]">
             {a.patient ? (
               <Link
@@ -85,7 +94,8 @@ export function AppointmentsTable({
             <PatientStatusIcons status={care[a.patientId]} />
           </span>
           {compact ? null : <span className="block text-2xs font-normal text-ink-subtle">{a.patient?.uhid}</span>}
-        </>
+          </span>
+        </span>
       ),
     },
     {
