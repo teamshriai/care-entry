@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CalendarPlus, UserPlus, UserRoundCheck } from 'lucide-react'
+import { UserPlus, UserRoundCheck } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -114,31 +114,16 @@ export function RegisterPatientPage() {
   }
 
   if (registered) {
-    // The acknowledgement, then the new patient's profile — or straight on to
-    // booking their first appointment. `replace` drops the filled-in form from
-    // history, so Back never lands on it again.
+    // A plain acknowledgement, then the new patient's profile. `replace`
+    // drops the filled-in form from history, so Back never lands on it again.
     return (
       <div className="flex min-h-[60dvh] items-center justify-center py-6">
         <Card accentTone="teal" className="w-full max-w-md">
           <AckCard
             title="Patient Created"
             icon={UserRoundCheck}
-            durationMs={9000}
+            durationMs={7000}
             onDone={() => navigate(`/patients/${registered.uhid}`, { replace: true })}
-            action={
-              <div className="flex flex-wrap justify-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => navigate(`/patients/${registered.uhid}?flow=schedule&uhid=${registered.uhid}`, { replace: true })}
-                >
-                  <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  Schedule Appointment
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => navigate(`/patients/${registered.uhid}`, { replace: true })}>
-                  Open profile
-                </Button>
-              </div>
-            }
           >
             <p className="text-base font-semibold text-ink">{registered.name}</p>
             <p className="text-2xl font-semibold tracking-wide tabular-nums text-primary-text">{registered.uhid}</p>
