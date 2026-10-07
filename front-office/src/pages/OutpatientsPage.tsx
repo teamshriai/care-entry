@@ -110,21 +110,15 @@ export function OutpatientsPage() {
         if (appointment.status !== 'Confirmed') {
           const bill = getBillsForAppointment(getState(), appointment.appointmentId)[0]
           // Paid at the billing counter; check-in opens once it is received.
-          return (
-            <>
-              {admit}
-              {bill ? (
-                <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${bill.paymentId}`)}>
-                  <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
-                  View bill
-                </Button>
-              ) : null}
-            </>
-          )
+          return bill ? (
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${bill.paymentId}`)}>
+              <IndianRupee className="h-3.5 w-3.5" strokeWidth={1.75} />
+              View bill
+            </Button>
+          ) : null
         }
         return (
           <>
-            {admit}
             {row.canMarkNoShow ? (
               <Button size="sm" variant="secondary" onClick={() => run(() => markNoShow(appointment.appointmentId), 'Marked as no-show', `${name} · fee kept`)}>
                 <UserX className="h-3.5 w-3.5" strokeWidth={1.75} />

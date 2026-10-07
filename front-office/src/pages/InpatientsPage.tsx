@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { BedDouble, BedSingle, Hourglass, LogOut } from 'lucide-react'
+import { BedDouble, BedSingle, LogOut } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { AdmissionIllustration } from '../components/ui/illustrations/AdmissionIllustration'
 import { Card } from '../components/ui/Card'
@@ -15,7 +15,7 @@ import { BillStatusBadge } from '../components/payment/BillStatusBadge'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useFlow } from '../flows/useFlow'
-import { getAwaitingBed, getDischargedOn, getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
+import { getDischargedOn, getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
 import { todayKey } from '../domain/time'
 import { BILL_STATUS_LABEL, BILL_STATUS_TONE, formatRupees } from '../utils/billing'
 import { formatClock } from '../utils/format'
@@ -28,9 +28,9 @@ import { PatientStatusIcons } from '../components/patient/PatientStatusIcons'
 import { usePatientCareStatus } from '../hooks/useCareStatus'
 import { PatientsTabs } from '../components/patient/PatientsTabs'
 
-type InpatientFilter = 'admitted' | 'awaiting' | 'beds' | 'discharged'
+type InpatientFilter = 'admitted' | 'beds' | 'discharged'
 
-const FILTERS: InpatientFilter[] = ['admitted', 'awaiting', 'beds', 'discharged']
+const FILTERS: InpatientFilter[] = ['admitted', 'beds', 'discharged']
 
 function readFilter(search: string): InpatientFilter {
   const value = new URLSearchParams(search).get('filter')
@@ -50,7 +50,7 @@ function payerOf(admission: Admission): string {
 }
 
 /**
- * Patients › Inpatients: who is in a bed, who is waiting for one, which beds are free
+ * Patients › Inpatients: who is in a bed, which beds are free
  * and who went home today — each figure is also the filter for the list
  * under it. Discharge sits on the patient's row, and a requested admission
  * is given its bed on its own row. A new admission starts from the
@@ -64,7 +64,6 @@ export function InpatientsPage() {
   const filter = readFilter(location.search)
 
   const rows = useStoreValue(getInpatientRows, now)
-  const awaiting = useStoreValue(getAwaitingBed)
   const wards = useStoreValue(getWardSummaries)
   const discharged = useStoreValue(getDischargedOn, now)
   const [wardChoice, setWardChoice] = useState<Ward | null>(null)
@@ -91,7 +90,6 @@ export function InpatientsPage() {
       tone: 'purple',
       icon: BedDouble,
     },
-    { key: 'awaiting', label: 'Awaiting bed', value: awaiting.length, context: 'Admission requested', tone: 'warning', icon: Hourglass },
     { key: 'beds', label: 'Beds free', value: bedsFree, context: `of ${bedsTotal} beds`, tone: 'stable', icon: BedSingle },
     { key: 'discharged', label: 'Discharged today', value: discharged.length, context: 'Beds released', tone: 'teal', icon: LogOut },
   ]
@@ -156,48 +154,6 @@ export function InpatientsPage() {
                       <Button size="sm" variant="secondary" onClick={() => openFlow('discharge', { uhid: a.patientId })}>
                         <LogOut size={14} aria-hidden="true" />
                         Discharge
-                      </Button>
-                    ),
-                  },
-                ]}
-              />
-            )}
-          </Card>
-        ) : null}
-
-        {filter === 'awaiting' ? (
-          <Card accentTone="purple">
-            {awaiting.length === 0 ? (
-              <EmptyState icon={Hourglass} title="Nobody is waiting for a bed" description="Admission requests appear here until a bed is given." />
-            ) : (
-              <ResponsiveTable
-                rows={awaiting}
-                rowKey={(a) => a.admissionId}
-                caption="Waiting for a bed"
-                columns={[
-                  { key: 'patient', header: 'Patient', mobile: 'title', sortValue: (a) => a.patientName, cell: (a) => <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} /> },
-                  { key: 'requested', header: 'Requested', className: 'whitespace-nowrap text-ink-muted', sortValue: (a) => a.createdAt, cell: (a) => at(a.createdAt) },
-                  { key: 'doctor', header: 'Doctor', className: 'whitespace-nowrap text-ink-muted', cell: (a) => a.doctorName },
-                  { key: 'type', header: 'Type', className: 'whitespace-nowrap', mobile: 'aside', cell: (a) => <Badge tone={a.admissionType === 'Emergency' ? 'critical' : 'neutral'}>{a.admissionType}</Badge> },
-                  {
-                    key: 'reason',
-                    header: 'Reason',
-                    className: 'text-ink-muted',
-                    cell: (a) => (
-                      <span className="block tbl:max-w-56 tbl:truncate" title={a.reason}>
-                        {a.reason}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: 'actions',
-                    header: <span className="sr-only">Actions</span>,
-                    className: 'whitespace-nowrap text-right',
-                    mobile: 'actions',
-                    cell: (a) => (
-                      <Button size="sm" onClick={() => openFlow('admit', { uhid: a.patientId })}>
-                        <BedDouble size={14} aria-hidden="true" />
-                        Allot bed
                       </Button>
                     ),
                   },
