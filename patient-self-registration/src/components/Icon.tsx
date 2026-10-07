@@ -1,4 +1,8 @@
-const PATHS: Record<string, string> = {
+import type { CSSProperties } from 'react';
+import { cn } from '../ui/cn';
+import { TONE_HEX, toneOf } from '../ui/tones';
+
+const PATHS = {
   userCheck: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 11l2 2 4-4',
   shieldCheck: 'M12 3l8 3v6c0 4.8-3.4 8.4-8 9-4.6-.6-8-4.2-8-9V6l8-3z M9 12l2 2 4-4',
   mapPin: 'M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z M12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
@@ -29,19 +33,37 @@ const PATHS: Record<string, string> = {
   external: 'M14 4h6v6 M20 4l-8.5 8.5 M18 14v5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 19V8a1.5 1.5 0 0 1 1.5-1.5H10',
   edit: 'M4 20h4.5L19 9.5a2.1 2.1 0 0 0-3-3L5.5 17V20z M14.5 6.5l3 3',
   download: 'M12 3.5v11 M7.8 10.3 12 14.5l4.2-4.2 M4 16.5v2A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5v-2',
-};
+} as const satisfies Record<string, string>;
 
+export type IconName = keyof typeof PATHS;
+
+/** A 24-grid line icon in `currentColor`. Decorative — the control or text
+ *  beside it carries the accessible name. */
 export function Icon({
   name,
   size = 18,
   strokeWidth = 2,
+  className,
 }: {
-  name: keyof typeof PATHS;
+  name: IconName;
   size?: number;
   strokeWidth?: number;
+  className?: string;
 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+      className={cn('shrink-0', className)}
+    >
       {PATHS[name].split(' M').map((d, i) => (
         <path key={i} d={i === 0 ? d : 'M' + d} />
       ))}
@@ -50,39 +72,18 @@ export function Icon({
 }
 
 /**
- * Each subject keeps one accent everywhere it appears — identity is violet,
- * health is rose, place is teal, dates are sky, time is orange, documents are
- * fuchsia, verification is green — so a patient can tell sections apart by
- * colour as well as by title. Anything not listed falls back to blue.
+ * The soft icon tile (DESIGN_SYSTEM §12.1 SoftIconTile): 12% of the
+ * subject's hue (18% in dark), the glyph a shade darker in light and the pure
+ * hue in dark. The recurring per-section motif.
  */
-type Tone = 'blue' | 'teal' | 'violet' | 'rose' | 'amber' | 'green' | 'sky' | 'fuchsia' | 'orange';
-
-const TONE: Partial<Record<keyof typeof PATHS, Tone>> = {
-  idCard: 'violet',
-  brainPulse: 'violet',
-  message: 'violet',
-  heartPulse: 'rose',
-  pill: 'rose',
-  activity: 'rose',
-  mapPin: 'teal',
-  calendar: 'sky',
-  hospital: 'teal',
-  clock: 'orange',
-  file: 'fuchsia',
-  shieldCheck: 'green',
-  checkCircle: 'green',
-  lock: 'green',
-};
-
-/** The accent for an icon, so a card can take on the colour of the badge it carries. */
-export function toneOf(name: keyof typeof PATHS) {
-  return TONE[name] ?? 'blue';
-}
-
-/** A small circular tinted badge wrapping an Icon — the recurring per-section motif. */
-export function IconBadge({ name, size = 30 }: { name: keyof typeof PATHS; size?: number }) {
+export function IconBadge({ name, size = 36 }: { name: IconName; size?: number }) {
+  const radius = size <= 30 ? 8 : size <= 38 ? 10 : 14;
   return (
-    <span className={`icon-badge icon-badge--${toneOf(name)}`} style={{ width: size, height: size, minWidth: size }}>
+    <span
+      aria-hidden="true"
+      style={{ '--tone': TONE_HEX[toneOf(name)], width: size, height: size, minWidth: size, borderRadius: radius } as CSSProperties}
+      className="inline-flex shrink-0 items-center justify-center bg-[color-mix(in_oklab,var(--tone)_12%,transparent)] text-[color-mix(in_oklab,var(--tone)_72%,black)] dark:bg-[color-mix(in_oklab,var(--tone)_18%,transparent)] dark:text-[var(--tone)]"
+    >
       <Icon name={name} size={Math.round(size * 0.5)} />
     </span>
   );

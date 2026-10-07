@@ -27,6 +27,7 @@ import type { Admission, DischargeType } from '../../types/admission'
 import type { Payment } from '../../types/payment'
 import type { Patient } from '../../types/patient'
 import type { FlowProps } from '../registry'
+import { inputClass } from '../../utils/formClasses'
 
 const TYPE_LABEL: Record<DischargeType, string> = {
   'Normal Discharge': 'Normal',
@@ -35,8 +36,6 @@ const TYPE_LABEL: Record<DischargeType, string> = {
   Death: 'Death',
 }
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none transition-colors focus:border-primary-600 focus:ring-1 focus:ring-primary-600 placeholder:text-ink-subtle'
 
 function isCritical(ward: string | null): boolean {
   return ward === 'ICU' || ward === 'Emergency'
@@ -180,7 +179,7 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
                 ) : null}
               </div>
             ) : patient ? (
-              <div className="flex items-start justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-primary-200 dark:border-primary-500/35 bg-primary-50 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold text-ink">{patient.name}</p>
                   <p className="mt-0.5 text-sm text-ink-muted">
@@ -227,9 +226,9 @@ export function DischargeFlow({ params, onClose }: FlowProps) {
               </div>
 
               {preview.canDischarge ? (
-                <p className="text-sm font-medium text-stable">Payment received — nothing is due on this stay.</p>
+                <p className="text-sm font-medium text-success-fg">Payment received — nothing is due on this stay.</p>
               ) : (
-                <div className="flex flex-col gap-3 rounded-xl border border-warning-border bg-warning-bg/40 px-4 py-3">
+                <div className="flex flex-col gap-3 rounded-xl border border-warning-fg/25 bg-warning-bg/40 px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-ink">{formatRupees(preview.balance)} still due</span>
                     <Badge tone={BILL_STATUS_TONE[preview.billStatus]}>{BILL_STATUS_LABEL[preview.billStatus]}</Badge>
@@ -329,7 +328,7 @@ function StaySummary({ admission, days }: { admission: Admission; days: number }
   return (
     <section aria-label="Stay" className="rounded-xl border border-border-soft bg-surface-2 px-4 py-3">
       <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <WardIcon ward={admission.wardLabel} className={cn('h-4 w-4', isCritical(admission.wardLabel) ? 'text-critical' : 'text-primary-text')} />
+        <WardIcon ward={admission.wardLabel} className={cn('h-4 w-4', isCritical(admission.wardLabel) ? 'text-critical-fg' : 'text-primary-text')} />
         {admission.wardLabel} · {admission.bedNumber}
         <span className="font-normal text-ink-muted">· Day {days}</span>
       </p>

@@ -37,6 +37,25 @@ without a trailing slash — from `dist/patient-self-registration/index.html`).
 
 Both apps open in the **light** theme by default; the dark theme stays available through each app's theme switch.
 
+## Design system
+
+Both apps follow [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) and share **one** token stylesheet,
+[`shared/design-system.css`](shared/design-system.css): colours (light and dark), the type scale,
+radius, shadows, motion, focus, touch-target and print rules, and the Plus Jakarta Sans + Noto fonts.
+Each app's `src/index.css` imports it and adds only its own keyframes. Components use tokens only
+(`bg-surface-1`, `text-ink-muted`, `text-primary-text` …), never raw hex.
+
+- **Navigation.** From 1024px a sidebar that collapses to an icon rail (the choice is remembered);
+  768–1023px the icon rail; below 768px a bottom bar — Front Office keeps the rest of its places and
+  the language in **More**, the patient portal's sections are its tabs.
+- **Tables** show as a table whenever their columns fit, and as stacked records when they don't — the
+  fit is measured, so no page scrolls sideways from 320px to 1920px.
+- **Phones** get horizontal scroll rows for figure cards, the Doctors-now hours, the portal tiles and
+  the reassurance cards; every control stays at least 44px.
+- **Desktop** steps the whole scale down slightly (15px base) for a denser desk screen.
+- **Doctor Availability** on the dashboard shows each doctor's day hour by hour (free · some free · full ·
+  break · over); tapping an hour opens Schedule Appointment on that doctor and that hour's first free time.
+
 ## How the front office works
 
 - **One search, one box per screen.** The box in the app bar finds a patient by name, mobile, UHID,

@@ -166,7 +166,7 @@ export function OutpatientsPage() {
               <CalendarClock className="h-3.5 w-3.5" strokeWidth={1.75} />
               Reschedule
             </Button>
-            <Button size="sm" variant="ghost" className="text-critical" onClick={() => setDialog({ appointmentId: row.appointment!.appointmentId, startWith: 'cancel' })}>
+            <Button size="sm" variant="ghost" className="text-critical-fg" onClick={() => setDialog({ appointmentId: row.appointment!.appointmentId, startWith: 'cancel' })}>
               Cancel
             </Button>
           </>
@@ -199,24 +199,24 @@ export function OutpatientsPage() {
         }
       />
 
-      <div className="flex flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-5 mt-4 sm:mt-5">
         <StatFilter
           label="Show outpatients"
           items={items}
           selected={filter}
           onSelect={(next) => setParam('filter', next)}
-          columns="grid-cols-2 sm:grid-cols-3 xl:grid-cols-6"
+          columns="sm:grid-cols-3 xl:grid-cols-6"
         />
 
         <div className="flex flex-wrap items-center gap-2">
           {provider ? (
-            <span className="inline-flex h-9 items-center gap-1 rounded-full border border-primary-600 bg-primary-50 pl-3 pr-1 text-xs font-semibold text-primary-text">
+            <span className="inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border border-primary-600 bg-primary-50 pl-3.5 pr-0.5 text-sm font-semibold text-primary-text">
               {provider.name}
               <button
                 type="button"
                 onClick={() => setParam('provider', null)}
                 aria-label={`Show every doctor, not only ${provider.name}`}
-                className="rounded-full p-1.5 hover:bg-surface-2"
+                className="focus-ring tap-target shrink-0 rounded-full hover:bg-surface-2"
               >
                 <X className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
               </button>

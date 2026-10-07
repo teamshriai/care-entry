@@ -37,7 +37,7 @@ export function GuestPassPrintPage() {
   }, [autoPrint, pass])
 
   return (
-    <div className="flex flex-col items-center gap-4 px-4 py-6">
+    <div className="flex flex-col items-center gap-4">
       <div className="flex w-full max-w-md items-center justify-between print:hidden">
         <Button size="sm" variant="ghost" onClick={() => navigate('/services/guest-pass')}>
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.75} />

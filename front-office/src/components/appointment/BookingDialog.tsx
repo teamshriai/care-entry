@@ -11,6 +11,8 @@ import { billNumberFor, formatRupees } from '../../utils/billing'
 import { dayWithDate } from '../../utils/dates'
 import { cn } from '../../utils/cn'
 import type { UnavailableParty } from '../../types/appointment'
+import { inputClass } from '../../utils/formClasses'
+import { formatTime } from '../../domain/time'
 
 /**
  * One booking's options when the patient or the doctor can't keep it:
@@ -50,7 +52,7 @@ export function BookingDialog({
   const paid = bills.reduce((sum, bill) => sum + bill.paidAmount, 0)
   const methods = [...new Set(bills.flatMap((bill) => bill.transactions.map((t) => t.method)))].join(' + ')
   const billNumbers = bills.filter((bill) => bill.paidAmount > 0).map(billNumberFor).join(', ')
-  const when = `${dayWithDate(appointment.date, today)} · ${appointment.slot}`
+  const when = `${dayWithDate(appointment.date, today)} · ${formatTime(appointment.slot)}`
 
   function confirmCancel() {
     if (!by) return
@@ -79,7 +81,7 @@ export function BookingDialog({
             <CalendarClock className="h-4 w-4" strokeWidth={1.75} />
             Reschedule
           </Button>
-          <Button size="lg" variant="secondary" className="text-critical" onClick={() => setView('cancel')}>
+          <Button size="lg" variant="secondary" className="text-critical-fg" onClick={() => setView('cancel')}>
             <XCircle className="h-4 w-4" strokeWidth={1.75} />
             Cancel booking
           </Button>
@@ -98,7 +100,7 @@ export function BookingDialog({
                   aria-checked={by === party}
                   onClick={() => setBy(party)}
                   className={cn(
-                    'rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
+                    'focus-ring min-h-11 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors',
                     by === party ? 'border-primary-600 bg-primary-50 font-semibold text-ink' : 'border-border text-ink-muted hover:bg-surface-2',
                   )}
                 >
@@ -113,10 +115,10 @@ export function BookingDialog({
             placeholder="Note (optional) — e.g. patient unwell, doctor on leave"
             aria-label="Note (optional)"
             maxLength={120}
-            className="h-11 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600"
+            className={inputClass}
           />
           {by ? (
-            <p className={cn('rounded-xl px-4 py-3 text-sm', by === 'Doctor' ? 'bg-stable-bg text-stable' : 'bg-surface-2 text-ink')}>
+            <p className={cn('rounded-xl px-4 py-3 text-sm', by === 'Doctor' ? 'bg-success-bg text-success-fg' : 'bg-surface-2 text-ink')}>
               {paid === 0
                 ? 'Nothing was paid on this booking.'
                 : by === 'Doctor'

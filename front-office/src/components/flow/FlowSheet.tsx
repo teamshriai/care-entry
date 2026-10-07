@@ -1,10 +1,12 @@
 import { useId, useRef } from 'react'
 import type { ElementType, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { IconBadge } from '../ui/IconBadge'
 import { useLayer } from '../../hooks/useLayer'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
+import { useScrollLock } from '../../hooks/useScrollLock'
 import type { Tone } from '../../utils/tone'
 import { cn } from '../../utils/cn'
 
@@ -40,22 +42,32 @@ export function FlowSheet({
   const titleId = useId()
   useLayer(true, onClose)
   useFocusTrap(panel, true)
+  useScrollLock(true)
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-end print:hidden">
-      <div className="absolute inset-0 bg-scrim" aria-hidden="true" />
-      <div
+      <motion.div
+        className="absolute inset-0 bg-scrim"
+        aria-hidden="true"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.15 }}
+      />
+      <motion.div
         ref={panel}
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          'relative flex h-full w-full flex-col bg-surface-1 shadow-lg focus:outline-none animate-[sheetIn_180ms_ease-out]',
+          'relative flex h-full w-full flex-col border-l border-border-soft bg-surface-1 shadow-card-lg focus:outline-none',
           size === 'full' ? 'max-w-none' : 'max-w-2xl',
         )}
       >
-        <header className="flex items-start justify-between gap-3 border-b border-border-soft px-5 py-4">
+        <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-soft px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-5 sm:pb-4 sm:pt-4">
           <div className="flex min-w-0 items-center gap-3">
             {icon ? <IconBadge icon={icon} tone={iconTone} size="sm" /> : null}
             <div className="min-w-0">
@@ -69,17 +81,17 @@ export function FlowSheet({
             type="button"
             onClick={onClose}
             data-skip-autofocus
-            className="tap-target rounded-full text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+            className="focus-ring tap-target -mr-2 shrink-0 rounded-lg text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
             aria-label="Close"
           >
-            <X className="h-5 w-5" />
+            <X size={20} aria-hidden="true" />
           </button>
         </header>
-        <div className={cn('flex-1 overflow-y-auto', size === 'full' ? 'px-4 py-4 sm:px-6 lg:min-h-0' : 'px-5 py-5')}>{children}</div>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain', size === 'full' ? 'px-4 py-4 sm:px-6' : 'px-4 py-5 sm:px-5')}>{children}</div>
         {footer ? (
-          <footer className={cn('border-t border-border-soft py-4', size === 'full' ? 'px-4 sm:px-6' : 'px-5')}>{footer}</footer>
+          <footer className={cn('safe-bottom shrink-0 border-t border-border-soft pt-3 [--safe-bottom-base:0.75rem] sm:pt-4 sm:[--safe-bottom-base:1rem]', size === 'full' ? 'px-4 sm:px-6' : 'px-4 sm:px-5')}>{footer}</footer>
         ) : null}
-      </div>
+      </motion.div>
     </div>,
     document.body,
   )

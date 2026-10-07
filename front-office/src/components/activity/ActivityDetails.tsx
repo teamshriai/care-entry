@@ -5,6 +5,8 @@ import { timeLabel } from '../../utils/activityFormat'
 import { formatRupees } from '../../utils/billing'
 import { Badge } from '../ui/Badge'
 import { Card, CardHeader } from '../ui/Card'
+import { ResponsiveTable } from '../ui/ResponsiveTable'
+import type { Column as TableColumn } from '../ui/ResponsiveTable'
 import { EmptyState } from '../ui/EmptyState'
 
 /** The most records the table lists; it scrolls inside its card. */
@@ -127,33 +129,24 @@ export function ActivityDetails({
         <EmptyState icon={Activity} title="No records found" description="There are no activities matching the selected filters." />
       ) : (
         <>
-          <div className="max-h-[28rem] overflow-auto">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-border-soft text-left text-xs font-semibold text-ink-muted">
-                  {columns.map((column) => (
-                    <th key={column.header} className={column.numeric ? 'sticky top-0 bg-surface-2 px-5 py-2 text-right font-semibold' : 'sticky top-0 bg-surface-2 px-5 py-2 font-semibold'}>
-                      {column.header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((event) => (
-                  <tr key={event.id} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    {columns.map((column) => (
-                      <td
-                        key={column.header}
-                        className={column.numeric ? 'whitespace-nowrap px-5 py-2.5 text-right text-ink-muted' : 'whitespace-nowrap px-5 py-2.5 text-ink-muted'}
-                      >
-                        {column.cell(event, withDate)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ResponsiveTable
+            rows={rows}
+            rowKey={(event) => event.id}
+            caption={DETAIL_TITLE[type]}
+            maxHeight="max-h-[28rem]"
+            columns={columns.map(
+              (column, index): TableColumn<ActivityEvent> => ({
+                key: column.header,
+                header: column.header,
+                numeric: column.numeric,
+                className: 'whitespace-nowrap text-ink-muted',
+                // Phones: the patient heads the record, its time under it, the
+                // status beside it, everything else as labelled values.
+                mobile: column.header === 'Patient' ? 'title' : index === 0 ? 'subtitle' : /status/i.test(column.header) ? 'aside' : 'meta',
+                cell: (event) => column.cell(event, withDate),
+              }),
+            )}
+          />
           {events.length > rows.length ? (
             <p className="border-t border-border-soft px-5 py-3 text-xs text-ink-muted">
               Showing the latest {rows.length} of {events.length} — choose a shorter period to see fewer.

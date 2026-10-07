@@ -1,47 +1,55 @@
-import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
-import { X } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from '../components/layout/Sidebar'
 import { AppBar } from '../components/layout/AppBar'
+import { pageTitleFor } from '../components/layout/navigation'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { FlowHost } from '../flows/FlowHost'
 import { BillingCounterNotices } from '../components/payment/BillingCounterNotices'
 
+/**
+ * The app shell (DESIGN_SYSTEM §8, with this portal's sidebar):
+ *   ≥ 1024px  full sidebar · app bar · page
+ *   768–1023  72px icon rail · app bar · page
+ *   < 768     app bar (with a sideways-scrolling row of every place) · page
+ * The page scrolls inside <main>; the shell itself never scrolls sideways.
+ */
 export function AppLayout() {
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { pathname } = useLocation()
+  const headerRef = useRef<HTMLElement>(null)
+
+  // `${pageTitle} · SHRI HEALTH` (§8.4).
+  useEffect(() => {
+    document.title = `${pageTitleFor(pathname)} · SHRI HEALTH`
+  }, [pathname])
+
+  // The app bar wraps onto two rows below 1280px; menus that pin themselves
+  // under it on phones read its real height from --app-header-h.
+  useEffect(() => {
+    const header = headerRef.current
+    if (!header) return undefined
+    const root = document.documentElement
+    const observer = new ResizeObserver(() => root.style.setProperty('--app-header-h', `${header.getBoundingClientRect().height}px`))
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [])
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-bg text-ink" data-density="compact">
+    <div className="flex h-dvh overflow-hidden text-ink" data-density="compact">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      <div className="hidden lg:block print:hidden">
-        <Sidebar />
-      </div>
-
-      {mobileNavOpen ? (
-        <div className="fixed inset-0 z-40 flex lg:hidden">
-          <div className="absolute inset-0 bg-scrim" onClick={() => setMobileNavOpen(false)} />
-          <div className="relative z-50 h-full w-64">
-            <Sidebar />
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen(false)}
-              className="absolute right-3 top-4 rounded-full p-1.5 text-ink-muted hover:bg-surface-muted"
-              aria-label="Close navigation"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="print:hidden">
-          <AppBar onMenuClick={() => setMobileNavOpen(true)} />
-        </div>
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
-          <div className="w-full">
-            <Outlet />
+        <AppBar ref={headerRef} />
+        <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden focus:outline-none">
+          {/* pb clears the home indicator on phones. */}
+          <div className="app-content mx-auto w-full max-w-[112rem] px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] sm:px-5 sm:pt-5 md:pb-6 xl:px-6">
+            {/* Keyed on the path: moving to another place clears a failed one. */}
+            <ErrorBoundary key={pathname} scope="page">
+              <Outlet />
+            </ErrorBoundary>
           </div>
         </main>
       </div>

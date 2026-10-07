@@ -18,6 +18,8 @@ import { registerDoctor } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { ConsultationType, DoctorRole, Gender, Provider, ProviderStatus } from '../types/doctor'
+import { inputClass } from '../utils/formClasses'
+import { formatTimeRange } from '../domain/time'
 
 const DAYS = [
   { value: 1, label: 'Mon' },
@@ -33,8 +35,6 @@ const CONSULT_TYPES: ConsultationType[] = ['Outpatient', 'Outpatient + Teleconsu
 const ROLES: DoctorRole[] = ['Consultant', 'Senior Consultant', 'Associate Consultant', 'Visiting Consultant', 'Registrar']
 const SLOT_LENGTHS = [10, 15, 20, 30, 45]
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
 
 interface DoctorFormState {
   name: string
@@ -142,12 +142,12 @@ export function RegisterDoctorPage() {
     return (
       <div>
         <PageHeader title="Register Doctor" subtitle="Profile created — the doctor is now in the directory." />
-        <div className="px-6 py-6 lg:px-8">
+        <div className="mt-5 sm:mt-6">
           <Card accentTone="indigo" className="max-w-2xl">
             <CardBody className="flex flex-col gap-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stable-bg">
-                  <CheckCircle2 className="h-5 w-5 text-stable" strokeWidth={1.75} />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success-bg">
+                  <CheckCircle2 className="h-5 w-5 text-success-fg" strokeWidth={1.75} />
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -156,10 +156,10 @@ export function RegisterDoctorPage() {
                   </div>
                   <p className="mt-0.5 text-sm text-ink-muted">
                     {created.department} · {created.specialty} · {created.employeeId} · consults{' '}
-                    {created.schedule.startTime}–{created.schedule.endTime} in {created.schedule.slotMinutes}-minute
+                    {formatTimeRange(created.schedule.startTime, created.schedule.endTime)} in {created.schedule.slotMinutes}-minute
                     slots
                   </p>
-                  <p className="mt-1 text-xs text-ink-faint">
+                  <p className="mt-1 text-xs text-ink-subtle">
                     {bookable
                       ? 'Now visible in the Doctor Directory, in availability, and selectable when booking appointments.'
                       : 'Saved as Inactive — activate the account from the profile before appointments can be booked.'}
@@ -203,7 +203,7 @@ export function RegisterDoctorPage() {
       />
 
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_340px] mt-4 sm:mt-5">
           <div className="flex min-w-0 flex-col gap-6">
             {error ? <Alert tone="critical">{error}</Alert> : null}
 
@@ -400,7 +400,7 @@ export function RegisterDoctorPage() {
                     </select>
                   </Field>
                 </div>
-                <p className="text-xs text-ink-faint">
+                <p className="text-xs text-ink-subtle">
                   Leave and one-off unavailability are recorded on the doctor&apos;s profile after registration.
                 </p>
               </CardBody>
@@ -457,13 +457,13 @@ export function RegisterDoctorPage() {
 
                 <dl className="space-y-2 border-t border-border-soft pt-3 text-sm">
                   <Row label="Working days" value={form.workingDays.length ? `${form.workingDays.length} days/week` : '—'} />
-                  <Row label="Session" value={`${form.startTime}–${form.endTime}`} />
+                  <Row label="Session" value={form.startTime && form.endTime ? formatTimeRange(form.startTime, form.endTime) : '—'} />
                   <Row label="Slot length" value={`${form.slotMinutes} min`} />
                   <Row label="Fee" value={form.consultationFee ? `₹${form.consultationFee}` : '—'} />
                   <Row label="Status" value={form.status} />
                 </dl>
 
-                <p className="text-xs text-ink-faint">
+                <p className="text-xs text-ink-subtle">
                   Registering creates a hospital profile only. Clinical functionality lives in the Clinician Portal.
                 </p>
 
@@ -498,10 +498,10 @@ function Field({
   return (
     <div className={className}>
       <label className="text-xs font-medium text-ink-muted">
-        {label} {required ? <span className="text-critical">*</span> : null}
+        {label} {required ? <span className="text-critical-fg">*</span> : null}
       </label>
       <div className="mt-1.5">{children}</div>
-      {hint ? <p className="mt-1 text-xs text-ink-faint">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-ink-subtle">{hint}</p> : null}
     </div>
   )
 }
@@ -512,10 +512,10 @@ function Choice({ active, onClick, children }: { active: boolean; onClick: () =>
       type="button"
       onClick={onClick}
       className={cn(
-        'rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+        'focus-ring min-h-11 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
         active
-          ? 'border-brand-600 bg-brand-600 text-white'
-          : 'border-border bg-surface text-ink hover:bg-surface-muted',
+          ? 'border-primary-600 bg-primary-600 text-on-primary'
+          : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
       )}
     >
       {children}

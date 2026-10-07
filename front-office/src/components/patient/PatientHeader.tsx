@@ -64,10 +64,10 @@ export function PatientHeader({
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border-soft bg-bg/95 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="-mx-4 -mt-4 border-b border-border-soft bg-bg/95 px-4 py-3.5 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6 sm:px-6 lg:sticky lg:top-0 lg:z-20">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-start gap-3.5">
-          <Avatar initials={initialsOf(patient.name)} size="lg" />
+          <Avatar name={patient.name} initials={initialsOf(patient.name)} size="lg" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h1 className="truncate text-xl font-semibold tracking-tight text-ink sm:text-2xl">{patient.name}</h1>
@@ -82,8 +82,9 @@ export function PatientHeader({
               <button
                 type="button"
                 onClick={copyUhid}
-                className="inline-flex items-center gap-1 font-semibold tabular-nums text-ink hover:text-primary-text"
+                className="focus-ring -my-2 inline-flex min-h-11 items-center gap-1 rounded-lg font-semibold tabular-nums text-ink hover:text-primary-text"
                 title="Copy UHID"
+                aria-label={`Copy UHID ${patient.uhid}`}
               >
                 {patient.uhid}
                 <Copy className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
@@ -91,7 +92,7 @@ export function PatientHeader({
               <span>
                 {patient.age ? `${patient.age} yrs` : 'Age —'} · {patient.sex}
               </span>
-              <a href={`tel:${patient.mobile.replace(/\s/g, '')}`} className="inline-flex items-center gap-1 hover:text-primary-text">
+              <a href={`tel:${patient.mobile.replace(/\s/g, '')}`} className="focus-ring -my-3 inline-flex items-center gap-1 rounded py-3 hover:text-primary-text">
                 <Phone className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
                 {patient.mobile}
               </a>
@@ -99,7 +100,7 @@ export function PatientHeader({
                 <button
                   type="button"
                   onClick={copyAbha}
-                  className="inline-flex min-w-0 items-center gap-1 text-stable hover:text-primary-text"
+                  className="focus-ring -my-3 inline-flex min-w-0 items-center gap-1 rounded py-3 text-success-fg hover:text-primary-text"
                   title="Copy ABHA"
                 >
                   <ShieldCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
@@ -114,7 +115,7 @@ export function PatientHeader({
               )}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={actions.billing} title="Open the patient's bills" className="rounded-lg">
+              <button type="button" onClick={actions.billing} title="Open the patient's bills" className="focus-ring tap-reach rounded-lg">
                 <Badge tone={PAYMENT_TONE[payment.status]}>
                   <IndianRupee className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
                   {payment.status === 'Paid'
@@ -182,7 +183,7 @@ function Action({
       <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
       <span className="hidden sm:inline">{label}</span>
       {badge ? (
-        <span className={cn('rounded-md px-1.5 py-0.5 text-2xs font-bold tabular-nums', primary ? 'bg-white/20' : 'bg-warning-bg text-warning')}>
+        <span className={cn('rounded-md px-1.5 py-0.5 text-2xs font-bold tabular-nums', primary ? 'bg-white/20' : 'bg-warning-bg text-warning-fg')}>
           {badge}
         </span>
       ) : null}

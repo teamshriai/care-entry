@@ -300,6 +300,30 @@ export function getDoctorSuggestions(state: AppState, department: string, now: n
     .sort((a, b) => Number(b.bookable) - Number(a.bookable) || firstSlotAt(a) - firstSlotAt(b))
 }
 
+export interface DepartmentSummary {
+  department: string
+  /** Active doctors in the department. */
+  doctors: number
+  /** Doctors with a free slot in the next two weeks. */
+  bookable: number
+  /** The department's soonest free slot, across all its doctors. */
+  next: FreeSlot | null
+}
+
+/** Each department with its doctors and soonest free time — what the
+ *  booking flow's department tiles show. */
+export function getDepartmentSummaries(state: AppState, now: number): DepartmentSummary[] {
+  return getDepartments(state).map((department) => {
+    const suggestions = getDoctorSuggestions(state, department, now)
+    return {
+      department,
+      doctors: suggestions.length,
+      bookable: suggestions.filter((s) => s.bookable).length,
+      next: suggestions.find((s) => s.bookable)?.nextSlots[0] ?? null,
+    }
+  })
+}
+
 export interface DateStripDay {
   date: string
   open: number

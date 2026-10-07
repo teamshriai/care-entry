@@ -67,7 +67,7 @@ export function BillingPage() {
         illustrationTone="stable"
       />
 
-      <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         <StatFilter label="Show bills" items={items} selected={filter} onSelect={selectFilter} />
 
         <Card accentTone="stable">

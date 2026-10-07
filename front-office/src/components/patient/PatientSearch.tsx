@@ -3,7 +3,6 @@ import type { KeyboardEvent, ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IndianRupee, ReceiptText, Search, ShieldCheck, UserPlus } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
-import { Button } from '../ui/Button'
 import { useStoreValue } from '../../hooks/useStore'
 import { hasOpenLayer } from '../../hooks/useLayer'
 import { findBillByNumber, getPatientFlags, getPatientSearchSuggestions, searchPatients } from '../../domain/selectors'
@@ -33,6 +32,9 @@ type PatientSearchProps =
       scope?: 'inpatients'
       placeholder?: string
       autoFocus?: boolean
+      /** The results push the page down instead of floating over it — for a
+       *  stacked layout where a floating list would cover the next section. */
+      inline?: boolean
     }
 
 /** "/" focuses the app bar search from anywhere — unless the desk is typing
@@ -88,16 +90,20 @@ export function PatientSearch(props: PatientSearchProps) {
     if (focusOnMount) inputRef.current?.focus()
   }, [focusOnMount])
 
+  // A floating list closes when the pointer goes elsewhere. An inline one is
+  // part of the page: closing it would shift everything below mid-click.
+  const inlineList = props.mode === 'pick' && Boolean(props.inline)
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || inlineList) return undefined
     function handleMouseDown(event: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handleMouseDown)
     return () => document.removeEventListener('mousedown', handleMouseDown)
-  }, [open])
+  }, [open, inlineList])
 
   const navigateMode = props.mode === 'navigate'
+  const inline = props.mode === 'pick' && Boolean(props.inline)
   useEffect(() => {
     if (!navigateMode) return undefined
     function handleKeyDown(event: globalThis.KeyboardEvent) {
@@ -206,8 +212,8 @@ export function PatientSearch(props: PatientSearchProps) {
   })
 
   return (
-    <div ref={rootRef} className={cn('relative flex min-w-0 items-center gap-2', navigateMode && 'w-full max-w-2xl')}>
-      <div className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-border bg-surface-1 px-3 focus-within:border-primary-600 focus-within:ring-2 focus-within:ring-primary-600/15">
+    <div ref={rootRef} className={cn('relative flex min-w-0 gap-2', inline ? 'flex-col' : 'items-center', navigateMode && 'w-full max-w-2xl')}>
+      <div className={cn('flex h-11 min-w-0 items-center gap-2 rounded-xl border border-border bg-surface-1 px-3 focus-within:border-primary-600 focus-within:ring-2 focus-within:ring-primary-600/15', inline ? 'flex-none' : 'flex-1')}>
         <Search className="h-4 w-4 shrink-0 text-ink-subtle" strokeWidth={1.75} aria-hidden="true" />
         <input
           ref={inputRef}
@@ -236,22 +242,31 @@ export function PatientSearch(props: PatientSearchProps) {
         ) : null}
       </div>
 
-      {navigateMode ? (
-        <Button onClick={register} className="shrink-0" aria-label="Register Patient">
-          <UserPlus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-          <span className="hidden sm:inline">Register Patient</span>
-        </Button>
-      ) : null}
-
       {showList ? (
-        <div className="menu-surface absolute left-0 right-0 top-full z-40 mt-1.5 max-h-[min(28rem,70vh)] overflow-y-auto rounded-xl pb-1.5">
+        <div
+          className={cn(
+            'overflow-y-auto rounded-xl border border-border-soft bg-surface-1 pb-1.5',
+            inline ? 'max-h-[min(22rem,55vh)] overscroll-contain shadow-card-sm' : 'absolute left-0 right-0 top-full z-40 mt-1.5 max-h-[min(28rem,70vh)] shadow-card-lg',
+          )}
+        >
           <ul id={listId} role="listbox" aria-label="Patients">
             {rows}
           </ul>
           {options.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-ink-muted">
-              No patient found{navigateMode ? ' — Register Patient adds a new one, with what you typed filled in.' : '.'}
-            </p>
+            <div className="px-4 py-3">
+              <p className="text-sm text-ink-muted">No patient found.</p>
+              {navigateMode && query.trim() ? (
+                // Not found from the search: register them, with what was typed filled in.
+                <button
+                  type="button"
+                  onClick={register}
+                  className="focus-ring mt-2 inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary-50 px-3 text-sm font-semibold text-primary-text transition-colors hover:bg-primary-100"
+                >
+                  <UserPlus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                  Register “{query.trim()}” as a new patient
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -272,7 +287,7 @@ function PatientRow({
 }) {
   return (
     <>
-      <Avatar initials={initialsOf(patient.name)} size="sm" />
+      <Avatar name={patient.name} initials={initialsOf(patient.name)} size="sm" />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
           <span className="truncate text-sm font-semibold text-ink">{patient.name}</span>
@@ -299,7 +314,7 @@ function PatientRow({
         <PatientStatusIcons status={care} showDetail />
         {flags && flags.due > 0 ? (
           <span
-            className={cn('flex items-center gap-0.5 text-xs font-semibold tabular-nums', flags.failed ? 'text-critical' : 'text-warning')}
+            className={cn('flex items-center gap-0.5 text-xs font-semibold tabular-nums', flags.failed ? 'text-critical-fg' : 'text-warning-fg')}
             title={flags.failed ? 'Payment failed' : 'Payment due'}
           >
             <IndianRupee className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />

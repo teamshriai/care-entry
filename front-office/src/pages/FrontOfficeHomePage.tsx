@@ -7,7 +7,6 @@ import {
   CircleDot,
   IndianRupee,
   Info,
-  Stethoscope,
   Undo2,
   UserCheck,
   UserPlus,
@@ -19,13 +18,15 @@ import { Badge } from '../components/ui/Badge'
 import { Card, CardHeader } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatCard } from '../components/frontoffice/StatCard'
-import { DoctorAvailabilityTable } from '../components/clinician/DoctorAvailabilityTable'
+import { DoctorAvailability } from '../components/clinician/DoctorAvailability'
+import { getDoctorTimeline } from '../domain/timelineSelectors'
+import { figureRowClass } from '../utils/figure'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
-import { getAppointmentsForDate, getBillingOverview, getDoctorRows, getNeedsAttention, getQueueView } from '../domain/selectors'
+import { getAppointmentsForDate, getBillingOverview, getNeedsAttention, getQueueView } from '../domain/selectors'
 import { getOutpatients } from '../domain/outpatientSelectors'
 import { getPatientRows } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
@@ -66,7 +67,7 @@ export function FrontOfficeHomePage() {
   const billing = useStoreValue(getBillingOverview)
   const inpatients = useStoreValue(getInpatientRows, now)
   const wards = useStoreValue(getWardSummaries)
-  const doctorRows = useStoreValue(getDoctorRows, now)
+  const timeline = useStoreValue(getDoctorTimeline, now)
   const needsAttention = useStoreValue(getNeedsAttention, now)
   const outpatients = useStoreValue(getOutpatients, now, 'today', false, '')
   const patientRows = useStoreValue(getPatientRows)
@@ -127,11 +128,23 @@ export function FrontOfficeHomePage() {
 
   return (
     <div>
-      <PageHeader title="SHRI Health Care Entry" subtitle={`${formatHeaderDateTime(new Date(now))} · every figure is derived from today's records`} />
+      <PageHeader
+        title="SHRI Health Care Entry"
+        subtitle={`${formatHeaderDateTime(new Date(now))} · every figure is derived from today's records`}
+        pinActions
+        actions={
+          <Button onClick={() => navigate('/register/new')}>
+            <UserPlus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            {/* "Register" alone fits beside the title on a phone. */}
+            <span className="sm:hidden">Register</span>
+            <span className="hidden sm:inline">Register Patient</span>
+          </Button>
+        }
+      />
 
-      <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         {/* Five figures, one purpose each — each card opens the place that holds it. */}
-        <section aria-label="Today at a glance" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <section aria-label="Today at a glance" className={figureRowClass('sm:grid-cols-3 xl:grid-cols-5')}>
           <StatCard
             hue="blue"
             icon={CalendarClock}
@@ -151,7 +164,7 @@ export function FrontOfficeHomePage() {
             title="Show who is waiting for consultation"
           />
           <StatCard
-            hue="purple"
+            hue="violet"
             icon={BedDouble}
             value={inpatients.length}
             label="Inpatients"
@@ -163,10 +176,10 @@ export function FrontOfficeHomePage() {
             hue="red"
             icon={IndianRupee}
             value={formatRupees(billing.dueAmount)}
-            label="Payment pending"
-            hint={`${billing.dueCount} bills${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
+            label="Payment pending today"
+            hint={`${billing.dueCount} ${billing.dueCount === 1 ? 'bill' : 'bills'}${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
             to="/billing?filter=due"
-            title="Show the bills with payment pending at the billing counter"
+            title="Bills raised today still to pay at the billing counter — opens every bill with payment pending"
           />
           <StatCard
             hue="teal"
@@ -179,30 +192,7 @@ export function FrontOfficeHomePage() {
           />
         </section>
 
-        {/* Doctors now — Book opens Schedule with the doctor chosen */}
-        <section className="min-w-0" aria-label="Doctors now">
-          <Card accentTone="indigo">
-            <CardHeader
-              icon={Stethoscope}
-              iconTone="indigo"
-              title="Doctors now"
-              subtitle="From today's schedule, leave and break · Schedule Appointment books with that doctor"
-              action={
-                <Button size="sm" variant="ghost" onClick={() => navigate('/doctors')}>
-                  View all
-                </Button>
-              }
-            />
-            <DoctorAvailabilityTable
-              rows={doctorRows}
-              compact
-              onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
-              onBook={(provider) => openFlow('schedule', { doctor: provider.providerId })}
-            />
-          </Card>
-        </section>
-
-        <div className="grid grid-cols-1 items-start gap-6 min-[1400px]:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 min-[1400px]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           {/* Today's outpatients — one action per row */}
           <section className="min-w-0" aria-label="Today's outpatients">
             <Card accentTone="info">
@@ -276,6 +266,18 @@ export function FrontOfficeHomePage() {
             </Card>
           </section>
         </div>
+
+        {/* Doctor Availability — each doctor's day hour by hour; an open hour books that slot */}
+        <section className="min-w-0" aria-label="Doctor Availability">
+          <DoctorAvailability
+            timeline={timeline}
+            onViewAll={() => navigate('/doctors')}
+            onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
+            onBookSlot={(provider, slot) =>
+              openFlow('schedule', slot ? { doctor: provider.providerId, date: today, slot } : { doctor: provider.providerId })
+            }
+          />
+        </section>
       </div>
     </div>
   )

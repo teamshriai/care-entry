@@ -13,37 +13,27 @@ const CardAccent = createContext<string | undefined>(undefined)
 export function Card({
   className = '',
   emphasis = 'default',
-  /** The card's colour: a solid bar along its top edge, a tint of it in the
-   *  header, and its edge mixed into the border. The body stays plain so
-   *  lists and forms read cleanly; print drops the colour. */
+  /** The card's colour (DESIGN_SYSTEM §4.4 — hue in soft tints, never a
+   *  saturated fill): a faint wash of it on the header and its hue mixed
+   *  into the edge. The body stays plain so lists and forms read cleanly;
+   *  print drops the colour. */
   accentTone,
   children,
   style,
   ...props
 }: ComponentPropsWithoutRef<'div'> & { emphasis?: CardEmphasis; accentTone?: Tone }) {
   const emphasisStyles: Record<CardEmphasis, string> = {
-    default: 'border border-border bg-surface-1 shadow-card',
-    critical: 'border border-critical-border bg-critical-bg',
+    default: 'surface-raised border border-border-soft bg-surface-1',
+    critical: 'border border-critical-fg/30 bg-critical-bg',
     quiet: 'border border-border-soft bg-surface-2',
   }
   const accentVar = accentTone ? TONE_VAR[accentTone] : undefined
-  const edge = accentVar ? `color-mix(in oklab, var(--color-${accentVar}) 32%, var(--color-border))` : undefined
+  const edge = accentVar ? `color-mix(in oklab, var(--color-${accentVar}) 16%, var(--color-border-soft))` : undefined
 
   return (
     <div
-      className={cn('rounded-xl', emphasisStyles[emphasis], accentVar && 'card-accent', className)}
-      style={
-        accentVar
-          ? {
-              borderLeftColor: edge,
-              borderRightColor: edge,
-              borderBottomColor: edge,
-              borderTopColor: `var(--color-${accentVar})`,
-              borderTopWidth: 3,
-              ...style,
-            }
-          : style
-      }
+      className={cn('min-w-0 rounded-xl', emphasisStyles[emphasis], accentVar && 'card-accent', className)}
+      style={accentVar ? { borderColor: edge, ...style } : style}
       {...props}
     >
       <CardAccent.Provider value={accentVar}>{children}</CardAccent.Provider>
@@ -71,21 +61,30 @@ export function CardHeader({
   const accentVar = useContext(CardAccent)
   return (
     <div
-      className={cn('flex min-h-11 items-start justify-between gap-4 px-4 pt-4 pb-3 sm:px-5', accentVar && 'card-accent-head rounded-t-[inherit]', className)}
-      style={accentVar ? { background: `color-mix(in oklab, var(--color-${accentVar}) 9%, var(--color-surface-1))` } : undefined}
+      className={cn(
+        'flex min-h-11 items-center justify-between gap-3 px-3.5 py-3 sm:gap-4 sm:px-4 lg:px-5',
+        accentVar && 'card-accent-head rounded-t-[inherit] border-b border-border-soft',
+        className,
+      )}
+      // A wash of the card's hue that fades out across the header.
+      style={
+        accentVar
+          ? { backgroundImage: `linear-gradient(100deg, color-mix(in oklab, var(--color-${accentVar}) 9%, transparent) 0%, transparent 65%)` }
+          : undefined
+      }
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
         {Icon ? <IconBadge icon={Icon} tone={iconTone ?? 'neutral'} size="xs" /> : null}
-        <div>
-          <h3 className="text-sm font-semibold tracking-tight text-ink">{title}</h3>
-          {subtitle ? <p className="mt-0.5 text-xs text-ink-faint">{subtitle}</p> : null}
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-semibold tracking-[-0.01em] text-ink">{title}</h3>
+          {subtitle ? <p className="mt-0.5 text-xs leading-snug text-ink-subtle">{subtitle}</p> : null}
         </div>
       </div>
-      {action}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   )
 }
 
 export function CardBody({ className = '', children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('px-5 py-4', className)}>{children}</div>
+  return <div className={cn('px-3.5 py-3.5 sm:px-4 lg:px-5', className)}>{children}</div>
 }

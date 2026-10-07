@@ -1,9 +1,20 @@
-/* Latin UI face, plus Noto companions so names and addresses written in
-   Kannada, Hindi/Marathi, Tamil or Malayalam render in a matching style
-   instead of falling back to whatever the device happens to have. */
-@import '@fontsource-variable/plus-jakarta-sans';
-@import '@fontsource-variable/noto-sans-kannada';
-@import '@fontsource-variable/noto-sans-devanagari';
-@import '@fontsource-variable/noto-sans-tamil';
-@import '@fontsource-variable/noto-sans-malayalam';
-@import './theme.css';
+/* Patient Self-Registration — every token, base rule, helper class and the
+   print rules come from the shared SHRI HEALTH design-system stylesheet
+   (DESIGN_SYSTEM.md, Appendix A), the same one Front Office uses. This file
+   holds only what is particular to this app. */
+@import '../../shared/design-system.css';
+
+@source './';
+
+/* Confetti on the "Registration complete" screen — one short burst, then
+   still (DESIGN_SYSTEM §11.3: nothing loops). */
+@keyframes confetti-fall {
+  0% { opacity: 1; transform: translate3d(0, -12px, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate3d(var(--drift, 0px), 260px, 0) rotate(540deg); }
+}
+
+/* The success tick draws itself once. */
+@keyframes draw-tick {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}

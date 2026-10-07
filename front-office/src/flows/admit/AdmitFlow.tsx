@@ -24,9 +24,8 @@ import type { Admission, AdmissionType, AttendantRelationship, PaymentType, Refe
 import type { Payment } from '../../types/payment'
 import type { Patient } from '../../types/patient'
 import type { FlowProps } from '../registry'
+import { inputClass } from '../../utils/formClasses'
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none transition-colors focus:border-primary-600 focus:ring-1 focus:ring-primary-600 placeholder:text-ink-subtle'
 
 interface Details {
   doctorId: string
@@ -234,7 +233,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                 ) : null}
               </div>
             ) : patient ? (
-              <div className="flex items-start justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+              <div className="flex items-start justify-between gap-3 rounded-xl border border-primary-200 dark:border-primary-500/35 bg-primary-50 px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-base font-semibold text-ink">{patient.name}</p>
                   <p className="mt-0.5 text-sm text-ink-muted">
@@ -288,11 +287,11 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                       <span className="flex items-center gap-2 text-sm font-semibold text-ink">
                         <WardIcon
                           ward={w.ward}
-                          className={cn('h-4.5 w-4.5', w.ward === 'ICU' || w.ward === 'Emergency' ? 'text-critical' : 'text-primary-text')}
+                          className={cn('h-4.5 w-4.5', w.ward === 'ICU' || w.ward === 'Emergency' ? 'text-critical-fg' : 'text-primary-text')}
                         />
                         {w.ward}
                       </span>
-                      <span className={cn('text-xs font-medium', full ? 'text-critical' : 'text-stable')}>
+                      <span className={cn('text-xs font-medium', full ? 'text-critical-fg' : 'text-success-fg')}>
                         {full ? 'Full' : `${w.available} free`} of {w.total}
                       </span>
                       <span className="text-xs text-ink-muted">{formatRupees(DAILY_BED_CHARGE[roomType])}/day</span>
@@ -319,7 +318,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                             b.bedId === bedId
                               ? 'border-primary-600 bg-primary-600 text-on-primary'
                               : free
-                                ? 'border-stable-border bg-stable-bg text-ink hover:border-primary-600'
+                                ? 'border-success-fg/25 bg-success-bg text-ink hover:border-primary-600'
                                 : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle line-through',
                           )}
                         >
@@ -376,10 +375,10 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                   aria-checked={details.admissionType === type}
                   onClick={() => update({ admissionType: type })}
                   className={cn(
-                    'rounded-lg border py-2 text-sm font-medium transition-colors',
+                    'focus-ring min-h-11 min-w-0 rounded-lg border px-1 py-2 text-sm font-medium break-words transition-colors',
                     details.admissionType === type
                       ? type === 'Emergency'
-                        ? 'border-critical bg-critical-bg text-critical'
+                        ? 'border-critical-fg bg-critical-bg text-critical-fg'
                         : 'border-primary-600 bg-primary-50 text-primary-text'
                       : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
                   )}
@@ -412,7 +411,7 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                   aria-checked={details.paymentType === type}
                   onClick={() => update({ paymentType: type })}
                   className={cn(
-                    'rounded-lg border py-2 text-sm font-medium transition-colors',
+                    'focus-ring min-h-11 min-w-0 rounded-lg border px-1 py-2 text-sm font-medium break-words transition-colors',
                     details.paymentType === type ? 'border-primary-600 bg-primary-50 text-primary-text' : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
                   )}
                 >

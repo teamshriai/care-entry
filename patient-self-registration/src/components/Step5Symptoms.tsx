@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { HISTORY_DEFS, SYMPTOM_DEFS } from '../data';
-import { Icon, IconBadge } from './Icon';
-import { trackSpotlight } from '../ui';
+import { Icon } from './Icon';
 import type { SymptomsDraft } from '../drafts';
 import type { Hypertension } from '../types';
+import { Alert, Button, ButtonRow, Card, CheckCard, ChipGroup, Field, Reveal, Section, StepHeader, StepNav, StepSub } from '../ui/kit';
+import { formGridClass, inputClass } from '../ui/classes';
+import { cn } from '../ui/cn';
 
 export function Step5Symptoms({
   draft,
@@ -34,100 +36,80 @@ export function Step5Symptoms({
   }
 
   return (
-    <div className="card step-enter">
-      <div className="step-nav">
-        <button className="btn-text" onClick={onBack}>← Back</button>
-        {onNext && (
-          <button
-            className="btn-next"
-            onClick={onNext}
-            disabled={nextDisabled}
-            title={nextDisabled ? 'Complete this step to continue' : 'Go to the next step'}
-          >
-            Next
-            <Icon name="chevron" size={14} />
-          </button>
-        )}
-      </div>
-      <div className="step-head">
-        <IconBadge name="activity" />
-        <h2 className="step-title">Current symptoms</h2>
-      </div>
-      <p className="step-sub">
-        Select all symptoms you are currently experiencing.{checkedCount > 0 ? ` ${checkedCount} selected.` : ''}
-      </p>
+    <Card>
+      <StepNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
+      <StepHeader icon="activity" title="Current symptoms" />
+      <StepSub>
+        Select all symptoms you are currently experiencing.
+        <span aria-live="polite">{checkedCount > 0 ? ` ${checkedCount} selected.` : ''}</span>
+      </StepSub>
 
-      <div className="grid-2" style={{ marginBottom: 28 }}>
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {SYMPTOM_DEFS.map((s) => (
-          <Choice key={s.key} label={s.label} checked={!!symptoms[s.key]} onToggle={() => toggle(s.key)} />
+          <CheckCard key={s.key} checked={!!symptoms[s.key]} onToggle={() => toggle(s.key)}>
+            {s.label}
+          </CheckCard>
         ))}
       </div>
 
-      <hr className="rule" />
-      <h3 className="section-title">Hypertension history</h3>
-      <p className="section-sub">Select "Not known" if this information is unavailable.</p>
+      <Section title="Hypertension history" sub='Select "Not known" if this information is unavailable.'>
+        <ChipGroup<Hypertension>
+          label="Hypertension history"
+          value={hypertension}
+          onChange={(v) => onChange({ hypertension: v })}
+          options={[
+            { value: 'yes', label: 'Yes' },
+            { value: 'no', label: 'No' },
+            { value: 'unknown', label: 'Not known' },
+          ]}
+        />
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        {(['yes', 'no', 'unknown'] as Hypertension[]).map((v) => (
-          <button key={v} className={`pill ${hypertension === v ? 'pill-active' : ''}`} onClick={() => onChange({ hypertension: v })}>
-            {v === 'yes' ? 'Yes' : v === 'no' ? 'No' : 'Not known'}
-          </button>
-        ))}
-      </div>
+        {hypertension === 'yes' && (
+          <Reveal className={`mt-4 ${formGridClass}`}>
+            <Field label="Date of diagnosis" optional>
+              <input className={inputClass} type="date" value={htOnsetDate} onChange={(e) => onChange({ htOnsetDate: e.target.value })} />
+            </Field>
+            <Field label="Current medication" optional>
+              <input className={inputClass} value={htMedication} onChange={(e) => onChange({ htMedication: e.target.value })} />
+            </Field>
+          </Reveal>
+        )}
+      </Section>
 
-      {hypertension === 'yes' && (
-        <div className="grid-2 step-enter">
-          <label className="field">
-            <span className="field-label">Date of diagnosis (if known)</span>
-            <input className="field-input" type="date" value={htOnsetDate} onChange={(e) => onChange({ htOnsetDate: e.target.value })} />
-          </label>
-          <label className="field">
-            <span className="field-label">Current medication (if applicable)</span>
-            <input className="field-input" value={htMedication} onChange={(e) => onChange({ htMedication: e.target.value })} placeholder="optional" />
-          </label>
+      <Section title="Medical history" sub="Please indicate if you have been diagnosed with any of the following.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {HISTORY_DEFS.map((h) => (
+            <CheckCard key={h.key} checked={!!history[h.key]} onToggle={() => toggleHistory(h.key)}>
+              {h.label}
+            </CheckCard>
+          ))}
         </div>
-      )}
+      </Section>
 
-      <hr className="rule" />
-      <h3 className="section-title">Medical History</h3>
-      <p className="section-sub">Please indicate if you have been diagnosed with any of the following.</p>
+      <Section title="Previous hospital visit" sub="Optional.">
+        <div className={formGridClass}>
+          <Field label="Date of last visit" icon="calendar">
+            <input className={inputClass} type="date" value={lastVisitDate} onChange={(e) => onChange({ lastVisitDate: e.target.value })} />
+          </Field>
+          <Field label="Hospital name" icon="hospital">
+            <input
+              className={inputClass}
+              value={lastVisitHospital}
+              onChange={(e) => onChange({ lastVisitHospital: e.target.value })}
+              placeholder="Name of the hospital or clinic"
+            />
+          </Field>
+        </div>
+      </Section>
 
-      <div className="grid-2">
-        {HISTORY_DEFS.map((h) => (
-          <Choice key={h.key} label={h.label} checked={!!history[h.key]} onToggle={() => toggleHistory(h.key)} />
-        ))}
-      </div>
+      <Section title="Previous records" sub="Optional. Discharge summaries, scan reports or prescriptions, for the doctor to review.">
+        <RecordUpload files={records} onChange={(files) => onChange({ records: files })} />
+      </Section>
 
-      <hr className="rule" />
-      <h3 className="section-title">Previous hospital visit</h3>
-      <p className="section-sub">Optional.</p>
-
-      <div className="grid-2" style={{ marginBottom: 20 }}>
-        <label className="field">
-          <span className="field-label field-icon-row"><Icon name="calendar" size={14} /> Date of last visit</span>
-          <input className="field-input" type="date" value={lastVisitDate} onChange={(e) => onChange({ lastVisitDate: e.target.value })} />
-        </label>
-        <label className="field">
-          <span className="field-label field-icon-row"><Icon name="hospital" size={14} /> Hospital name</span>
-          <input
-            className="field-input"
-            value={lastVisitHospital}
-            onChange={(e) => onChange({ lastVisitHospital: e.target.value })}
-            placeholder="Name of the hospital or clinic"
-          />
-        </label>
-      </div>
-
-      <hr className="rule" />
-      <h3 className="section-title">Previous records</h3>
-      <p className="section-sub">
-        Optional. Discharge summaries, scan reports or prescriptions, for the doctor to review.
-      </p>
-
-      <RecordUpload files={records} onChange={(files) => onChange({ records: files })} />
-
-      <button className="btn btn-primary" style={{ marginTop: 30 }} onClick={onContinue}>Save and continue</button>
-    </div>
+      <ButtonRow className="mt-8">
+        <Button onClick={onContinue}>Save and continue</Button>
+      </ButtonRow>
+    </Card>
   );
 }
 
@@ -159,47 +141,75 @@ function RecordUpload({ files, onChange }: { files: File[]; onChange: (f: File[]
   return (
     <div>
       <div
-        className={`dropzone ${dragging ? 'dropzone--over' : ''}`}
+        className={cn(
+          'focus-ring flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-7 text-center transition-colors',
+          dragging ? 'border-primary-600 bg-primary-50' : 'border-border bg-surface-2 hover:border-border-strong',
+        )}
         onClick={() => inputRef.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); add(e.dataTransfer.files); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          add(e.dataTransfer.files);
+        }}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); } }}
+        aria-label="Upload previous records"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
       >
-        <span className="dropzone-icon">
+        <span className="mb-1 flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-primary-text shadow-card">
           <Icon name="upload" size={18} />
         </span>
-        <span className="dropzone-text">
-          <strong>Choose files</strong> or drag them here
+        <span className="text-sm text-ink-muted">
+          <strong className="font-semibold text-primary-text">Choose files</strong> or drag them here
         </span>
-        <span className="dropzone-hint">PDF, JPG, PNG or HEIC · up to 10 MB each</span>
+        <span className="text-xs text-ink-subtle">PDF, JPG, PNG or HEIC · up to 10 MB each</span>
         <input
           ref={inputRef}
           type="file"
           multiple
           accept={ACCEPTED}
-          className="dropzone-input"
-          onChange={(e) => { add(e.target.files); e.target.value = ''; }}
+          className="sr-only"
+          tabIndex={-1}
+          onChange={(e) => {
+            add(e.target.files);
+            e.target.value = '';
+          }}
         />
       </div>
 
-      {error && <div className="alert alert-error" style={{ marginTop: 12 }}>{error}</div>}
+      {error && <Alert tone="error" className="mt-3">{error}</Alert>}
 
       {files.length > 0 && (
-        <ul className="file-list">
+        <ul className="mt-3 flex flex-col gap-2">
           {files.map((file, i) => (
-            <li key={`${file.name}-${file.size}`} className="file-row">
-              <span className="file-icon">
+            <li
+              key={`${file.name}-${file.size}`}
+              className="flex min-w-0 items-center gap-3 rounded-lg border border-border-soft bg-surface-1 py-1 pl-3 pr-1 motion-safe:animate-[fadeIn_200ms_ease-out]"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-ink-subtle">
                 <Icon name="file" size={15} />
               </span>
-              <span className="file-meta">
-                <span className="file-name">{file.name}</span>
-                <span className="file-size">{formatBytes(file.size)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-ink">{file.name}</span>
+                <span className="block text-xs text-ink-subtle">{formatBytes(file.size)}</span>
               </span>
-              <button className="file-remove" onClick={() => remove(i)} aria-label={`Remove ${file.name}`}>
-                <Icon name="close" size={14} />
+              <button
+                type="button"
+                className="focus-ring tap-target shrink-0 rounded-lg text-ink-subtle transition-colors hover:bg-critical-bg hover:text-critical-fg"
+                onClick={() => remove(i)}
+                aria-label={`Remove ${file.name}`}
+              >
+                <Icon name="close" size={15} />
               </button>
             </li>
           ))}
@@ -213,24 +223,4 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function Choice({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
-  return (
-    <button
-      className={`choice-card ${checked ? 'choice-card--on' : ''}`}
-      onClick={onToggle}
-      onMouseMove={trackSpotlight}
-      aria-pressed={checked}
-    >
-      <span className="checkbox-box">
-        {checked && (
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
-        )}
-      </span>
-      <span>{label}</span>
-    </button>
-  );
 }

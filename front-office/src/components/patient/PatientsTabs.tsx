@@ -26,7 +26,7 @@ export function PatientsTabs() {
   ]
 
   return (
-    <nav aria-label="Patients" className="scrollbar-hide flex gap-1 overflow-x-auto">
+    <nav aria-label="Patients" className="scrollbar-hide flex gap-1 overflow-x-auto border-b border-border-soft">
       {tabs.map(({ to, label, icon: Icon, count, end, title }) => (
         <NavLink
           key={to}
@@ -35,19 +35,19 @@ export function PatientsTabs() {
           title={title}
           className={({ isActive }) =>
             cn(
-              'focus-ring inline-flex shrink-0 items-center gap-2 rounded-t-lg border-b-2 px-3 pb-2.5 pt-1.5 text-sm font-semibold transition-colors',
-              isActive ? 'border-primary-600 text-primary-text' : 'border-transparent text-ink-muted hover:border-border hover:text-ink',
+              'focus-ring -mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-lg border-b-2 px-3 text-sm font-medium transition-colors',
+              isActive ? 'border-primary-600 text-primary-text' : 'border-transparent text-ink-subtle hover:text-ink',
             )
           }
         >
           {({ isActive }) => (
             <>
-              <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              <Icon size={16} className="shrink-0" strokeWidth={isActive ? 2.2 : 1.8} aria-hidden="true" />
               {label}
               <span
                 className={cn(
-                  'rounded-full px-2 py-0.5 text-2xs font-bold tabular-nums',
-                  isActive ? 'bg-primary-50 text-primary-text' : 'bg-surface-2 text-ink-muted',
+                  'rounded-full px-1.5 py-0.5 text-2xs font-semibold tabular-nums',
+                  isActive ? 'bg-primary-100 text-primary-text' : 'bg-surface-2 text-ink-muted',
                 )}
               >
                 {count}

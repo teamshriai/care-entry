@@ -37,12 +37,13 @@ function portalRoute(): Plugin {
 
 // ─── Build stamp ─────────────────────────────────────────────────────────────
 // Shown at the foot of the sidebar so anyone can tell which build they are
-// looking at: "OCT 3 - 12:05 @26" (India time, when this build was made),
+// looking at: "OCT 3 - 12:05 PM @26" (India time, when this build was made),
 // with the commit it was built from in its tooltip.
 function buildStamp(at: Date): string {
   const part = (options: Intl.DateTimeFormatOptions) =>
     new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', ...options }).format(at)
-  const time = part({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+  // 12-hour, like every other time people read in the app: "11:10 AM".
+  const time = part({ hour: 'numeric', minute: '2-digit', hour12: true }).toUpperCase().replace(/\s+/g, ' ')
   return `${part({ month: 'short' }).toUpperCase()} ${part({ day: 'numeric' })} - ${time} @${part({ year: '2-digit' })}`
 }
 
@@ -67,11 +68,14 @@ export default defineConfig({
   server: { host: true },
   preview: { host: true },
   build: {
+    // Fonts are never inlined as data: URLs, so a strict CSP `font-src 'self'`
+    // still works (DESIGN_SYSTEM §0).
+    assetsInlineLimit: (filePath: string) => (/\.(woff2?|ttf|otf)$/.test(filePath) ? false : undefined),
     rolldownOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        patientSelfRegistration: resolve(__dirname, 'patient-self-registration/index.html'),
-        patientSelfRegistrationDemo: resolve(__dirname, 'patient-self-registration/demo.html'),
+        main: resolve(import.meta.dirname, 'index.html'),
+        patientSelfRegistration: resolve(import.meta.dirname, 'patient-self-registration/index.html'),
+        patientSelfRegistrationDemo: resolve(import.meta.dirname, 'patient-self-registration/demo.html'),
       },
     },
   },

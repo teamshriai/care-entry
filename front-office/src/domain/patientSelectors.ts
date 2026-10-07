@@ -14,7 +14,7 @@ import { getAppointmentsForPatient, getBillsForAppointment, getPatientFlags, get
 import { billDisplayStatus, billNumberFor, billServicesSummary, formatRupees, isBillDue, stayDays } from '../utils/billing'
 import { appointmentStatusLabel } from '../utils/appointment'
 import { formatDateKey } from '../utils/dates'
-import { todayKey } from './time'
+import { formatTime, todayKey } from './time'
 
 export type RiskLevel = 'High' | 'Watch' | 'Normal'
 
@@ -172,7 +172,7 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
       at: appointment.slotTimestamp,
       kind: 'encounter',
       title: `Outpatient encounter · ${doctor}`,
-      detail: `${appointment.department} · ${formatDateKey(appointment.date)} ${appointment.slot}`,
+      detail: `${appointment.department} · ${formatDateKey(appointment.date)} ${formatTime(appointment.slot)}`,
       status: appointmentStatusLabel(appointment.status),
     })
   }

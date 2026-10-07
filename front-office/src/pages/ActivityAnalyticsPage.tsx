@@ -29,14 +29,16 @@ import { addDaysToKey } from '../domain/selectors'
 import { formatRupees } from '../utils/billing'
 import { MONTH, timeLabel } from '../utils/activityFormat'
 import { ActivityDetails } from '../components/activity/ActivityDetails'
-import { STAT_HUE } from '../utils/statHue'
+import { TONE_HEX } from '../utils/toneHex'
+import { figureRowClass } from '../utils/figure'
+import { ResponsiveTable } from '../components/ui/ResponsiveTable'
+import type { Column } from '../components/ui/ResponsiveTable'
 import { cn } from '../utils/cn'
+import { inputClass } from '../utils/formClasses'
 
 /** The most recent rows the activity table lists (it scrolls inside its card). */
 const RECENT_ROWS = 50
 
-const inputClass =
-  'h-10 rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500'
 
 function shortDate(key: string): string {
   const [year, month, day] = key.split('-').map(Number)
@@ -83,7 +85,7 @@ export function ActivityAnalyticsPage() {
   const multiDay = range.from !== range.to
   const rows = filtered.slice(0, RECENT_ROWS)
   const typeLabel = activityType === 'ALL' ? 'All activities' : ACTIVITY_INFO[activityType].label
-  const trendColor = activityType === 'ALL' ? '--color-stat-blue' : `--color-stat-${ACTIVITY_INFO[activityType].hue}`
+  const trendColor = activityType === 'ALL' ? 'var(--color-chart-1)' : TONE_HEX[ACTIVITY_INFO[activityType].hue]
 
   const counts = summary.counts
   const detailEvents = inPeriod.filter((e) => e.activityType === selected)
@@ -93,12 +95,12 @@ export function ActivityAnalyticsPage() {
     <div>
       <PageHeader title="Activity & Analytics" subtitle="View Front Office activity, operational trends, and performance insights." />
 
-      <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         {/* Filters */}
         <section aria-label="Filters" className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-1 p-3 shadow-card lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <span className="text-xs font-semibold text-ink-muted">Date Range</span>
-            <div className="flex flex-wrap gap-1 rounded-lg border border-border p-0.5" role="group" aria-label="Period">
+            <div className="flex flex-wrap gap-1 rounded-xl border border-border-soft bg-surface-2 p-1" role="group" aria-label="Period">
               {REPORT_PERIODS.map((option) => (
                 <button
                   key={option.key}
@@ -106,8 +108,8 @@ export function ActivityAnalyticsPage() {
                   aria-pressed={option.key === period}
                   onClick={() => setPeriod(option.key)}
                   className={cn(
-                    'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                    option.key === period ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
+                    'focus-ring min-h-11 rounded-lg px-3.5 text-sm font-medium transition-colors',
+                    option.key === period ? 'bg-surface-1 text-ink shadow-card' : 'text-ink-muted hover:text-ink',
                   )}
                 >
                   {option.label}
@@ -146,7 +148,7 @@ export function ActivityAnalyticsPage() {
                 setActivityType(next)
                 if (next !== 'ALL') setSelected(next)
               }}
-              className={cn(inputClass, 'min-w-[13rem]')}
+              className={cn(inputClass, 'w-full min-w-0 sm:w-auto sm:min-w-[13rem]')}
               aria-label="Activity type"
             >
               <option value="ALL">All Activities</option>
@@ -164,7 +166,7 @@ export function ActivityAnalyticsPage() {
 
         {/* Operational summary — information only. */}
         <h2 className="-mb-3 text-sm font-semibold text-ink">Operational Summary</h2>
-        <section aria-label="Operational Summary" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+        <section aria-label="Operational Summary" className={figureRowClass('sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7')}>
           <StatCard
             selected={selected === 'PATIENT_REGISTERED'}
             onSelect={() => setSelected('PATIENT_REGISTERED')} hue="teal" icon={UserPlus} value={counts.PATIENT_REGISTERED} label="Patients Registered" hint="New UHIDs created" />
@@ -185,7 +187,7 @@ export function ActivityAnalyticsPage() {
             onSelect={() => setSelected('GUEST_PASS_ISSUED')} hue="indigo" icon={IdCard} value={counts.GUEST_PASS_ISSUED} label="Guest Passes Issued" hint="Visitors, doctors, staff" />
           <StatCard
             selected={selected === 'PATIENT_ADMITTED'}
-            onSelect={() => setSelected('PATIENT_ADMITTED')} hue="purple" icon={BedDouble} value={counts.PATIENT_ADMITTED} label="Admissions" hint="Patients admitted" />
+            onSelect={() => setSelected('PATIENT_ADMITTED')} hue="violet" icon={BedDouble} value={counts.PATIENT_ADMITTED} label="Admissions" hint="Patients admitted" />
           <StatCard
             selected={selected === 'PATIENT_DISCHARGED'}
             onSelect={() => setSelected('PATIENT_DISCHARGED')} hue="pink" icon={LogOut} value={counts.PATIENT_DISCHARGED} label="Discharges" hint="Patients discharged" />
@@ -219,7 +221,7 @@ export function ActivityAnalyticsPage() {
                 <>
                   <TrendLineChart
                     points={trend}
-                    colorVar={trendColor}
+                    color={trendColor}
                     ariaLabel={`${typeLabel} ${perUnit}, ${rangeLabel(range)}`}
                     xTitle={scale === 'hour' ? 'Hour of the day' : period === 'week' ? 'Day' : 'Date'}
                     yTitle={activityType === 'ALL' ? 'Number of activities' : `Number of ${typeLabel.toLowerCase()}`}
@@ -269,30 +271,19 @@ export function ActivityAnalyticsPage() {
             iconTone="brand"
             title="Recent Activity"
             subtitle={`${typeLabel} · ${rangeLabel(range)}`}
-            action={<span className="text-xs tabular-nums text-ink-faint">{filtered.length}</span>}
+            action={<span className="text-xs tabular-nums text-ink-subtle">{filtered.length}</span>}
           />
           {filtered.length === 0 ? (
             <NoActivity />
           ) : (
             <>
-              <div className="max-h-[32rem] overflow-auto">
-                <table className="w-full min-w-[640px] border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-border-soft bg-surface-2 text-left text-xs font-semibold text-ink-muted">
-                      <th className="px-5 py-2 font-semibold">Time</th>
-                      <th className="px-5 py-2 font-semibold">Activity</th>
-                      <th className="px-5 py-2 font-semibold">Patient</th>
-                      <th className="px-5 py-2 font-semibold">Staff</th>
-                      <th className="px-5 py-2 font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((event) => (
-                      <ActivityRow key={event.id} event={event} withDate={multiDay} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ResponsiveTable
+                rows={rows}
+                rowKey={(event) => event.id}
+                caption="Recent activity"
+                maxHeight="max-h-[32rem]"
+                columns={activityColumns(multiDay)}
+              />
               {filtered.length > rows.length ? (
                 <p className="border-t border-border-soft px-5 py-3 text-xs text-ink-muted">
                   Showing the latest {rows.length} of {filtered.length} — choose a shorter period or one activity to narrow it down.
@@ -306,35 +297,43 @@ export function ActivityAnalyticsPage() {
   )
 }
 
-function ActivityRow({ event, withDate }: { event: ActivityEvent; withDate: boolean }) {
-  const info = ACTIVITY_INFO[event.activityType]
-  return (
-    <tr className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-      <td className="whitespace-nowrap px-5 py-2.5 tabular-nums text-ink-muted">{timeLabel(event.timestamp, withDate)}</td>
-      <td className="px-5 py-2.5">
-        <span className="flex items-center gap-2 font-medium text-ink">
-          <span className={cn('h-2 w-2 shrink-0 rounded-full', STAT_HUE[info.hue].icon)} aria-hidden="true" />
-          {info.event}
-          {event.amount !== undefined ? <span className="font-normal text-ink-muted">· {formatRupees(event.amount)}</span> : null}
-        </span>
-        {event.detail ? <span className="mt-0.5 block truncate pl-4 text-xs text-ink-subtle">{event.detail}</span> : null}
-      </td>
-      <td className="px-5 py-2.5">
-        {event.patientId ? (
+function activityColumns(withDate: boolean): Column<ActivityEvent>[] {
+  return [
+    { key: 'time', header: 'Time', mobile: 'subtitle', className: 'whitespace-nowrap tabular-nums text-ink-muted', cell: (event) => timeLabel(event.timestamp, withDate) },
+    {
+      key: 'activity',
+      header: 'Activity',
+      mobile: 'title',
+      cell: (event) => {
+        const info = ACTIVITY_INFO[event.activityType]
+        return (
+          <>
+            <span className="flex items-center gap-2 font-medium text-ink">
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: TONE_HEX[info.hue] }} aria-hidden="true" />
+              {info.event}
+              {event.amount !== undefined ? <span className="font-normal text-ink-muted">· {formatRupees(event.amount)}</span> : null}
+            </span>
+            {event.detail ? <span className="mt-0.5 block truncate pl-4 text-xs font-normal text-ink-subtle">{event.detail}</span> : null}
+          </>
+        )
+      },
+    },
+    {
+      key: 'patient',
+      header: 'Patient',
+      cell: (event) =>
+        event.patientId ? (
           <>
             <span className="block truncate text-ink">{event.patientName ?? event.patientId}</span>
             <span className="block text-xs tabular-nums text-ink-subtle">{event.patientId}</span>
           </>
         ) : (
           <span className="text-ink-subtle">—</span>
-        )}
-      </td>
-      <td className="whitespace-nowrap px-5 py-2.5 text-ink-muted">{event.staffName}</td>
-      <td className="px-5 py-2.5">
-        <Badge tone={event.status === 'Completed' ? 'stable' : 'neutral'}>{event.status}</Badge>
-      </td>
-    </tr>
-  )
+        ),
+    },
+    { key: 'staff', header: 'Staff', className: 'whitespace-nowrap text-ink-muted', cell: (event) => event.staffName },
+    { key: 'status', header: 'Status', mobile: 'aside', cell: (event) => <Badge tone={event.status === 'Completed' ? 'stable' : 'neutral'}>{event.status}</Badge> },
+  ]
 }
 
 function NoActivity() {

@@ -16,12 +16,11 @@ import { todayKey } from '../domain/time'
 import { formatRelativeTime, formatClock } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { MlcCategory } from '../types/frontDesk'
+import { inputClass } from '../utils/formClasses'
 
 const CATEGORIES: MlcCategory[] = ['Road traffic accident', 'Assault', 'Poisoning', 'Burns', 'Suicide attempt', 'Other']
 const BROUGHT_BY = ['Police', 'Relative', 'Bystander', 'Ambulance']
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
 
 export function MlcPage() {
   const now = useNow(60000)
@@ -78,7 +77,7 @@ export function MlcPage() {
         subtitle="An MLC is always recorded against a patient. Police intimation is captured and acknowledged — never assumed."
       />
 
-      <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[380px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[380px_minmax(0,1fr)] mt-4 sm:mt-5">
         <Card accentTone="warning" className="min-w-0">
           <CardHeader icon={FileWarning} iconTone="warning" title="Register an MLC" />
           <CardBody>
@@ -87,7 +86,7 @@ export function MlcPage() {
 
               <div>
                 <p className="mb-1.5 text-xs font-medium text-ink-muted">
-                  Patient <span className="text-critical">*</span>
+                  Patient <span className="text-critical-fg">*</span>
                 </p>
                 <PatientPickField
                   patient={patient}
@@ -103,7 +102,7 @@ export function MlcPage() {
 
               <div>
                 <label className="text-xs font-medium text-ink-muted">
-                  MLC category <span className="text-critical">*</span>
+                  MLC category <span className="text-critical-fg">*</span>
                 </label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {CATEGORIES.map((option) => (
@@ -112,10 +111,10 @@ export function MlcPage() {
                       type="button"
                       onClick={() => setCategory(option)}
                       className={cn(
-                        'rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                        'focus-ring min-h-11 rounded-full border px-3.5 text-sm font-medium transition-colors',
                         category === option
-                          ? 'border-brand-600 bg-brand-600 text-white'
-                          : 'border-border bg-surface text-ink hover:bg-surface-muted',
+                          ? 'border-primary-600 bg-primary-600 text-on-primary'
+                          : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
                       )}
                     >
                       {option}
@@ -126,7 +125,7 @@ export function MlcPage() {
 
               <div>
                 <label className="text-xs font-medium text-ink-muted">
-                  Brought by <span className="text-critical">*</span>
+                  Brought by <span className="text-critical-fg">*</span>
                 </label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {BROUGHT_BY.map((option) => (
@@ -135,10 +134,10 @@ export function MlcPage() {
                       type="button"
                       onClick={() => setBroughtBy(option)}
                       className={cn(
-                        'rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                        'focus-ring min-h-11 rounded-full border px-3.5 text-sm font-medium transition-colors',
                         broughtBy === option
-                          ? 'border-brand-600 bg-brand-600 text-white'
-                          : 'border-border bg-surface text-ink hover:bg-surface-muted',
+                          ? 'border-primary-600 bg-primary-600 text-on-primary'
+                          : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
                       )}
                     >
                       {option}
@@ -149,7 +148,7 @@ export function MlcPage() {
 
               <div>
                 <label className="text-xs font-medium text-ink-muted">
-                  Police station <span className="text-critical">*</span>
+                  Police station <span className="text-critical-fg">*</span>
                 </label>
                 <input
                   value={policeStation}
@@ -172,7 +171,7 @@ export function MlcPage() {
               <Button type="submit" disabled={!patient || !category || !policeStation.trim()}>
                 Allocate MLC number
               </Button>
-              <p className="text-xs text-ink-faint">
+              <p className="text-xs text-ink-subtle">
                 Records are retained for 10 years, which overrides erasure requests.
               </p>
             </form>
@@ -183,7 +182,7 @@ export function MlcPage() {
           <CardHeader
             title="MLC register"
             subtitle="Every case and its police intimation status, newest first"
-            action={<span className="text-xs tabular-nums text-ink-faint">{records.length}</span>}
+            action={<span className="text-xs tabular-nums text-ink-subtle">{records.length}</span>}
           />
           {records.length === 0 ? (
             <EmptyState
@@ -223,7 +222,7 @@ export function MlcPage() {
                         variant="secondary"
                         onClick={() => run(markMlcIntimationSent, record.mlcId, 'Police intimation sent')}
                       >
-                        <Send className="h-3.5 w-3.5 text-info" strokeWidth={1.75} />
+                        <Send className="h-3.5 w-3.5 text-info-fg" strokeWidth={1.75} />
                         Send intimation
                       </Button>
                     ) : !record.acknowledgedAt ? (
@@ -231,7 +230,7 @@ export function MlcPage() {
                         size="sm"
                         onClick={() => run(acknowledgeMlcIntimation, record.mlcId, 'Acknowledgement captured')}
                       >
-                        <ShieldCheck className="h-3.5 w-3.5 text-stable" strokeWidth={1.75} />
+                        <ShieldCheck className="h-3.5 w-3.5 text-success-fg" strokeWidth={1.75} />
                         Capture acknowledgement
                       </Button>
                     ) : null}

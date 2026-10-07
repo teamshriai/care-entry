@@ -1,28 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import '../App.css';
-import './portal.css';
-import { Icon, IconBadge, toneOf } from '../components/Icon';
-import { trackSpotlight } from '../ui';
+import type { ReactNode } from 'react';
+import { Icon, IconBadge } from '../components/Icon';
+import type { IconName } from '../components/Icon';
 import { maskMobile } from '../data';
-import {
-  CONTACTS,
-  DOCUMENTS,
-  FAQ,
-  MEDICATIONS,
-  NOTICES,
-  UPCOMING,
-  VISITS,
-  daysUntil,
-  formatDate,
-  greeting,
-} from './portalData';
+import { CONTACTS, DOCUMENTS, FAQ, MEDICATIONS, NOTICES, UPCOMING, VISITS, daysUntil, formatDate, formatTime, greeting } from './portalData';
 import type { Notice } from './portalData';
 import type { MockPatient } from '../types';
-import logo from '../logo.png'
+import { PatientShell } from '../ui/PatientShell';
+import { Badge, Button, ButtonRow, Card, RailPanel, RailRow, Reveal, Section, StepSub } from '../ui/kit';
+import { inputClass } from '../ui/classes';
+import { cn } from '../ui/cn';
+import { TONE_HEX, tintedSurface, toneOf } from '../ui/tones';
 
-type Section = 'overview' | 'appointments' | 'records' | 'medications' | 'assistance';
+type SectionKey = 'overview' | 'appointments' | 'records' | 'medications' | 'assistance';
 
-const NAV: { key: Section; label: string; icon: Parameters<typeof Icon>[0]['name'] }[] = [
+const NAV: { key: SectionKey; label: string; icon: IconName }[] = [
   { key: 'overview', label: 'Overview', icon: 'activity' },
   { key: 'appointments', label: 'Appointments', icon: 'calendar' },
   { key: 'records', label: 'Records', icon: 'file' },
@@ -30,341 +22,289 @@ const NAV: { key: Section; label: string; icon: Parameters<typeof Icon>[0]['name
   { key: 'assistance', label: 'Assistance', icon: 'message' },
 ];
 
+const TITLES: Record<SectionKey, string> = {
+  overview: 'Overview',
+  appointments: 'Appointments',
+  records: 'Records',
+  medications: 'Medications',
+  assistance: 'Assistance',
+};
+
 export function PatientPortal({
   patient,
-  dark,
-  onToggleTheme,
+  theme,
   onSignOut,
 }: {
   patient: MockPatient;
-  dark: boolean;
-  onToggleTheme: () => void;
+  theme: { dark: boolean; toggle: () => void };
   onSignOut: () => void;
 }) {
-  const [section, setSection] = useState<Section>('overview');
+  const [section, setSection] = useState<SectionKey>('overview');
   const next = UPCOMING[0];
   const firstName = patient.name.split(' ')[0];
 
+  function go(key: SectionKey) {
+    setSection(key);
+    window.scrollTo({ top: 0 });
+  }
+
   return (
-    <div className="app-shell">
-      <aside className="side-nav">
-        <div className="brand">
-          <span className="brand-mark">
-            <img src={logo} alt="" width={34} height={34} />
-          </span>
-          <span className="brand-text">
-            <span className="brand-name">SHRI HEALTH</span>
-            <span className="brand-sub">Patient portal</span>
-          </span>
-        </div>
+    <PatientShell
+      product="Patient portal"
+      navLabel="Your care"
+      navKind="sections"
+      nav={NAV.map((n) => ({ key: n.key, label: n.label, icon: n.icon, active: section === n.key, onSelect: () => go(n.key) }))}
+      actions={[{ label: 'Sign out', icon: 'logout', onSelect: onSignOut }]}
+      note="Sample data"
+      heading={section === 'overview' ? `${greeting()}, ${firstName}` : TITLES[section]}
+      headerExtra={<NoticeBell />}
+      user={{ name: patient.name, detail: patient.systemId, badge: { label: 'Signed in', done: true } }}
+      theme={{ dark: theme.dark, onToggle: theme.toggle }}
+      rail={
+        <>
+          <RailPanel title="Your details" aside={<Badge tone="success">Verified</Badge>}>
+            <RailRow icon="userCheck" label="Name" value={patient.name} />
+            <RailRow icon="idCard" label="Patient ID" value={patient.systemId} mono />
+            <RailRow icon="phone" label="Mobile" value={maskMobile(patient.mobile)} />
+            <RailRow icon="calendar" label="Date of birth" value={patient.dob} />
+          </RailPanel>
 
-        <nav className="rail" aria-label="Portal sections">
-          <p className="rail-head">Your care</p>
-          <ol className="rail-list">
-            {NAV.map((n) => (
-              <li key={n.key}>
-                <button
-                  className={`rail-item ${section === n.key ? 'rail-item--active' : ''}`}
-                  onClick={() => setSection(n.key)}
-                  aria-current={section === n.key ? 'page' : undefined}
-                >
-                  <span className="rail-icon">
-                    <Icon name={n.icon} size={16} />
-                  </span>
-                  <span className="rail-label">{n.label}</span>
-                </button>
-              </li>
+          <RailPanel title="Care assistant" accent aside={<span className="text-primary-text"><Icon name="brainPulse" size={16} /></span>}>
+            <p className="text-sm leading-relaxed text-ink-muted">
+              Ask about your appointments, medicines or reports and get an answer drawn from your record.
+            </p>
+            <Button variant="secondary" icon="message" className="mt-3 min-h-11 w-full" onClick={() => go('assistance')}>
+              Open the assistant
+            </Button>
+          </RailPanel>
+        </>
+      }
+    >
+      {section === 'overview' && (
+        <div className="flex flex-col gap-4 sm:gap-5">
+          {next && (
+            <Card>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                  <Icon name="calendar" size={14} /> Next appointment
+                </span>
+                <Badge tone="primary">{daysUntil(next.date) ?? 'Scheduled'}</Badge>
+              </div>
+
+              <div className="mt-4 flex items-start gap-4">
+                <DateBlock date={next.date} />
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold tracking-tight text-ink sm:text-xl">
+                    {formatDate(next.date)} · {formatTime(next.time)}
+                  </p>
+                  <p className="mt-0.5 text-sm text-ink-muted">
+                    {next.department} · {next.clinician}
+                  </p>
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink-subtle">
+                    <Icon name="mapPin" size={13} /> {next.location}
+                  </p>
+                </div>
+              </div>
+
+              <ButtonRow className="mt-5">
+                <Button onClick={() => go('appointments')}>View appointments</Button>
+                <Button variant="outline" onClick={() => go('assistance')}>
+                  Request a change
+                </Button>
+              </ButtonRow>
+            </Card>
+          )}
+
+          <div className="scrollbar-hide -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto overscroll-x-contain px-4 py-1 [&>*]:w-[42%] [&>*]:min-w-[8.5rem] [&>*]:shrink-0 [&>*]:snap-start sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:p-0 sm:[&>*]:w-auto sm:[&>*]:min-w-0 lg:grid-cols-4">
+            <QuickTile icon="calendar" label="Appointments" value={`${UPCOMING.length} upcoming`} onClick={() => go('appointments')} />
+            <QuickTile icon="file" label="Records" value={`${DOCUMENTS.length} available`} onClick={() => go('records')} />
+            <QuickTile icon="pill" label="Medications" value={`${MEDICATIONS.length} active`} onClick={() => go('medications')} />
+            <QuickTile icon="message" label="Assistance" value="Help & contacts" onClick={() => go('assistance')} />
+          </div>
+
+          <Card>
+            <PortalHeading icon="clock" title="Recent visits" />
+            <LineList>
+              {VISITS.map((v) => (
+                <LineRow key={v.id} lead={<LineDate>{formatDate(v.date)}</LineDate>} title={v.department} sub={`${v.clinician} · ${v.summary}`} />
+              ))}
+            </LineList>
+          </Card>
+        </div>
+      )}
+
+      {section === 'appointments' && (
+        <Card>
+          <PortalHeading icon="calendar" title="Appointments" />
+          <StepSub>Upcoming bookings. Changes are confirmed by reception.</StepSub>
+
+          <LineList>
+            {UPCOMING.map((a) => (
+              <LineRow
+                key={a.id}
+                lead={
+                  <LineDate>
+                    {formatDate(a.date)}
+                    <span className="block font-normal text-ink-subtle">{formatTime(a.time)}</span>
+                  </LineDate>
+                }
+                title={a.department}
+                sub={`${a.clinician} · ${a.location}`}
+                aside={<Badge tone={a.status === 'confirmed' ? 'success' : 'warning'}>{a.status === 'confirmed' ? 'Confirmed' : 'Awaiting'}</Badge>}
+              />
             ))}
-          </ol>
-        </nav>
+          </LineList>
 
-        <div className="side-foot">
-          <button className="side-action" onClick={onSignOut}>
-            <Icon name="logout" size={15} />
-            Sign out
-          </button>
-          <div className="side-note">
-            <span className="side-dot" />
-            Sample data
-          </div>
-        </div>
-      </aside>
+          <Section title="Past visits" sub="The two most recent consultations.">
+            <LineList flush>
+              {VISITS.map((v) => (
+                <LineRow key={v.id} lead={<LineDate>{formatDate(v.date)}</LineDate>} title={v.department} sub={`${v.clinician} · ${v.summary}`} />
+              ))}
+            </LineList>
+          </Section>
+        </Card>
+      )}
 
-      <div className="app-stage">
-        <header className="top-bar">
-          <div className="top-title">
-            <h1 className="top-heading">
-              {section === 'overview' ? `${greeting()}, ${firstName}` : NAV.find((n) => n.key === section)?.label}
-            </h1>
-          </div>
+      {section === 'records' && (
+        <Card>
+          <PortalHeading icon="file" title="Records" />
+          <StepSub>Reports released to you. Anyone collecting on your behalf needs your patient ID and their own photo identity.</StepSub>
 
-          <div className="top-actions">
-            <NoticeBell />
+          <LineList>
+            {DOCUMENTS.map((d) => (
+              <LineRow
+                key={d.id}
+                lead={<DocIcon name="file" />}
+                title={d.title}
+                sub={`${d.kind} · ${formatDate(d.date)} · ${d.size}`}
+                aside={
+                  <button
+                    type="button"
+                    className="focus-ring tap-target rounded-lg border border-border-soft text-ink-muted transition-colors hover:border-border-strong hover:bg-surface-2 hover:text-ink"
+                    aria-label={`Download ${d.title}`}
+                    title="Download"
+                  >
+                    <Icon name="download" size={16} />
+                  </button>
+                }
+              />
+            ))}
+          </LineList>
+        </Card>
+      )}
 
-            <button
-              className="theme-toggle"
-              onClick={onToggleTheme}
-              aria-label={dark ? 'Switch to day mode' : 'Switch to night mode'}
-              title={dark ? 'Day mode' : 'Night mode'}
-            >
-              <Icon name={dark ? 'sun' : 'moon'} size={16} />
-            </button>
+      {section === 'medications' && (
+        <Card>
+          <PortalHeading icon="pill" title="Medications" />
+          <StepSub>Current prescriptions. Refill requests are reviewed by the prescribing clinician.</StepSub>
 
-            <div className="user-chip">
-              <span className="user-avatar">
-                <Icon name="userCheck" size={15} />
-              </span>
-              <span className="user-meta">
-                <span className="user-name">{patient.name}</span>
-                <span className="user-role">{patient.systemId}</span>
-              </span>
-              <span className="badge badge-complete">Signed in</span>
+          <LineList>
+            {MEDICATIONS.map((m) => (
+              <LineRow
+                key={m.id}
+                lead={<DocIcon name="pill" />}
+                title={`${m.name} · ${m.dose}`}
+                sub={`${m.schedule} · ${m.prescribedBy}`}
+                aside={<Badge tone={m.refillsLeft > 1 ? 'success' : 'warning'}>{m.refillsLeft} refills</Badge>}
+              />
+            ))}
+          </LineList>
+        </Card>
+      )}
+
+      {section === 'assistance' && (
+        <Card>
+          <PortalHeading icon="message" title="Assistance" />
+          <StepSub>Ask the assistant, browse common questions, or contact the hospital.</StepSub>
+
+          <Assistant patientName={firstName} />
+
+          <Section title="Common questions" sub="Answers to what patients ask most often.">
+            <div className="divide-y divide-border-soft overflow-hidden rounded-xl border border-border-soft">
+              {FAQ.map((item) => (
+                <FaqRow key={item.q} question={item.q} answer={item.a} />
+              ))}
             </div>
-          </div>
-        </header>
+          </Section>
 
-        <div className="stage-grid">
-          <main className="app-main">
-            {section === 'overview' && (
-              <div className="portal-stack step-enter">
-                {next && (
-                  <section className="card portal-feature" onMouseMove={trackSpotlight}>
-                    <div className="feature-head">
-                      <span className="feature-label">
-                        <Icon name="calendar" size={14} /> Next appointment
-                      </span>
-                      <span className="badge badge-draft">{daysUntil(next.date) ?? 'Scheduled'}</span>
-                    </div>
+          <Section title="Contact" sub="Reception is open 8:00 AM – 8:00 PM. The helpline runs 24 hours.">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <ContactTile icon="phone" label="Reception" value={CONTACTS.reception} />
+              <ContactTile icon="message" label="24-hour helpline" value={CONTACTS.helpline} />
+            </div>
+          </Section>
+        </Card>
+      )}
+    </PatientShell>
+  );
+}
 
-                    <p className="feature-when">
-                      {formatDate(next.date)} · {next.time}
-                    </p>
-                    <p className="feature-where">
-                      {next.department} · {next.clinician}
-                    </p>
-                    <p className="feature-room">
-                      <Icon name="mapPin" size={13} /> {next.location}
-                    </p>
+/* ── Pieces ──────────────────────────────────────────────────────────────── */
 
-                    <div className="btn-row" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 18 }}>
-                      <button className="btn btn-primary" onClick={() => setSection('appointments')}>
-                        View appointments
-                      </button>
-                      <button className="btn btn-secondary" onClick={() => setSection('assistance')}>
-                        Request a change
-                      </button>
-                    </div>
-                  </section>
-                )}
-
-                <div className="quick-grid">
-                  <QuickTile icon="calendar" label="Appointments" value={`${UPCOMING.length} upcoming`} onClick={() => setSection('appointments')} />
-                  <QuickTile icon="file" label="Records" value={`${DOCUMENTS.length} available`} onClick={() => setSection('records')} />
-                  <QuickTile icon="pill" label="Medications" value={`${MEDICATIONS.length} active`} onClick={() => setSection('medications')} />
-                  <QuickTile icon="message" label="Assistance" value="Help & contacts" onClick={() => setSection('assistance')} />
-                </div>
-
-                <section className="card">
-                  <div className="portal-head">
-                    <IconBadge name="clock" size={30} />
-                    <h2 className="portal-title">Recent visits</h2>
-                  </div>
-                  <ul className="line-list">
-                    {VISITS.map((v) => (
-                      <li key={v.id} className="line-row">
-                        <span className="line-date">{formatDate(v.date)}</span>
-                        <span className="line-main">
-                          <span className="line-title">{v.department}</span>
-                          <span className="line-sub">{v.clinician} · {v.summary}</span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              </div>
-            )}
-
-            {section === 'appointments' && (
-              <section className="card step-enter">
-                <div className="portal-head">
-                  <IconBadge name="calendar" size={30} />
-                  <h2 className="portal-title">Appointments</h2>
-                </div>
-                <p className="step-sub">Upcoming bookings. Changes are confirmed by reception.</p>
-
-                <ul className="line-list">
-                  {UPCOMING.map((a) => (
-                    <li key={a.id} className="line-row line-row--wide">
-                      <span className="line-date">
-                        {formatDate(a.date)}
-                        <span className="line-time">{a.time}</span>
-                      </span>
-                      <span className="line-main">
-                        <span className="line-title">{a.department}</span>
-                        <span className="line-sub">{a.clinician} · {a.location}</span>
-                      </span>
-                      <span className={`badge ${a.status === 'confirmed' ? 'badge-complete' : 'badge-draft'}`}>
-                        {a.status === 'confirmed' ? 'Confirmed' : 'Awaiting'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                <hr className="rule" />
-                <h3 className="section-title">Past visits</h3>
-                <p className="section-sub">The two most recent consultations.</p>
-                <ul className="line-list">
-                  {VISITS.map((v) => (
-                    <li key={v.id} className="line-row">
-                      <span className="line-date">{formatDate(v.date)}</span>
-                      <span className="line-main">
-                        <span className="line-title">{v.department}</span>
-                        <span className="line-sub">{v.clinician} · {v.summary}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {section === 'records' && (
-              <section className="card step-enter">
-                <div className="portal-head">
-                  <IconBadge name="file" size={30} />
-                  <h2 className="portal-title">Records</h2>
-                </div>
-                <p className="step-sub">Reports released to you. Anyone collecting on your behalf needs your patient ID and their own photo identity.</p>
-
-                <ul className="line-list">
-                  {DOCUMENTS.map((d) => (
-                    <li key={d.id} className="line-row line-row--wide">
-                      <span className="doc-icon">
-                        <Icon name="file" size={16} />
-                      </span>
-                      <span className="line-main">
-                        <span className="line-title">{d.title}</span>
-                        <span className="line-sub">{d.kind} · {formatDate(d.date)} · {d.size}</span>
-                      </span>
-                      <button className="icon-btn" aria-label={`Download ${d.title}`} title="Download">
-                        <Icon name="download" size={15} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {section === 'medications' && (
-              <section className="card step-enter">
-                <div className="portal-head">
-                  <IconBadge name="pill" size={30} />
-                  <h2 className="portal-title">Medications</h2>
-                </div>
-                <p className="step-sub">Current prescriptions. Refill requests are reviewed by the prescribing clinician.</p>
-
-                <ul className="line-list">
-                  {MEDICATIONS.map((m) => (
-                    <li key={m.id} className="line-row line-row--wide">
-                      <span className="doc-icon">
-                        <Icon name="pill" size={16} />
-                      </span>
-                      <span className="line-main">
-                        <span className="line-title">{m.name} · {m.dose}</span>
-                        <span className="line-sub">{m.schedule} · {m.prescribedBy}</span>
-                      </span>
-                      <span className={`badge ${m.refillsLeft > 1 ? 'badge-complete' : 'badge-draft'}`}>
-                        {m.refillsLeft} refills
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {section === 'assistance' && (
-              <section className="card step-enter">
-                <div className="portal-head">
-                  <IconBadge name="message" size={30} />
-                  <h2 className="portal-title">Assistance</h2>
-                </div>
-                <p className="step-sub">Ask the assistant, browse common questions, or contact the hospital.</p>
-
-                <Assistant patientName={firstName} />
-
-                <hr className="rule" />
-                <h3 className="section-title">Common questions</h3>
-                <p className="section-sub">Answers to what patients ask most often.</p>
-
-                <div className="faq">
-                  {FAQ.map((item) => (
-                    <FaqRow key={item.q} question={item.q} answer={item.a} />
-                  ))}
-                </div>
-
-                <hr className="rule" />
-                <h3 className="section-title">Contact</h3>
-                <p className="section-sub">Reception is open 08:00–20:00. The helpline runs 24 hours.</p>
-
-                <div className="contact-grid">
-                  <ContactTile icon="phone" label="Reception" value={CONTACTS.reception} />
-                  <ContactTile icon="message" label="24-hour helpline" value={CONTACTS.helpline} />
-                </div>
-              </section>
-            )}
-          </main>
-
-          <aside className="side-rail">
-            <section className="rail-panel">
-              <div className="rail-panel-head">
-                <h2 className="rail-panel-title">Your details</h2>
-                <span className="badge badge-complete">Verified</span>
-              </div>
-              <RailRow icon="userCheck" label="Name" value={patient.name} />
-              <RailRow icon="idCard" label="Patient ID" value={patient.systemId} mono />
-              <RailRow icon="phone" label="Mobile" value={maskMobile(patient.mobile)} />
-              <RailRow icon="calendar" label="Date of birth" value={patient.dob ?? '—'} last />
-            </section>
-
-            <section className="rail-panel rail-panel--accent">
-              <div className="rail-panel-head">
-                <h2 className="rail-panel-title">AI assistant</h2>
-                <Icon name="brainPulse" size={16} />
-              </div>
-              <p className="rail-accent-copy">
-                Ask about your appointments, medicines or reports and get an answer drawn from your record.
-              </p>
-              <button className="btn btn-secondary rail-accent-btn" onClick={() => setSection('assistance')}>
-                <span className="btn-ico"><Icon name="message" size={14} /></span>
-                Open the assistant
-              </button>
-            </section>
-          </aside>
-        </div>
-      </div>
+function PortalHeading({ icon, title }: { icon: IconName; title: string }) {
+  return (
+    <div className="flex min-h-11 items-center gap-3">
+      <IconBadge name={icon} size={36} />
+      <h2 className="text-lg font-semibold tracking-tight text-ink sm:text-xl">{title}</h2>
     </div>
   );
 }
 
-function QuickTile({
-  icon,
-  label,
-  value,
-  onClick,
-}: {
-  icon: Parameters<typeof Icon>[0]['name'];
-  label: string;
-  value: string;
-  onClick: () => void;
-}) {
+/** The solid date block (DESIGN_SYSTEM §9.3 "next item" card). */
+function DateBlock({ date }: { date: string }) {
+  const d = new Date(date);
+  const valid = !isNaN(d.getTime());
   return (
-    <button className={`quick-tile tone-${toneOf(icon)}`} onClick={onClick} onMouseMove={trackSpotlight}>
-      <span className="quick-icon">
-        <Icon name={icon} size={17} />
+    <span className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-tile-blue shadow-card" aria-hidden="true">
+      <span className="text-2xs font-semibold uppercase tracking-wide text-tile-blue-fg/85">{valid ? d.toLocaleDateString('en-IN', { month: 'short' }) : ''}</span>
+      <span className="text-2xl font-semibold leading-none text-tile-blue-fg">{valid ? d.getDate() : '—'}</span>
+    </span>
+  );
+}
+
+function LineList({ children, flush = false }: { children: ReactNode; flush?: boolean }) {
+  return <ul className={cn('divide-y divide-border-soft', !flush && 'mt-5 border-t border-border-soft')}>{children}</ul>;
+}
+
+function LineDate({ children }: { children: ReactNode }) {
+  return <span className="w-24 shrink-0 text-sm font-semibold tabular-nums text-ink sm:w-28">{children}</span>;
+}
+
+function LineRow({ lead, title, sub, aside }: { lead: ReactNode; title: string; sub: string; aside?: ReactNode }) {
+  return (
+    <li className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
+      {lead}
+      <span className="min-w-0 flex-1 basis-48">
+        <span className="block text-sm font-semibold text-ink">{title}</span>
+        <span className="mt-0.5 block text-sm text-ink-muted">{sub}</span>
       </span>
-      <span className="quick-label">{label}</span>
-      <span className="quick-value">{value}</span>
-      <span className="quick-go">
-        <Icon name="chevron" size={14} />
+      {aside ? <span className="ml-auto shrink-0">{aside}</span> : null}
+    </li>
+  );
+}
+
+function DocIcon({ name }: { name: IconName }) {
+  return <IconBadge name={name} size={36} />;
+}
+
+function QuickTile({ icon, label, value, onClick }: { icon: IconName; label: string; value: string; onClick: () => void }) {
+  const tone = toneOf(icon);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={tintedSurface(tone, 0.045)}
+      className="focus-ring group flex min-h-24 min-w-0 flex-col items-start gap-1.5 rounded-xl border bg-surface-1 p-3 text-left shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-md sm:min-h-28 sm:gap-2 sm:p-4"
+    >
+      <span className="transition-transform group-hover:scale-105">
+        <IconBadge name={icon} size={36} />
+      </span>
+      <span className="text-sm font-semibold text-ink">{label}</span>
+      <span className="flex w-full items-center justify-between gap-1 text-xs text-ink-muted">
+        {value}
+        <span style={{ color: TONE_HEX[tone] }} className="opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100">
+          <Icon name="chevron" size={14} className="-rotate-90" />
+        </span>
       </span>
     </button>
   );
@@ -373,110 +313,92 @@ function QuickTile({
 function FaqRow({ question, answer }: { question: string; answer: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`faq-row ${open ? 'faq-row--open' : ''}`}>
-      <button className="faq-q" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+    <div className={cn('bg-surface-1', open && 'bg-surface-2/50')}>
+      <button
+        type="button"
+        className="focus-ring flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
         <span>{question}</span>
-        <span className="faq-chevron">
-          <Icon name="chevron" size={15} />
-        </span>
+        <Icon name="chevron" size={16} className={cn('text-ink-subtle transition-transform duration-200', open && 'rotate-180')} />
       </button>
-      {open && <p className="faq-a">{answer}</p>}
+      {open && <p className="px-4 pb-4 text-sm leading-relaxed text-ink-muted motion-safe:animate-[fadeIn_200ms_ease-out]">{answer}</p>}
     </div>
   );
 }
 
-function ContactTile({
-  icon,
-  label,
-  value,
-}: {
-  icon: Parameters<typeof Icon>[0]['name'];
-  label: string;
-  value: string;
-}) {
+function ContactTile({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   return (
-    <a className="contact-tile" href={`tel:${value.replace(/\s/g, '')}`}>
-      <span className="contact-icon">
-        <Icon name={icon} size={16} />
-      </span>
-      <span className="contact-meta">
-        <span className="contact-label">{label}</span>
-        <span className="contact-value">{value}</span>
+    <a
+      className="focus-ring flex min-h-14 min-w-0 items-center gap-3 rounded-xl border border-border-soft bg-surface-1 p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-md"
+      href={`tel:${value.replace(/\s/g, '')}`}
+    >
+      <IconBadge name={icon} size={36} />
+      <span className="min-w-0">
+        <span className="block text-xs text-ink-subtle">{label}</span>
+        <span className="block truncate text-sm font-semibold tabular-nums text-ink">{value}</span>
       </span>
     </a>
   );
 }
 
-function RailRow({
-  icon,
-  label,
-  value,
-  mono,
-  last,
-}: {
-  icon: Parameters<typeof Icon>[0]['name'];
-  label: string;
-  value: string;
-  mono?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <div className={`rail-row ${last ? 'rail-row--last' : ''}`}>
-      <span className="rail-row-label">
-        <Icon name={icon} size={13} />
-        {label}
-      </span>
-      <span className={`rail-row-value ${mono ? 'rail-row-value--mono' : ''}`}>{value}</span>
-    </div>
-  );
-}
-
-
-/** Notification bell and its drop-down panel. */
+/** Notification bell and its panel (DESIGN_SYSTEM §8.7). */
 function NoticeBell() {
   const [open, setOpen] = useState(false);
   const [notices, setNotices] = useState<Notice[]>(NOTICES);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const unread = notices.filter((n) => n.unread).length;
 
-  // A panel anchored to the header should close on an outside click or Escape.
+  // A panel anchored to the header closes on an outside press or Escape.
   useEffect(() => {
-    if (!open) return;
-    function onPointer(e: MouseEvent) {
+    if (!open) return undefined;
+    function onPointer(e: PointerEvent) {
       if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     }
-    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('pointerdown', onPointer);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('pointerdown', onPointer);
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
 
   return (
-    <div className="notice-wrap" ref={wrapRef}>
+    <div className="relative" ref={wrapRef}>
       <button
-        className={`theme-toggle notice-bell ${unread ? 'notice-bell--unread' : ''}`}
+        ref={triggerRef}
+        type="button"
+        className="focus-ring tap-target relative rounded-lg text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
         onClick={() => setOpen((v) => !v)}
-        aria-label={unread ? `${unread} unread notifications` : 'Notifications'}
+        aria-label={unread ? `Notifications (${unread} unread)` : 'Notifications'}
         aria-expanded={open}
-        title="Notifications"
+        aria-haspopup="true"
       >
-        <Icon name="bell" size={16} />
-        {unread > 0 && <span className="notice-count">{unread}</span>}
+        <Icon name="bell" size={19} />
+        {unread > 0 && (
+          <span className="absolute right-1.5 top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-2xs font-semibold leading-none tabular-nums text-on-danger">
+            {unread > 9 ? '9+' : unread}
+          </span>
+        )}
       </button>
 
       {open && (
-        <div className="notice-panel step-enter">
-          <div className="notice-panel-head">
-            <span className="notice-panel-title">Notifications</span>
+        <div className="fixed inset-x-4 top-[3.75rem] z-40 overflow-hidden rounded-xl border border-border-soft bg-surface-1 shadow-card-lg motion-safe:animate-[slideUp_180ms_var(--ease-premium)_both] sm:absolute sm:inset-x-auto sm:right-0 sm:top-[calc(100%+6px)] sm:w-[calc(100vw-2rem)] sm:max-w-sm">
+          <div className="flex items-center justify-between gap-2 border-b border-border-soft px-3.5 py-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Notifications</span>
             {unread > 0 && (
               <button
-                className="btn-text"
+                type="button"
+                className="focus-ring inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-semibold text-primary-text hover:underline"
                 onClick={() => setNotices((list) => list.map((n) => ({ ...n, unread: false })))}
               >
                 Mark all as read
@@ -484,24 +406,26 @@ function NoticeBell() {
             )}
           </div>
 
-          <ul className="notice-list">
+          <ul className="max-h-96 overflow-y-auto overscroll-contain">
             {notices.map((n) => (
-              <li key={n.id}>
+              <li key={n.id} className="border-b border-border-soft last:border-b-0">
                 <button
-                  className={`notice-row ${n.unread ? 'notice-row--unread' : ''}`}
-                  onClick={() =>
-                    setNotices((list) => list.map((x) => (x.id === n.id ? { ...x, unread: false } : x)))
-                  }
+                  type="button"
+                  className={cn(
+                    'focus-ring flex w-full items-start gap-2.5 px-3.5 py-3 text-left transition-colors hover:bg-surface-2',
+                    n.unread && 'bg-primary-50/40',
+                  )}
+                  onClick={() => setNotices((list) => list.map((x) => (x.id === n.id ? { ...x, unread: false } : x)))}
                 >
-                  <span className="notice-icon">
-                    <Icon name={n.icon} size={15} />
+                  <IconBadge name={n.icon} size={30} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink">{n.title}</span>
+                    <span className="mt-0.5 block text-sm text-ink-muted">{n.body}</span>
+                    <span className="mt-1 block text-xs text-ink-subtle">{n.when}</span>
                   </span>
-                  <span className="notice-body">
-                    <span className="notice-title">{n.title}</span>
-                    <span className="notice-copy">{n.body}</span>
-                    <span className="notice-when">{n.when}</span>
-                  </span>
-                  {n.unread && <span className="notice-dot" />}
+                  {n.unread && (
+                    <span className="shrink-0 rounded-full bg-primary-100 px-1.5 py-0.5 text-2xs font-semibold text-primary-text">New</span>
+                  )}
                 </button>
               </li>
             ))}
@@ -511,7 +435,6 @@ function NoticeBell() {
     </div>
   );
 }
-
 
 interface Turn {
   id: number;
@@ -531,7 +454,7 @@ const TOPICS: { label: string; match: string[]; answer: () => string }[] = [
     answer: () => {
       const a = UPCOMING.find((x) => x.status !== 'completed');
       if (!a) return 'You have no upcoming appointments booked.';
-      return `${a.department} with ${a.clinician} on ${formatDate(a.date)} at ${a.time}. Location: ${a.location}. Status: ${a.status === 'confirmed' ? 'confirmed' : 'awaiting confirmation'}.`;
+      return `${a.department} with ${a.clinician} on ${formatDate(a.date)} at ${formatTime(a.time)}. Location: ${a.location}. Status: ${a.status === 'confirmed' ? 'confirmed' : 'awaiting confirmation'}.`;
     },
   },
   {
@@ -566,7 +489,7 @@ const TOPICS: { label: string; match: string[]; answer: () => string }[] = [
     label: 'How do I reach the hospital?',
     match: ['contact', 'phone', 'call', 'reception', 'number', 'reach'],
     answer: () =>
-      `Reception is ${CONTACTS.reception}, open 08:00–20:00. The 24-hour helpline is ${CONTACTS.helpline}.`,
+      `Reception is ${CONTACTS.reception}, open 8:00 AM – 8:00 PM. The 24-hour helpline is ${CONTACTS.helpline}.`,
   },
 ];
 
@@ -586,70 +509,78 @@ function Assistant({ patientName }: { patientName: string }) {
     },
   ]);
   const [input, setInput] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
 
+  // Keep the newest answer in view inside the transcript — never scroll the page.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const thread = threadRef.current;
+    if (thread) thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' });
   }, [turns]);
 
   function ask(question: string) {
     const text = question.trim();
     if (!text) return;
     setInput('');
-    setTurns((t) => [
-      ...t,
-      { id: t.length, role: 'you', text },
-      { id: t.length + 1, role: 'bot', text: answerFor(text) },
-    ]);
+    setTurns((t) => [...t, { id: t.length, role: 'you', text }, { id: t.length + 1, role: 'bot', text: answerFor(text) }]);
   }
 
   return (
-    <div className="assistant">
-      <div className="assistant-head">
-        <span className="assistant-avatar">
+    <Reveal className="mt-5 overflow-hidden rounded-xl border border-border-soft bg-surface-1">
+      <div className="flex items-center gap-3 border-b border-border-soft px-4 py-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-sky text-accent-sky-fg">
           <Icon name="brainPulse" size={16} />
         </span>
-        <span className="assistant-head-text">
-          <span className="assistant-name">Care assistant</span>
-          <span className="assistant-note">Answers drawn from your record. Not a substitute for clinical advice.</span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-ink">Care assistant</span>
+          <span className="block text-xs text-ink-subtle">Answers drawn from your record. Not a substitute for clinical advice.</span>
         </span>
       </div>
 
-      <div className="assistant-thread">
+      <div ref={threadRef} role="log" aria-live="polite" className="flex max-h-80 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-surface-2/50 p-4">
         {turns.map((t) => (
-          <div key={t.id} className={`bubble bubble--${t.role}`}>
+          <div
+            key={t.id}
+            className={cn(
+              'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed motion-safe:animate-[slideUp_220ms_var(--ease-premium)_both]',
+              t.role === 'you' ? 'self-end rounded-br-md bg-primary-600 text-on-primary' : 'self-start rounded-bl-md border border-border-soft bg-surface-1 text-ink',
+            )}
+          >
             {t.text}
           </div>
         ))}
-        <div ref={endRef} />
       </div>
 
-      <div className="assistant-chips">
+      <div className="flex flex-wrap gap-2 border-t border-border-soft p-3">
         {TOPICS.map((t) => (
-          <button key={t.label} className="assistant-chip" onClick={() => ask(t.label)}>
+          <button
+            key={t.label}
+            type="button"
+            className="focus-ring min-h-11 rounded-lg border border-border-soft bg-surface-2 px-3 py-2 text-left text-sm text-ink-muted transition-colors hover:border-border-strong hover:text-ink"
+            onClick={() => ask(t.label)}
+          >
             {t.label}
           </button>
         ))}
       </div>
 
       <form
-        className="assistant-form"
+        className="flex gap-2 border-t border-border-soft p-3"
         onSubmit={(e) => {
           e.preventDefault();
           ask(input);
         }}
       >
         <input
-          className="field-input"
+          className={inputClass}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Ask about an appointment, medicine or report"
           aria-label="Ask the assistant"
         />
-        <button className="btn btn-primary" type="submit" disabled={!input.trim()}>
+        <Button type="submit" className="min-h-11 shrink-0 px-4" disabled={!input.trim()}>
           Ask
-        </button>
+        </Button>
       </form>
-    </div>
+    </Reveal>
   );
 }

@@ -19,6 +19,7 @@ import { nameError, nextNameInput } from '../utils/validation'
 import { cn } from '../utils/cn'
 import { GUEST_PASS_TYPES } from '../types/frontDesk'
 import type { GuestPassType } from '../types/frontDesk'
+import { inputClass } from '../utils/formClasses'
 
 const RELATIONSHIPS = ['Spouse', 'Son', 'Daughter', 'Parent', 'Sibling', 'Other relative', 'Friend']
 const STAFF_ROLES = ['Staff without ID card', 'Trainee', 'Vendor', 'Contractor']
@@ -37,8 +38,6 @@ const TYPE_HINT: Record<GuestPassType, string> = {
   'Staff / service': 'For staff without an ID card, vendors and contractors — confirmed with whoever authorised them.',
 }
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
 
 /**
  * Guest Pass — nobody moves about the hospital without a hospital ID or a
@@ -140,7 +139,7 @@ export function GuestPassPage() {
         subtitle="Nobody moves about the hospital without a hospital ID or a pass — printed only after the ID is seen and the visit confirmed."
       />
 
-      <div className="px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mt-5 sm:mt-6">
         <Card accentTone="brand" className="min-w-0 max-w-2xl">
           <CardHeader icon={IdCard} iconTone="brand" title="Print a pass" subtitle={TYPE_HINT[type]} />
           <CardBody>
@@ -158,8 +157,8 @@ export function GuestPassPage() {
                       aria-checked={type === option}
                       onClick={() => reset(option)}
                       className={cn(
-                        'flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center text-xs font-semibold transition-colors',
-                        type === option ? 'border-brand-600 bg-brand-50 text-primary-text' : 'border-border bg-surface text-ink-muted hover:bg-surface-muted',
+                        'focus-ring flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-2.5 text-center text-xs font-semibold break-words transition-colors',
+                        type === option ? 'border-primary-600 bg-primary-50 text-primary-text' : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
                       )}
                     >
                       <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
@@ -255,9 +254,9 @@ export function GuestPassPage() {
               </Field>
 
               {/* Verification — nothing is printed unchecked */}
-              <div className="flex flex-col gap-2 rounded-xl border border-warning-border bg-warning-bg/40 px-3.5 py-3">
+              <div className="flex flex-col gap-2 rounded-xl border border-warning-fg/25 bg-warning-bg/40 px-3.5 py-3">
                 <p className="flex items-center gap-1.5 text-xs font-semibold text-ink">
-                  <ShieldCheck className="h-4 w-4 text-warning" strokeWidth={1.75} aria-hidden="true" />
+                  <ShieldCheck className="h-4 w-4 text-warning-fg" strokeWidth={1.75} aria-hidden="true" />
                   Verification
                 </p>
                 {type === 'Visiting doctor' ? null : (
@@ -271,7 +270,7 @@ export function GuestPassPage() {
                   />
                 )}
                 <label className="flex items-start gap-2 text-xs text-ink">
-                  <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-primary-600)]" />
+                  <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-primary-600)]" />
                   <span>
                     I have seen the ID and confirmed this visit with <strong>{confirmer}</strong>
                     {type === 'Patient visitor' ? ' — they know and want this visitor.' : ' — they expect this person.'}
@@ -295,7 +294,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium text-ink-muted">
-        {label} {required ? <span className="text-critical">*</span> : null}
+        {label} {required ? <span className="text-critical-fg">*</span> : null}
       </p>
       {children}
     </div>
@@ -313,8 +312,8 @@ function Chips({ options, value, onChange }: { options: string[]; value: string;
           aria-checked={value === option}
           onClick={() => onChange(option)}
           className={cn(
-            'rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
-            value === option ? 'border-brand-600 bg-brand-600 text-white' : 'border-border bg-surface text-ink hover:bg-surface-muted',
+            'focus-ring min-h-11 rounded-full border px-3.5 text-sm font-medium transition-colors',
+            value === option ? 'border-primary-600 bg-primary-600 text-on-primary' : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
           )}
         >
           {option}

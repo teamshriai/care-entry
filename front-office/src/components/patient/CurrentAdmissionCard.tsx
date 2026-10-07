@@ -14,6 +14,7 @@ import { formatClock } from '../../utils/format'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import type { Admission } from '../../types/admission'
+import { inputClass } from '../../utils/formClasses'
 
 /**
  * The patient's current admission — or the request waiting for a bed — on
@@ -76,7 +77,7 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
             <dt className="text-xs text-ink-muted">Attendant</dt>
             <dd className="truncate font-medium text-ink">
               {admission.attendant.name} ({admission.attendant.relationship}) ·{' '}
-              <a href={`tel:${admission.attendant.phone.replace(/[^0-9+]/g, '')}`} className="text-primary-text hover:underline">
+              <a href={`tel:${admission.attendant.phone.replace(/[^0-9+]/g, '')}`} className="focus-ring tap-reach rounded text-primary-text hover:underline">
                 {admission.attendant.phone}
               </a>
             </dd>
@@ -106,7 +107,7 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             placeholder="e.g. Admitted in error"
-            className="h-10 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary-600"
+            className={inputClass}
           />
           <div className="flex justify-end pt-1">
             <Button type="submit" variant="danger" disabled={!reason.trim()}>

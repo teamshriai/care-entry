@@ -1,8 +1,7 @@
-import { Icon, IconBadge } from './Icon';
 import { maskAadhaar } from '../data';
 import type { RegistrationOrigin } from '../identity/identityData';
 import type { MockPatient } from '../types';
-import '../identity/identity.css';
+import { Alert, Button, ButtonRow, Card, StepHeader, StepNav, StepSub, SummaryList, SummaryRow } from '../ui/kit';
 
 const GENDER_LABELS: Record<string, string> = {
   unknown: 'Not stated',
@@ -27,61 +26,37 @@ export function Step1Review({
   onNext: () => void;
   onRestart: () => void;
 }) {
-  const sourceLabel =
-    origin.source === 'aadhaar' ? 'Aadhaar' : origin.source === 'abha' ? 'ABHA' : 'Entered manually';
+  const sourceLabel = origin.source === 'aadhaar' ? 'Aadhaar' : origin.source === 'abha' ? 'ABHA' : 'Entered manually';
 
   return (
-    <div className="card step-enter">
-      <div className="step-nav">
-        <button className="btn-next" onClick={onNext}>
-          Next
-          <Icon name="chevron" size={14} />
-        </button>
-      </div>
-
-      <div className="step-head">
-        <IconBadge name="userCheck" />
-        <h2 className="step-title">Your details</h2>
-      </div>
-      <p className="step-sub">These details were captured at the start of this registration.</p>
+    <Card>
+      <StepNav onNext={onNext} />
+      <StepHeader icon="userCheck" title="Your details" />
+      <StepSub>These details were captured at the start of this registration.</StepSub>
 
       {origin.identity && (
-        <div className="prefill-banner">
-          <span className="prefill-icon">
-            <Icon name="checkCircle" size={16} />
-          </span>
-          <span>
-            <strong>Verified via {sourceLabel}</strong>
-            {origin.source === 'aadhaar' && origin.identity.aadhaar
-              ? ` · ${maskAadhaar(origin.identity.aadhaar)}`
-              : ''}
-            {origin.source === 'abha' && origin.identity.abhaAddress ? ` · ${origin.identity.abhaAddress}` : ''}
-          </span>
-        </div>
+        <Alert tone="success" className="mt-5">
+          <strong>Verified via {sourceLabel}</strong>
+          {origin.source === 'aadhaar' && origin.identity.aadhaar ? ` · ${maskAadhaar(origin.identity.aadhaar)}` : ''}
+          {origin.source === 'abha' && origin.identity.abhaAddress ? ` · ${origin.identity.abhaAddress}` : ''}
+        </Alert>
       )}
 
-      <div className="review-grid">
-        <ReviewRow label="Full name" value={patient.name} />
-        <ReviewRow label="Mobile number" value={patient.mobile} />
-        <ReviewRow label="Patient ID" value={patient.systemId} />
-        <ReviewRow label="Date of birth" value={patient.dob ?? 'Not provided'} />
-        <ReviewRow label="Gender" value={GENDER_LABELS[patient.gender] ?? patient.gender} />
-        <ReviewRow label="Registration method" value={sourceLabel} />
-      </div>
+      <SummaryList className="mt-5">
+        <SummaryRow label="Full name" value={patient.name} />
+        <SummaryRow label="Mobile number" value={patient.mobile} />
+        <SummaryRow label="Patient ID" value={patient.systemId} mono />
+        <SummaryRow label="Date of birth" value={patient.dob ?? 'Not provided'} />
+        <SummaryRow label="Gender" value={GENDER_LABELS[patient.gender] ?? patient.gender} />
+        <SummaryRow label="Registration method" value={sourceLabel} />
+      </SummaryList>
 
-      <div className="btn-row">
-        <button className="btn btn-primary" onClick={onNext}>Continue</button>
-        <button className="btn btn-secondary" onClick={onRestart}>Start a new registration</button>
-      </div>
-    </div>
-  );
-}
-
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="review-row">
-      <span className="review-label">{label}</span>
-      <span className="review-value">{value}</span>
-    </div>
+      <ButtonRow>
+        <Button onClick={onNext}>Continue</Button>
+        <Button variant="outline" onClick={onRestart}>
+          Start a new registration
+        </Button>
+      </ButtonRow>
+    </Card>
   );
 }

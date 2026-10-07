@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
-import { Icon, IconBadge } from '../components/Icon';
-import { trackSpotlight } from '../ui';
+import { useEffect, useState } from 'react';
 import { CORRECT_OTP, formatAadhaar } from '../data';
 import { DEMO_HINTS, lookupAadhaar, lookupAbha, type DemoIdentity } from './identityData';
 import type { IdMethod } from './MethodChooser';
-import './identity.css';
+import { Alert, BackButton, Button, ButtonRow, CheckCard, Field, Reveal, SampleChip, SampleHint, StepHeader, StepSub, TextButton } from '../ui/kit';
+import { inputClass } from '../ui/classes';
+import { OtpInput } from '../ui/OtpInput';
+import { cn } from '../ui/cn';
 
 /**
  * Credential entry followed by a one-time code, for either Aadhaar or ABHA.
@@ -26,15 +27,13 @@ export function IdentityVerify({
   const [consent, setConsent] = useState(false);
   const [showNotice, setShowNotice] = useState(false);
   const [resendIn, setResendIn] = useState(0);
-  const boxesRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const isAadhaar = method === 'aadhaar';
   const label = isAadhaar ? 'Aadhaar' : 'ABHA';
 
+  // The resend countdown ticks only while the code screen is showing.
   useEffect(() => {
-    if (phase !== 'otp') return;
-    boxesRef.current[0]?.focus();
-    setResendIn(30);
+    if (phase !== 'otp') return undefined;
     const t = setInterval(() => setResendIn((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => clearInterval(t);
   }, [phase]);
@@ -61,20 +60,8 @@ export function IdentityVerify({
       return;
     }
     setError('');
+    setResendIn(30);
     setPhase('otp');
-  }
-
-  function handleOtp(index: number, raw: string) {
-    const digit = raw.replace(/\D/g, '').slice(-1);
-    const next = (otp.slice(0, index) + digit + otp.slice(index + 1)).slice(0, 6);
-    setOtp(next);
-    setError('');
-    if (digit && index < 5) boxesRef.current[index + 1]?.focus();
-    if (next.length === 6 && !next.includes(' ')) verify(next);
-  }
-
-  function handleKey(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) boxesRef.current[index - 1]?.focus();
   }
 
   function fillCode() {
@@ -87,7 +74,6 @@ export function IdentityVerify({
     if (code !== CORRECT_OTP) {
       setError(`Incorrect code. This sample build accepts ${CORRECT_OTP}.`);
       setOtp('');
-      boxesRef.current[0]?.focus();
       return;
     }
     const found = lookup();
@@ -95,167 +81,164 @@ export function IdentityVerify({
   }
 
   return (
-    <div className="step-enter">
-      <button className="btn-text" onClick={phase === 'otp' ? () => { setPhase('credential'); setOtp(''); setError(''); } : onBack}>
-        ← Back
-      </button>
-
-      <div className="step-head">
-        <IconBadge name={phase === 'otp' ? 'shieldCheck' : isAadhaar ? 'idCard' : 'heartPulse'} />
-        <h2 className="step-title">
-          {phase === 'credential' ? `${label} verification` : 'Enter verification code'}
-        </h2>
+    <Reveal>
+      <div className="-mt-1 mb-4">
+        <BackButton
+          onClick={
+            phase === 'otp'
+              ? () => {
+                  setPhase('credential');
+                  setOtp('');
+                  setError('');
+                }
+              : onBack
+          }
+        />
       </div>
 
-      {phase === 'otp' && (
-        <p className="step-sub">Enter the six-digit code sent to your registered mobile number.</p>
-      )}
+      <StepHeader
+        icon={phase === 'otp' ? 'shieldCheck' : isAadhaar ? 'idCard' : 'heartPulse'}
+        title={phase === 'credential' ? `${label} verification` : 'Enter verification code'}
+      />
+
+      {phase === 'otp' && <StepSub>Enter the six-digit code sent to your registered mobile number.</StepSub>}
 
       {phase === 'credential' && (
-        <>
-          <label className="field" style={{ maxWidth: 400, marginBottom: 18 }}>
-            <span className="field-label">
-              {isAadhaar ? 'Aadhaar number' : 'ABHA number or address'}
-              <span className="field-required">*</span>
-            </span>
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendCode();
+          }}
+        >
+          <Field label={isAadhaar ? 'Aadhaar number' : 'ABHA number or address'} required className="mt-6 max-w-md">
             <input
-              className="field-input"
+              className={inputClass}
               value={credential}
               autoFocus
+              autoComplete="off"
               inputMode={isAadhaar ? 'numeric' : 'text'}
               placeholder={isAadhaar ? '1234 5678 9012' : '14-2345-6789-0123 or name@abdm'}
               onChange={(e) => {
                 setCredential(isAadhaar ? formatAadhaar(e.target.value) : e.target.value);
                 setError('');
               }}
-              onKeyDown={(e) => e.key === 'Enter' && sendCode()}
             />
-          </label>
+          </Field>
 
-          <div className="consent-block">
-            {/* Until consent is given, a light runs around the outside of the box. */}
-            <div className={`consent-run ${consent ? '' : 'consent-run--active'}`}>
-            <button
-              className={`choice-card ${consent ? 'choice-card--on' : ''}`}
-              onClick={() => { setConsent((v) => !v); setError(''); }}
-              onMouseMove={trackSpotlight}
-              aria-pressed={consent}
-            >
-              <span className="checkbox-box">
-                {consent && (
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                )}
-              </span>
-              <span>
-                I consent to my {label} details being retrieved and used for the purpose of this registration, and I
-                accept the privacy notice and terms of use.
-                <span className="field-required">*</span>
-              </span>
-            </button>
+          <div className="mt-5">
+            {/* Until consent is given, a quiet dashed ring marks what is still needed. */}
+            <div className={cn('rounded-xl transition-[outline-color]', consent ? 'outline-transparent' : 'outline-2 outline-offset-2 outline-dashed outline-primary-300')}>
+              <CheckCard
+                checked={consent}
+                onToggle={() => {
+                  setConsent((v) => !v);
+                  setError('');
+                }}
+              >
+                I consent to my {label} details being retrieved and used for the purpose of this registration, and I accept the privacy notice and
+                terms of use.
+                <span className="text-critical-fg" aria-hidden="true">
+                  {' '}
+                  *
+                </span>
+              </CheckCard>
             </div>
 
-            <button className="btn-text consent-toggle" onClick={() => setShowNotice((v) => !v)}>
+            <TextButton className="mt-2" onClick={() => setShowNotice((v) => !v)}>
               {showNotice ? 'Hide privacy notice and terms' : 'Read the privacy notice and terms'}
-            </button>
+            </TextButton>
 
             {showNotice && (
-              <div className="consent-notice step-enter">
-                <dl>
-                  <dt>Purpose</dt>
-                  <dd>Identification and registration for this hospital visit only.</dd>
+              <Reveal className="mt-2 rounded-xl border border-border-soft bg-surface-2 p-4">
+                <dl className="grid grid-cols-1 gap-x-5 gap-y-3 text-sm sm:grid-cols-[10rem_minmax(0,1fr)]">
+                  <dt className="font-semibold text-ink">Purpose</dt>
+                  <dd className="text-ink-muted">Identification and registration for this hospital visit only.</dd>
 
-                  <dt>Data retrieved</dt>
-                  <dd>
+                  <dt className="font-semibold text-ink">Data retrieved</dt>
+                  <dd className="text-ink-muted">
                     {isAadhaar
                       ? 'Name, date of birth, gender and address held against your Aadhaar number.'
                       : 'Name, date of birth, gender and address held in your Ayushman Bharat Health Account.'}
                   </dd>
 
-                  <dt>Not collected</dt>
-                  <dd>
+                  <dt className="font-semibold text-ink">Not collected</dt>
+                  <dd className="text-ink-muted">
                     {isAadhaar
                       ? 'Biometric data is never collected. Your Aadhaar number is not stored in full; only the final four digits are displayed.'
                       : 'No clinical records are retrieved from your health account. Only profile details are used.'}
                   </dd>
 
-                  <dt>Verification</dt>
-                  <dd>
-                    A one-time code is sent to the mobile number registered against your {label}. No details are
-                    retrieved until that code is verified.
+                  <dt className="font-semibold text-ink">Verification</dt>
+                  <dd className="text-ink-muted">
+                    A one-time code is sent to the mobile number registered against your {label}. No details are retrieved until that code is verified.
                   </dd>
 
-                  <dt>Retention and withdrawal</dt>
-                  <dd>
-                    Details are retained as part of your patient record. Consent may be withdrawn at any time by
-                    contacting reception, after which this registration reverts to manual entry.
+                  <dt className="font-semibold text-ink">Retention and withdrawal</dt>
+                  <dd className="text-ink-muted">
+                    Details are retained as part of your patient record. Consent may be withdrawn at any time by contacting reception, after which this
+                    registration reverts to manual entry.
                   </dd>
 
-                  <dt>Sample data notice</dt>
-                  <dd>
-                    This build contacts no UIDAI or ABDM service. Lookups read a local sample table and no real identity
-                    data is transmitted or stored.
+                  <dt className="font-semibold text-ink">Sample data notice</dt>
+                  <dd className="text-ink-muted">
+                    This build contacts no UIDAI or ABDM service. Lookups read a local sample table and no real identity data is transmitted or stored.
                   </dd>
                 </dl>
-              </div>
+              </Reveal>
             )}
           </div>
 
-          {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div>}
+          {error && <Alert tone="error" className="mt-4">{error}</Alert>}
 
-          <div className="btn-row">
-            <button className="btn btn-primary" onClick={sendCode} disabled={!consent}>Send verification code</button>
-          </div>
-        </>
+          <ButtonRow>
+            <Button type="submit" disabled={!consent}>
+              Send verification code
+            </Button>
+          </ButtonRow>
+        </form>
       )}
 
       {phase === 'otp' && (
         <>
-          <div className="otp-row" style={{ justifyContent: 'flex-start' }}>
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <input
-                key={i}
-                ref={(el) => { boxesRef.current[i] = el; }}
-                className="otp-box"
-                maxLength={1}
-                inputMode="numeric"
-                value={otp[i] ?? ''}
-                onChange={(e) => handleOtp(i, e.target.value)}
-                onKeyDown={(e) => handleKey(i, e)}
-              />
-            ))}
-          </div>
+          <OtpInput
+            className="mt-6"
+            value={otp}
+            onChange={(next) => {
+              setOtp(next);
+              setError('');
+            }}
+            onComplete={verify}
+            invalid={Boolean(error)}
+            autoFocus
+          />
 
-          {error && <div className="alert alert-error" style={{ marginBottom: 14 }}>{error}</div>}
+          {error && <Alert tone="error" className="mt-4">{error}</Alert>}
 
-          <p className="identity-resend">
-            {resendIn > 0 ? `A new code may be requested in ${resendIn}s` : (
-              <button className="btn-text" onClick={() => setResendIn(30)}>Request a new code</button>
-            )}
+          <p className="mt-3 text-sm text-ink-muted" aria-live="polite">
+            {resendIn > 0 ? `A new code may be requested in ${resendIn}s` : <TextButton onClick={() => setResendIn(30)}>Request a new code</TextButton>}
           </p>
         </>
       )}
 
-      <div className="demo-hint">
-        <Icon name="lock" size={14} />
-        <span>
-          <strong>Sample {phase === 'credential' ? 'values' : 'code'}:</strong>
-          {phase === 'credential'
-            ? (isAadhaar ? DEMO_HINTS.aadhaar : DEMO_HINTS.abha).map((h) => (
-                <button
-                  key={h}
-                  className="hint-chip"
-                  onClick={() => { setCredential(h); setOtp(''); setError(''); }}
-                >
-                  {h}
-                </button>
-              ))
-            : (
-              <button className="hint-chip" onClick={fillCode}>{CORRECT_OTP}</button>
-            )}
-        </span>
-      </div>
-    </div>
+      <SampleHint label={`Sample ${phase === 'credential' ? 'values' : 'code'}:`}>
+        {phase === 'credential' ? (
+          (isAadhaar ? DEMO_HINTS.aadhaar : DEMO_HINTS.abha).map((h) => (
+            <SampleChip
+              key={h}
+              onClick={() => {
+                setCredential(h);
+                setOtp('');
+                setError('');
+              }}
+            >
+              {h}
+            </SampleChip>
+          ))
+        ) : (
+          <SampleChip onClick={fillCode}>{CORRECT_OTP}</SampleChip>
+        )}
+      </SampleHint>
+    </Reveal>
   );
 }

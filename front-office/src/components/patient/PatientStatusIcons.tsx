@@ -4,6 +4,7 @@ import { cn } from '../../utils/cn'
 import { TONE_STYLES } from '../../utils/tone'
 import type { Tone } from '../../utils/tone'
 import type { PatientCareStatus } from '../../domain/patientSelectors'
+import { formatTime } from '../../domain/time'
 
 interface Mark {
   icon: LucideIcon
@@ -23,13 +24,13 @@ function marksFor(status: PatientCareStatus): Mark[] {
     marks.push({ icon, tone: admitted.critical ? 'critical' : 'info', label, detail: admitted.bed })
   }
   if (outpatient) {
-    const when = outpatient.token ? `Token ${outpatient.token}` : outpatient.time
+    const when = outpatient.token ? `Token ${outpatient.token}` : outpatient.time ? formatTime(outpatient.time) : null
     const teleconsult = outpatient.mode === 'Teleconsult'
     marks.push({
       icon: teleconsult ? Video : Stethoscope,
       tone: teleconsult ? 'purple' : 'teal',
       label: [teleconsult ? 'Teleconsult' : 'Outpatient (OPD)', outpatient.doctor, when].filter(Boolean).join(' · '),
-      detail: outpatient.token ?? outpatient.time ?? 'OPD',
+      detail: outpatient.token ?? (outpatient.time ? formatTime(outpatient.time) : 'OPD'),
     })
   }
   return marks

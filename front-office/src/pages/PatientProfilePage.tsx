@@ -42,7 +42,7 @@ export function PatientProfilePage() {
     return (
       <div>
         <PageHeader title="Patient not found" />
-        <div className="px-6 py-6 lg:px-8">
+        <div className="mt-5 sm:mt-6">
           <Card accentTone="teal" className="max-w-xl">
             <CardBody>
               <EmptyState
@@ -72,7 +72,7 @@ export function PatientProfilePage() {
         }}
       />
 
-      <div className="grid grid-cols-1 gap-6 px-4 py-6 sm:px-6 lg:px-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px] mt-4 sm:mt-5">
         <div className="flex min-w-0 flex-col gap-6">
           {header.admission ? <CurrentAdmissionCard admission={header.admission} now={now} /> : null}
           <PatientTimeline

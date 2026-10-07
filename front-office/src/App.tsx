@@ -20,6 +20,7 @@ import { BillingPage } from './pages/BillingPage'
 import { InpatientsPage } from './pages/InpatientsPage'
 import { PaymentDetailPage } from './pages/PaymentDetailPage'
 import { PaymentReceiptPage } from './pages/PaymentReceiptPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 import { todayKey } from './domain/time'
 import { useStoreValue } from './hooks/useStore'
 import { getAdmissionById } from './domain/admissionSelectors'
@@ -85,7 +86,7 @@ function App() {
   return (
     <ThemeProvider>
       <ToastProvider>
-          <Routes>
+        <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<FrontOfficeHomePage />} />
 
@@ -156,10 +157,12 @@ function App() {
             <Route path="/front-office/attendant-pass" element={<Navigate to="/services/guest-pass" replace />} />
             <Route path="/front-office/enquiry" element={<Navigate to="/services/enquiry" replace />} />
             <Route path="/front-office/mlc" element={<Navigate to="/services/mlc" replace />} />
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+            {/* Anything else: say so, inside the shell, instead of silently
+                landing on the dashboard. */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
+        </Routes>
       </ToastProvider>
     </ThemeProvider>
   )

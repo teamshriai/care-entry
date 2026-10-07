@@ -22,6 +22,7 @@ import { cn } from '../utils/cn'
 import { nationalMobile } from '../utils/phone'
 import { abhaError, ageError, ageNeedsConfirmation, mobileError, nameError, nextAgeInput, nextNameInput, sexError } from '../utils/validation'
 import type { Patient, Sex } from '../types/patient'
+import { errorClass, inputClass } from '../utils/formClasses'
 
 const SEXES: Sex[] = ['Male', 'Female', 'Other']
 
@@ -120,7 +121,7 @@ export function RegisterPatientPage() {
     // booking their first appointment. `replace` drops the filled-in form from
     // history, so Back never lands on it again.
     return (
-      <div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center px-6 py-10">
+      <div className="flex min-h-[60dvh] items-center justify-center py-6">
         <Card accentTone="teal" className="w-full max-w-md">
           <AckCard
             title="Patient Created"
@@ -159,7 +160,7 @@ export function RegisterPatientPage() {
     <div>
       <PageHeader title="Register Patient" subtitle="Create a new patient record and allocate a UHID. The registration fee is billed to the billing counter." />
 
-      <div className="grid grid-cols-1 gap-6 px-6 py-6 lg:px-8 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)] mt-4 sm:mt-5">
         <Card accentTone="teal" className="min-w-0">
           <CardHeader icon={UserPlus} iconTone="teal" title="Patient details" />
           <CardBody>
@@ -191,7 +192,7 @@ export function RegisterPatientPage() {
                     maxLength={3}
                     placeholder="0–130"
                     aria-invalid={Boolean(shown('age'))}
-                    className={cn(inputClass, (shown('age') || needsAgeConfirm) && errorClass, needsAgeConfirm && 'font-semibold text-critical')}
+                    className={cn(inputClass, (shown('age') || needsAgeConfirm) && errorClass, needsAgeConfirm && 'font-semibold text-critical-fg')}
                   />
                 </Field>
                 <Field label="Sex" required error={shown('sex')}>
@@ -207,12 +208,12 @@ export function RegisterPatientPage() {
                           touch('sex')()
                         }}
                         className={cn(
-                          'flex-1 rounded-lg border px-2 py-2 text-sm font-medium transition-colors',
+                          'focus-ring min-h-11 flex-1 rounded-lg border px-2 py-2 text-sm font-medium transition-colors',
                           form.sex === option
-                            ? 'border-brand-600 bg-brand-600 text-white'
+                            ? 'border-primary-600 bg-primary-600 text-on-primary'
                             : shown('sex')
-                              ? 'border-critical bg-surface text-ink hover:bg-surface-muted'
-                              : 'border-border bg-surface text-ink hover:bg-surface-muted',
+                              ? 'border-critical-fg bg-surface-1 text-ink hover:bg-surface-2'
+                              : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
                         )}
                       >
                         {option}
@@ -284,7 +285,7 @@ export function RegisterPatientPage() {
 
         <div className="flex min-w-0 flex-col gap-6">
           {duplicates.length > 0 ? (
-            <Card accentTone="warning" className="border-warning-border bg-warning-bg/40">
+            <Card accentTone="warning" className="border-warning-fg/25 bg-warning-bg/40">
               <CardHeader
                 title="Possible existing patient found"
                 subtitle="Matched on mobile number, name or ABHA. Confirm before creating a second record."
@@ -293,7 +294,7 @@ export function RegisterPatientPage() {
                 {duplicates.map((candidate) => (
                   <div key={candidate.patientId} className="flex items-center justify-between gap-3 px-5 py-3">
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <Avatar initials={initialsOf(candidate.name)} size="sm" />
+                      <Avatar name={candidate.name} initials={initialsOf(candidate.name)} size="sm" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-ink">{candidate.name}</p>
                         <p className="truncate text-xs text-ink-muted">
@@ -328,9 +329,6 @@ export function RegisterPatientPage() {
   )
 }
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none transition-colors focus:border-brand-500 focus:ring-1 focus:ring-brand-500 placeholder:text-ink-faint'
-const errorClass = 'border-critical focus:border-critical focus:ring-critical'
 
 function Field({
   label,
@@ -350,10 +348,10 @@ function Field({
   return (
     <div>
       <label htmlFor={htmlFor} className="text-xs font-medium text-ink-muted">
-        {label} {required ? <span className="text-critical">*</span> : null}
+        {label} {required ? <span className="text-critical-fg">*</span> : null}
       </label>
       <div className="mt-1.5">{children}</div>
-      {error ? <FieldError message={error} /> : hint ? <p className="mt-1 text-xs text-ink-faint">{hint}</p> : null}
+      {error ? <FieldError message={error} /> : hint ? <p className="mt-1 text-xs text-ink-subtle">{hint}</p> : null}
     </div>
   )
 }

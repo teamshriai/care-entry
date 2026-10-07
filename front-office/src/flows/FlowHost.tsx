@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { isFlowName, readFlow, withoutFlow } from './flowParams'
 import type { FlowLocationState } from './flowParams'
 import { FLOWS } from './registry'
@@ -36,5 +39,19 @@ export function FlowHost() {
   }, [unknown, location.pathname, location.search, navigate])
 
   if (!active || !Flow) return null
-  return <Flow key={active.key} params={active.params} onClose={close} />
+  return (
+    <ErrorBoundary key={active.key} scope={`flow:${active.name}`} onDismiss={close} dismissLabel="Close" frame={flowErrorFrame}>
+      <Flow params={active.params} onClose={close} />
+    </ErrorBoundary>
+  )
+}
+
+/** A failed flow still shows over the page, where the desk was looking. */
+function flowErrorFrame(panel: ReactNode) {
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim sm:items-center sm:p-4">
+      <div className="w-full max-w-md rounded-t-2xl border border-border-soft bg-surface-1 shadow-modal sm:rounded-xl">{panel}</div>
+    </div>,
+    document.body,
+  )
 }

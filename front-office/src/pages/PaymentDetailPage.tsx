@@ -35,7 +35,7 @@ export function PaymentDetailPage() {
     return (
       <div>
         <PageHeader title="Bill not found" />
-        <div className="px-6 py-6 lg:px-8">
+        <div className="mt-5 sm:mt-6">
           <Card accentTone="stable" className="max-w-xl">
             <CardBody>
               <EmptyState
@@ -92,7 +92,7 @@ export function PaymentDetailPage() {
         }
       />
 
-      <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_340px]">
           <Card accentTone="stable" className="min-w-0">
@@ -140,7 +140,7 @@ export function PaymentDetailPage() {
                           {timestampLabel(row.at)} · {row.detail}
                         </p>
                       </div>
-                      <span className={row.failed ? 'font-medium tabular-nums text-critical line-through' : 'font-medium tabular-nums text-stable'}>
+                      <span className={row.failed ? 'font-medium tabular-nums text-critical-fg line-through' : 'font-medium tabular-nums text-success-fg'}>
                         {formatRupees(row.amount)}
                       </span>
                     </div>
@@ -192,7 +192,7 @@ export function PaymentDetailPage() {
                       )}
                     </>
                   ) : payment.status === 'Paid' || payment.status === 'Partially Paid' ? (
-                    <p className="text-sm font-medium text-stable">Payment received at the billing counter.</p>
+                    <p className="text-sm font-medium text-success-fg">Payment received at the billing counter.</p>
                   ) : (
                     <p className="text-xs text-ink-subtle">This bill is {payment.status.toLowerCase()}.</p>
                   )}

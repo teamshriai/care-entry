@@ -10,6 +10,8 @@ import { cn } from '../../utils/cn'
 import { billNumberFor, formatRupees } from '../../utils/billing'
 import type { Payment } from '../../types/payment'
 import { PatientStatusIcons } from '../patient/PatientStatusIcons'
+import { ResponsiveTable } from '../ui/ResponsiveTable'
+import type { Column } from '../ui/ResponsiveTable'
 import { usePatientCareStatus } from '../../hooks/useCareStatus'
 
 /** The bill list — the Billing page passes in whichever bills its filter
@@ -32,69 +34,113 @@ export function PaymentsTable({
     return <EmptyState icon={Receipt} title={emptyTitle} description={emptyDescription} />
   }
 
+  const columns: Column<Payment>[] = [
+    {
+      key: 'bill',
+      header: 'Bill no.',
+      className: 'whitespace-nowrap',
+      mobile: 'subtitle',
+      sortValue: (payment) => billNumberFor(payment),
+      cell: (payment) => (
+        <Link
+          to={`/payments/${payment.paymentId}`}
+          onClick={(event) => event.stopPropagation()}
+          className="focus-ring tap-reach rounded font-medium text-primary-text hover:underline"
+        >
+          {billNumberFor(payment)}
+        </Link>
+      ),
+    },
+    {
+      key: 'patient',
+      header: 'Patient',
+      mobile: 'title',
+      sortValue: (payment) => payment.patientName,
+      cell: (payment) => (
+        <>
+          <span className="flex min-w-0 items-center gap-1.5 text-ink tbl:max-w-[14rem]">
+            <span className="truncate" title={payment.patientName}>
+              {payment.patientName}
+            </span>
+            <PatientStatusIcons status={care[payment.patientId]} />
+          </span>
+          <span className="block text-2xs font-normal text-ink-subtle">{payment.patientId}</span>
+        </>
+      ),
+    },
+    {
+      key: 'when',
+      header: 'Date & Time',
+      className: 'whitespace-nowrap text-ink-muted',
+      sortValue: (payment) => payment.createdAt,
+      cell: (payment) => (
+        <>
+          <span className="tbl:block">{formatDateKey(todayKey(new Date(payment.createdAt)))}</span>
+          <span className="tbl:hidden"> · </span>
+          <span className="tabular-nums tbl:block tbl:text-xs tbl:text-ink-subtle">{formatClock(payment.createdAt)}</span>
+        </>
+      ),
+    },
+    {
+      key: 'description',
+      header: 'Description',
+      className: 'text-ink-muted',
+      cell: (payment) => (
+        <span className="block tbl:max-w-[10rem] tbl:truncate 2xl:max-w-[16rem]" title={payment.items.map((i) => i.description).join(', ')}>
+          {payment.items.map((item) => item.description).join(', ')}
+        </span>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      numeric: true,
+      className: 'whitespace-nowrap font-medium text-ink',
+      sortValue: (payment) => payment.totalAmount,
+      cell: (payment) => formatRupees(payment.totalAmount),
+    },
+    ...(showBalance
+      ? [
+          {
+            key: 'balance',
+            header: 'Balance',
+            numeric: true,
+            className: 'whitespace-nowrap font-medium',
+            sortValue: (payment: Payment) => payment.balance,
+            cell: (payment: Payment) => (
+              <span className={cn(payment.balance > 0 ? 'text-warning-fg' : 'text-ink-subtle')}>{formatRupees(payment.balance)}</span>
+            ),
+          } satisfies Column<Payment>,
+        ]
+      : []),
+    {
+      key: 'status',
+      header: 'Status',
+      className: 'whitespace-nowrap',
+      mobile: 'aside',
+      cell: (payment) => <BillStatusBadge payment={payment} />,
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">Actions</span>,
+      className: 'whitespace-nowrap text-right',
+      mobile: 'actions',
+      cell: (payment) =>
+        renderActions ? (
+          <div className="flex justify-end gap-1.5" onClick={(event) => event.stopPropagation()}>
+            {renderActions(payment)}
+          </div>
+        ) : null,
+    },
+  ]
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[880px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-border-soft text-left text-xs font-medium uppercase tracking-wide text-ink-faint">
-            <th className="px-5 py-2.5 font-medium">Bill no.</th>
-            <th className="px-5 py-2.5 font-medium">Patient</th>
-            <th className="px-5 py-2.5 font-medium">Date &amp; Time</th>
-            <th className="px-5 py-2.5 font-medium">Description</th>
-            <th className="px-5 py-2.5 font-medium text-right">Amount</th>
-            {showBalance ? <th className="px-5 py-2.5 font-medium text-right">Balance</th> : null}
-            <th className="px-5 py-2.5 font-medium">Status</th>
-            <th className="px-5 py-2.5 font-medium" />
-          </tr>
-        </thead>
-        <tbody>
-          {payments.map((payment) => (
-            <tr key={payment.paymentId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-subtle">
-              <td className="whitespace-nowrap px-5 py-3">
-                <Link to={`/payments/${payment.paymentId}`} className="font-medium text-primary-text hover:underline">
-                  {billNumberFor(payment)}
-                </Link>
-              </td>
-              <td className="px-5 py-3">
-                <p className="flex max-w-[14rem] items-center gap-1.5 text-ink">
-                  <span className="truncate" title={payment.patientName}>
-                    {payment.patientName}
-                  </span>
-                  <PatientStatusIcons status={care[payment.patientId]} />
-                </p>
-                <p className="text-2xs text-ink-faint">{payment.patientId}</p>
-              </td>
-              <td className="whitespace-nowrap px-5 py-3 text-ink-muted">
-                {formatDateKey(todayKey(new Date(payment.createdAt)))} · {formatClock(payment.createdAt)}
-              </td>
-              <td className="px-5 py-3 text-ink-muted">
-                <span className="block max-w-[16rem] truncate" title={payment.items.map((i) => i.description).join(', ')}>
-                  {payment.items.map((item) => item.description).join(', ')}
-                </span>
-              </td>
-              <td className="whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums text-ink">
-                {formatRupees(payment.totalAmount)}
-              </td>
-              {showBalance ? (
-                <td
-                  className={cn(
-                    'whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums',
-                    payment.balance > 0 ? 'text-warning' : 'text-ink-faint',
-                  )}
-                >
-                  {formatRupees(payment.balance)}
-                </td>
-              ) : null}
-              <td className="whitespace-nowrap px-5 py-3">
-                <BillStatusBadge payment={payment} />
-              </td>
-              <td className="whitespace-nowrap px-5 py-3 text-right">
-                <div className="flex justify-end gap-1.5">{renderActions?.(payment)}</div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ResponsiveTable
+      rows={payments}
+      columns={columns}
+      rowKey={(payment) => payment.paymentId}
+      caption="Bills"
+      showFooter
+    />
   )
 }

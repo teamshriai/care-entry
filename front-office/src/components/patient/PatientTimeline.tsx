@@ -10,7 +10,7 @@ import { BILL_STATUS_LABEL, BILL_STATUS_TONE } from '../../utils/billing'
 import { appointmentStatusLabel } from '../../utils/appointment'
 import { relativeDayLabel, formatDateKey } from '../../utils/dates'
 import { formatClock } from '../../utils/format'
-import { todayKey } from '../../domain/time'
+import { formatTime, todayKey } from '../../domain/time'
 import type { PatientTimeline as Timeline, TimelineKind, UpcomingItem } from '../../domain/patientSelectors'
 import type { BillDisplayStatus } from '../../types/payment'
 
@@ -82,7 +82,7 @@ export function PatientTimeline({
                   </span>
                   <div className="min-w-0 flex-1">
                     {event.paymentId ? (
-                      <Link to={`/payments/${event.paymentId}`} className="block truncate text-sm font-medium text-ink hover:text-primary-text">
+                      <Link to={`/payments/${event.paymentId}`} className="focus-ring -my-3 block truncate rounded py-3 text-sm font-medium text-ink hover:text-primary-text">
                         {event.title}
                       </Link>
                     ) : (
@@ -119,7 +119,7 @@ function UpcomingRow({
     return (
       <li className="flex items-center gap-3 px-5 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info-bg">
-          <Ticket className="h-4 w-4 text-info" strokeWidth={1.75} aria-hidden="true" />
+          <Ticket className="h-4 w-4 text-info-fg" strokeWidth={1.75} aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-ink">
@@ -138,16 +138,16 @@ function UpcomingRow({
   const tele = appointment.mode === 'Teleconsult'
   return (
     <li className="flex flex-wrap items-center gap-3 px-5 py-3">
-      <span className={tele ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-bg' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info-bg'}>
+      <span className={tele ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-therapy-bg' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info-bg'}>
         {tele ? (
-          <Video className="h-4 w-4 text-purple" strokeWidth={1.75} aria-hidden="true" />
+          <Video className="h-4 w-4 text-therapy-fg" strokeWidth={1.75} aria-hidden="true" />
         ) : (
-          <Stethoscope className="h-4 w-4 text-info" strokeWidth={1.75} aria-hidden="true" />
+          <Stethoscope className="h-4 w-4 text-info-fg" strokeWidth={1.75} aria-hidden="true" />
         )}
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-ink">
-          {relativeDayLabel(appointment.date, today)} · {appointment.slot} · {appointment.provider?.name ?? 'Doctor'}
+          {relativeDayLabel(appointment.date, today)} · {formatTime(appointment.slot)} · {appointment.provider?.name ?? 'Doctor'}
         </p>
         <p className="truncate text-xs text-ink-muted">
           {tele ? 'Teleconsult' : 'Outpatient encounter'} · {appointment.department}
@@ -156,7 +156,7 @@ function UpcomingRow({
       </div>
       <Badge status={appointment.status}>{appointmentStatusLabel(appointment.status)}</Badge>
       {unpaid && bill ? (
-        <Link to={`/payments/${bill.paymentId}`} className="text-xs font-semibold text-primary-text hover:underline">
+        <Link to={`/payments/${bill.paymentId}`} className="focus-ring tap-reach rounded text-xs font-semibold text-primary-text hover:underline">
           View bill
         </Link>
       ) : isToday ? (

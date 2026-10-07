@@ -46,7 +46,7 @@ export function PaymentReceiptPage() {
     return (
       <div>
         <PageHeader title="Receipt not found" />
-        <div className="px-6 py-6 lg:px-8">
+        <div className="mt-5 sm:mt-6">
           <Card accentTone="stable" className="max-w-xl">
             <CardBody>
               <EmptyState
@@ -76,12 +76,12 @@ export function PaymentReceiptPage() {
         }
       />
 
-      <div className="px-6 py-6 lg:px-8">
+      <div className="mt-5 sm:mt-6">
         <Card accentTone="stable" className="mx-auto max-w-xl">
           <CardBody className="flex flex-col gap-4">
             <div className="border-b border-border-soft pb-4 text-center">
               <p className="text-lg font-semibold tracking-tight text-ink">{facility.name}</p>
-              <p className="text-xs text-ink-faint">Facility code {facility.code}</p>
+              <p className="text-xs text-ink-subtle">Facility code {facility.code}</p>
               <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-ink-muted">Payment Receipt</p>
             </div>
 
@@ -94,7 +94,7 @@ export function PaymentReceiptPage() {
             </dl>
 
             <div className="border-t border-border-soft pt-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">Description</p>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-subtle">Description</p>
               <div className="space-y-1.5 text-sm">
                 {payment.items.map((item) => (
                   <div key={item.code} className="flex items-center justify-between">
@@ -110,7 +110,7 @@ export function PaymentReceiptPage() {
               <span className="text-lg font-semibold tabular-nums text-ink">{formatRupees(payment.paidAmount)}</span>
             </div>
             {payment.balance > 0 ? (
-              <div className="flex items-center justify-between text-sm text-warning">
+              <div className="flex items-center justify-between text-sm text-warning-fg">
                 <span>Balance due</span>
                 <span className="tabular-nums">{formatRupees(payment.balance)}</span>
               </div>
@@ -126,12 +126,12 @@ export function PaymentReceiptPage() {
             </div>
 
             {payment.refund ? (
-              <div className="rounded-lg border border-info-border bg-info-bg px-3 py-2.5 text-xs text-info">
+              <div className="rounded-lg border border-info-fg/25 bg-info-bg px-3 py-2.5 text-xs text-info-fg">
                 Refunded {formatRupees(payment.refund.amount)} on {timestampLabel(payment.refund.refundedAt)} — {payment.refund.reason}
               </div>
             ) : null}
 
-            <p className="border-t border-border-soft pt-3 text-center text-2xs text-ink-faint">
+            <p className="border-t border-border-soft pt-3 text-center text-2xs text-ink-subtle">
               Simulated receipt — no real payment gateway is connected in this build.
             </p>
           </CardBody>

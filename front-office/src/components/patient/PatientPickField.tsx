@@ -28,7 +28,7 @@ export function PatientPickField({
 
   if (patient && !changing) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2.5">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-primary-200 dark:border-primary-500/35 bg-primary-50 px-3 py-2.5">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink">{patient.name}</p>
           <p className="truncate text-xs text-ink-muted">

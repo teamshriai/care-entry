@@ -4,17 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="description" content="Register with SHRI HEALTH before your visit — your details reach the care team before you arrive." />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>SHRI HEALTH Patient Registration</title>
+    <meta name="theme-color" content="#E8EDF4" />
     <script>
-      try {
-        document.documentElement.setAttribute(
-          'data-theme',
-          localStorage.getItem('shri-theme-v3') === 'dark' ? 'dark' : 'light'
-        );
-      } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'light');
-      }
+      // Applies the saved theme before first paint so there is no flash of the
+      // other theme. Light is the default; keep the key in sync with
+      // src/ui/useTheme.ts.
+      (function () {
+        var dark = false;
+        try {
+          dark = localStorage.getItem('shri-theme-v3') === 'dark';
+        } catch (e) {
+          /* Blocked storage — light is the correct fallback. */
+        }
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#14181F' : '#E8EDF4');
+      })();
     </script>
   </head>
   <body>

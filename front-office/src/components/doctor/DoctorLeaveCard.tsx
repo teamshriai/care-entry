@@ -12,7 +12,7 @@ import { useToast } from '../../hooks/useToast'
 import { useFlow } from '../../flows/useFlow'
 import { getDoctorDayBookings, getDoctorLeaves, getDoctorQueueCount } from '../../domain/selectors'
 import { addDoctorLeave, cancelDoctorDayBookings, removeDoctorLeave } from '../../domain/actions'
-import { todayKey } from '../../domain/time'
+import { formatTime, todayKey } from '../../domain/time'
 import { formatRupees } from '../../utils/billing'
 import { formatDateKey } from '../../utils/dates'
 
@@ -83,7 +83,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
               setDate(event.target.value)
             }}
             aria-label="Leave date"
-            className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
+            className="focus-ring min-h-11 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink"
           />
           <input
             value={reason}
@@ -91,7 +91,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
             placeholder="Reason"
             aria-label="Reason"
             maxLength={60}
-            className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
+            className="focus-ring min-h-11 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink"
           />
 
           {queueBlocks ? (
@@ -101,8 +101,8 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
           ) : null}
 
           {bookings.length > 0 ? (
-            <div className="flex flex-col gap-2 rounded-xl border border-warning-border bg-warning-bg/40 p-3">
-              <p className="text-xs font-medium text-warning">
+            <div className="flex flex-col gap-2 rounded-xl border border-warning-fg/25 bg-warning-bg/40 p-3">
+              <p className="text-xs font-medium text-warning-fg">
                 {bookings.length} booking{bookings.length === 1 ? '' : 's'} on {formatDateKey(date)} — move or cancel {bookings.length === 1 ? 'it' : 'them'} first.
               </p>
               <ul className="divide-y divide-border-soft">
@@ -110,7 +110,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
                   <li key={appointment.appointmentId} className="flex flex-wrap items-center gap-2 py-2">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-ink">
-                        {appointment.slot} · {patient?.name ?? 'Patient'}
+                        {formatTime(appointment.slot)} · {patient?.name ?? 'Patient'}
                       </span>
                       <span className="block text-xs text-ink-muted">{formatRupees(paid)} paid</span>
                     </span>
@@ -118,7 +118,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
                       <CalendarClock className="h-3.5 w-3.5" strokeWidth={1.75} />
                       Reschedule
                     </Button>
-                    <Button type="button" size="sm" variant="ghost" className="text-critical" onClick={() => setCancelling(appointment.appointmentId)}>
+                    <Button type="button" size="sm" variant="ghost" className="text-critical-fg" onClick={() => setCancelling(appointment.appointmentId)}>
                       Cancel
                     </Button>
                   </li>
@@ -137,7 +137,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
         </form>
 
         {leaves.length === 0 ? (
-          <p className="text-xs text-ink-faint">No leave recorded.</p>
+          <p className="text-xs text-ink-subtle">No leave recorded.</p>
         ) : (
           <div className="divide-y divide-border-soft border-t border-border-soft">
             {leaves.map((leave) => (
@@ -149,7 +149,7 @@ export function DoctorLeaveCard({ providerId, providerName }: { providerId: stri
                 <button
                   type="button"
                   onClick={() => run(() => removeDoctorLeave(leave.leaveId), 'Leave removed', formatDateKey(leave.date))}
-                  className="rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-muted hover:text-critical"
+                  className="focus-ring tap-target rounded-lg text-ink-subtle transition-colors hover:bg-surface-2 hover:text-critical-fg"
                   aria-label={`Remove leave on ${formatDateKey(leave.date)}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CORRECT_OTP, MAX_OTP_ATTEMPTS, maskMobile } from '../data';
-import { Icon, IconBadge } from './Icon';
+import { Alert, Card, SampleChip, SampleHint, StepHeader, StepNav, StepSub, TextButton } from '../ui/kit';
+import { OtpInput } from '../ui/OtpInput';
 
 export function Step2Otp({
   mobile,
@@ -16,111 +17,89 @@ export function Step2Otp({
   onNext?: () => void;
   nextDisabled?: boolean;
 }) {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState('');
   const [resendSeconds, setResendSeconds] = useState(30);
   const [verifying, setVerifying] = useState(false);
-  const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
+  const done = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const t = setInterval(() => setResendSeconds((s) => (s > 0 ? s - 1 : s)), 1000);
-    return () => clearInterval(t);
+    return () => {
+      clearInterval(t);
+      window.clearTimeout(done.current);
+    };
   }, []);
 
-  function verify(joined: string) {
-    if (joined === CORRECT_OTP) {
+  function verify(code: string) {
+    if (attempts >= MAX_OTP_ATTEMPTS) {
+      setError('Attempt limit reached. Request a new code.');
+      setOtp('');
+      return;
+    }
+    if (code === CORRECT_OTP) {
       setVerifying(true);
-      setTimeout(onVerified, 350); // brief celebratory pause
+      done.current = window.setTimeout(onVerified, 350); // a brief beat to show the success state
       return;
     }
     const next = attempts + 1;
     setAttempts(next);
-    setOtp(['', '', '', '', '', '']);
-    inputsRef.current[0]?.focus();
-    setError(
-      next >= MAX_OTP_ATTEMPTS
-        ? 'Attempt limit reached. Request a new code.'
-        : `Incorrect code. ${MAX_OTP_ATTEMPTS - next} attempts remaining.`
-    );
-  }
-
-  function handleChange(i: number, raw: string) {
-    const v = raw.replace(/\D/g, '').slice(-1);
-    const next = [...otp];
-    next[i] = v;
-    setOtp(next);
-    setError('');
-    if (v && i < 5) inputsRef.current[i + 1]?.focus();
-    if (v && i === 5) {
-      const joined = next.join('');
-      if (joined.length === 6) verify(joined);
-    }
-  }
-
-  function handleKeyDown(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !otp[i] && i > 0) inputsRef.current[i - 1]?.focus();
+    setOtp('');
+    setError(next >= MAX_OTP_ATTEMPTS ? 'Attempt limit reached. Request a new code.' : `Incorrect code. ${MAX_OTP_ATTEMPTS - next} attempts remaining.`);
   }
 
   function handleResend() {
-    setOtp(['', '', '', '', '', '']);
+    setOtp('');
     setAttempts(0);
     setError('');
     setResendSeconds(30);
-    inputsRef.current[0]?.focus();
   }
 
   return (
-    <div className="card step-enter card--center" style={{ textAlign: 'center' }}>
-      <div className="step-nav">
-        <button className="btn-text" onClick={onBack}>← Back</button>
-        {onNext && (
-          <button
-            className="btn-next"
-            onClick={onNext}
-            disabled={nextDisabled}
-            title={nextDisabled ? 'Complete this step to continue' : 'Go to the next step'}
-          >
-            Next
-            <Icon name="chevron" size={14} />
-          </button>
-        )}
-      </div>
-      <div className="step-head" style={{ justifyContent: 'center' }}>
-        <IconBadge name="shieldCheck" />
-        <h2 className="step-title">Mobile verification</h2>
-      </div>
-      <p className="step-sub" style={{ margin: '10px auto 28px' }}>
-        A six-digit verification code has been sent to <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>{maskMobile(mobile)}</strong>
-      </p>
+    <Card center>
+      <StepNav onBack={onBack} onNext={onNext} nextDisabled={nextDisabled} />
+      <StepHeader icon="shieldCheck" title="Mobile verification" center />
+      <StepSub className="mx-auto mb-7 max-w-md">
+        A six-digit verification code has been sent to <strong className="font-semibold text-ink">{maskMobile(mobile)}</strong>
+      </StepSub>
 
-      <div className="otp-row">
-        {otp.map((v, i) => (
-          <input
-            key={i}
-            ref={(el) => { inputsRef.current[i] = el; }}
-            className={`otp-box ${verifying ? 'otp-box--success' : ''}`}
-            maxLength={1}
-            inputMode="numeric"
-            value={v}
-            onChange={(e) => handleChange(i, e.target.value)}
-            onKeyDown={(e) => handleKeyDown(i, e)}
-          />
-        ))}
+      <OtpInput
+        value={otp}
+        onChange={(next) => {
+          setOtp(next);
+          setError('');
+        }}
+        onComplete={verify}
+        success={verifying}
+        invalid={Boolean(error)}
+        autoFocus
+        className="mx-auto"
+      />
+
+      <div className="mx-auto mt-5 max-w-md space-y-3 text-left">
+        {error ? <Alert tone="error">{error}</Alert> : null}
+        {verifying ? <Alert tone="success">Verified</Alert> : null}
       </div>
 
-      {error && <div className="alert alert-error" style={{ justifyContent: 'center', marginBottom: 16 }}>{error}</div>}
-      {verifying && <div className="alert alert-success" style={{ justifyContent: 'center', marginBottom: 16 }}>Verified!</div>}
-
-      <div style={{ fontSize: 13, color: 'var(--ink-2)', marginBottom: 20 }}>
+      <div className="mt-4 text-sm text-ink-muted" aria-live="polite">
         {resendSeconds <= 0 ? (
-          <button className="btn-text" onClick={handleResend}>Request a new code</button>
+          <TextButton onClick={handleResend}>Request a new code</TextButton>
         ) : (
-          <span>A new code may be requested in 0:{resendSeconds < 10 ? '0' + resendSeconds : resendSeconds}</span>
+          <span>A new code may be requested in {resendSeconds}s</span>
         )}
       </div>
 
-      <p style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>Sample code: <strong>123456</strong></p>
-    </div>
+      <SampleHint label="Sample code:">
+        <SampleChip
+          onClick={() => {
+            setOtp(CORRECT_OTP);
+            verify(CORRECT_OTP);
+          }}
+        >
+          {CORRECT_OTP}
+        </SampleChip>
+      </SampleHint>
+    </Card>
   );
 }

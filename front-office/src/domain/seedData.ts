@@ -18,7 +18,7 @@
 // derived from exactly the shapes built below and consumed by
 // selectors.ts/actions.ts.
 // ============================================================================
-import { todayKey, dayStartTimestamp, slotToTimestamp, roundDownToStep, slotLabel } from './time'
+import { dayStartTimestamp, formatTime, roundDownToStep, slotLabel, slotToTimestamp, todayKey } from './time'
 import type { AppState, TokenCounters } from '../types/store'
 import type { Patient } from '../types/patient'
 import type { Provider } from '../types/doctor'
@@ -123,6 +123,54 @@ export function createSeedState(): AppState {
   const sessionStart = clamp(roundDownToStep(now - 150 * MINUTE, 15), earliest, latest - 240 * MINUTE)
   const sessionEnd = clamp(roundDownToStep(now + 210 * MINUTE, 15), sessionStart + 180 * MINUTE, latest)
   const t = (ts: number) => slotLabel(ts)
+
+  /** One more doctor in the seed's own shape — contact details from a
+   *  handle, Active, working every day on the session given. */
+  const seedDoctor = (d: {
+    providerId: string
+    name: string
+    gender: Provider['gender']
+    dateOfBirth: string
+    mobile: string
+    handle: string
+    department: string
+    specialty: string
+    qualification: string
+    registrationNumber: string
+    experienceYears: number
+    employeeId: string
+    consultationType: Provider['consultationType']
+    consultationFee: number
+    room: string
+    role: Provider['role']
+    start: number
+    end: number
+    slotMinutes: number
+    breaks?: { start: string; end: string }[]
+    /** How long ago the profile was created. */
+    days: number
+  }): Provider => ({
+    providerId: d.providerId,
+    name: d.name,
+    gender: d.gender,
+    dateOfBirth: d.dateOfBirth,
+    mobile: d.mobile,
+    email: `${d.handle}@shrimedical.mock`,
+    department: d.department,
+    specialty: d.specialty,
+    qualification: d.qualification,
+    registrationNumber: d.registrationNumber,
+    experienceYears: d.experienceYears,
+    employeeId: d.employeeId,
+    consultationType: d.consultationType,
+    consultationFee: d.consultationFee,
+    room: d.room,
+    loginEmail: `${d.handle}@shrimedical.mock`,
+    role: d.role,
+    status: 'Active',
+    schedule: { workingDays: ALL_DAYS, startTime: t(d.start), endTime: t(Math.max(d.end, d.start + 120 * MINUTE)), slotMinutes: d.slotMinutes, breaks: d.breaks ?? [] },
+    createdAt: minutesAgo(d.days * 24 * 60),
+  })
 
   const providers: Provider[] = [
     {
@@ -310,6 +358,72 @@ export function createSeedState(): AppState {
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 15, breaks: [] },
       createdAt: minutesAgo(250 * 24 * 60),
     },
+    // Every department has at least three doctors (ten more below), so the
+    // desk always has a real choice — the same records drive the directory,
+    // booking, Doctor Availability and every filter.
+    seedDoctor({
+      providerId: 'dr-sanjay-iyer', name: 'Dr. Sanjay Iyer', gender: 'Male', dateOfBirth: '1979-02-14', mobile: '+91 98456 20341', handle: 'sanjay.iyer',
+      department: 'Neurology', specialty: 'Movement Disorders', qualification: 'MBBS, MD, DM (Neurology)', registrationNumber: 'KMC-55617', experienceYears: 15,
+      employeeId: 'SHRI-DOC-044', consultationType: 'Outpatient', consultationFee: 850, room: 'Room 15, Block B', role: 'Consultant',
+      start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 280,
+    }),
+    seedDoctor({
+      providerId: 'dr-revathi-reddy', name: 'Dr. Revathi Reddy', gender: 'Female', dateOfBirth: '1983-11-02', mobile: '+91 98457 41190', handle: 'revathi.reddy',
+      department: 'Cardiology', specialty: 'Cardiac Electrophysiology', qualification: 'MBBS, MD, DM (Cardiology)', registrationNumber: 'KMC-60482', experienceYears: 11,
+      employeeId: 'SHRI-DOC-047', consultationType: 'Outpatient + Teleconsult', consultationFee: 950, room: 'Room 5, Block A', role: 'Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 190,
+      // A lunch break in the afternoon part of her session.
+      breaks: [{ start: t(sessionStart + 180 * MINUTE), end: t(sessionStart + 210 * MINUTE) }],
+    }),
+    seedDoctor({
+      providerId: 'dr-harish-menon', name: 'Dr. Harish Menon', gender: 'Male', dateOfBirth: '1972-06-25', mobile: '+91 98458 77012', handle: 'harish.menon',
+      department: 'Cardiology', specialty: 'Heart Failure & Preventive Cardiology', qualification: 'MBBS, MD, DM (Cardiology)', registrationNumber: 'KMC-41275', experienceYears: 21,
+      employeeId: 'SHRI-DOC-009', consultationType: 'Outpatient', consultationFee: 900, room: 'Room 6, Block A', role: 'Senior Consultant',
+      start: sessionStart + 60 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 820,
+    }),
+    seedDoctor({
+      providerId: 'dr-farah-ahmed', name: 'Dr. Farah Ahmed', gender: 'Female', dateOfBirth: '1988-04-19', mobile: '+91 98459 30558', handle: 'farah.ahmed',
+      department: 'General Medicine', specialty: 'Family Medicine', qualification: 'MBBS, MD (Family Medicine)', registrationNumber: 'TNMC-90417', experienceYears: 7,
+      employeeId: 'SHRI-DOC-051', consultationType: 'Outpatient + Teleconsult', consultationFee: 550, room: 'Room 3, Block A', role: 'Associate Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 120,
+    }),
+    seedDoctor({
+      providerId: 'dr-ashwin-kamath', name: 'Dr. Ashwin Kamath', gender: 'Male', dateOfBirth: '1984-09-07', mobile: '+91 98460 12873', handle: 'ashwin.kamath',
+      department: 'Orthopedics', specialty: 'Sports Medicine & Arthroscopy', qualification: 'MBBS, MS (Orthopaedics)', registrationNumber: 'KMC-63911', experienceYears: 10,
+      employeeId: 'SHRI-DOC-038', consultationType: 'Outpatient', consultationFee: 750, room: 'Room 9, Block C', role: 'Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 20, days: 340,
+    }),
+    seedDoctor({
+      providerId: 'dr-nandini-hegde', name: 'Dr. Nandini Hegde', gender: 'Female', dateOfBirth: '1980-12-03', mobile: '+91 98461 56024', handle: 'nandini.hegde',
+      department: 'Orthopedics', specialty: 'Spine & Trauma', qualification: 'MBBS, MS (Orthopaedics), FNB (Spine)', registrationNumber: 'KMC-50734', experienceYears: 14,
+      employeeId: 'SHRI-DOC-027', consultationType: 'Outpatient', consultationFee: 800, room: 'Room 10, Block C', role: 'Consultant',
+      start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 30, days: 510,
+    }),
+    seedDoctor({
+      providerId: 'dr-suresh-pillai', name: 'Dr. Suresh Pillai', gender: 'Male', dateOfBirth: '1969-03-28', mobile: '+91 98462 90317', handle: 'suresh.pillai',
+      department: 'Neurosurgery', specialty: 'Spine Surgery', qualification: 'MBBS, MS, MCh (Neurosurgery)', registrationNumber: 'TNMC-47902', experienceYears: 25,
+      employeeId: 'SHRI-DOC-005', consultationType: 'Outpatient', consultationFee: 1100, room: 'Room 17, Block B', role: 'Senior Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 30, days: 900,
+    }),
+    seedDoctor({
+      providerId: 'dr-divya-raghavan', name: 'Dr. Divya Raghavan', gender: 'Female', dateOfBirth: '1985-07-16', mobile: '+91 98463 22148', handle: 'divya.raghavan',
+      department: 'Neurosurgery', specialty: 'Paediatric Neurosurgery', qualification: 'MBBS, MS, MCh (Neurosurgery)', registrationNumber: 'KMC-66205', experienceYears: 9,
+      employeeId: 'SHRI-DOC-049', consultationType: 'Outpatient + Teleconsult', consultationFee: 1150, room: 'Room 18, Block B', role: 'Consultant',
+      // Starts after her morning theatre list.
+      start: sessionStart + 90 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 230,
+    }),
+    seedDoctor({
+      providerId: 'dr-arvind-shetty', name: 'Dr. Arvind Shetty', gender: 'Male', dateOfBirth: '1982-01-30', mobile: '+91 98464 71530', handle: 'arvind.shetty',
+      department: 'Emergency Medicine', specialty: 'Acute Medicine', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'KMC-58840', experienceYears: 12,
+      employeeId: 'SHRI-DOC-033', consultationType: 'Outpatient', consultationFee: 700, room: 'Emergency Block, Bay 3', role: 'Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 310,
+    }),
+    seedDoctor({
+      providerId: 'dr-swetha-venkat', name: 'Dr. Swetha Venkat', gender: 'Female', dateOfBirth: '1990-10-11', mobile: '+91 98465 08623', handle: 'swetha.venkat',
+      department: 'Emergency Medicine', specialty: 'Trauma Care', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'TNMC-93361', experienceYears: 6,
+      employeeId: 'SHRI-DOC-053', consultationType: 'Outpatient', consultationFee: 700, room: 'Emergency Block, Bay 4', role: 'Associate Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 95,
+    }),
   ]
 
   // Dr. Meera Shah is on approved leave today — drives the "On leave" status.
@@ -548,7 +662,7 @@ export function createSeedState(): AppState {
         differencePaymentId: null,
       }
       appointment.reschedules.push(entry)
-      logAt(moved.at, 'Appointment rescheduled', `${p.name} · ${from.name} ${entry.from.date} ${entry.from.slot} → ${provider.name} ${date} ${slot} · ${moved.by === 'Doctor' ? 'doctor unavailable' : 'patient’s request'}`)
+      logAt(moved.at, 'Appointment rescheduled', `${p.name} · ${from.name} ${entry.from.date} ${formatTime(entry.from.slot)} → ${provider.name} ${date} ${formatTime(slot)} · ${moved.by === 'Doctor' ? 'doctor unavailable' : 'patient’s request'}`)
       const difference = provider.consultationFee - from.consultationFee
       if (difference > 0 && moved.by === 'Patient') {
         const differenceBill = pushBill({
@@ -563,8 +677,8 @@ export function createSeedState(): AppState {
       }
     }
     const first = appointment.reschedules[0]?.from ?? { date, slot }
-    logAt(bookedAt, 'Appointment booked', `${p.name} → ${from.name} at ${first.slot}${first.date === today ? '' : ` on ${first.date}`}`)
-    if (seed.cancel) logAt(seed.cancel.at, 'Appointment cancelled', `${p.name} · ${slot} · ${seed.cancel.reason}`)
+    logAt(bookedAt, 'Appointment booked', `${p.name} → ${from.name} at ${formatTime(first.slot)}${first.date === today ? '' : ` on ${first.date}`}`)
+    if (seed.cancel) logAt(seed.cancel.at, 'Appointment cancelled', `${p.name} · ${formatTime(slot)} · ${seed.cancel.reason}`)
 
     // A moved booking was paid for its first doctor; its line now names the
     // doctor the patient will see.
@@ -673,11 +787,21 @@ export function createSeedState(): AppState {
   })
   book({ patientId: 'SHRI-0057164', providerId: 'dr-vikram-das', day: 7, slotIndex: 1, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(100), reason: 'Follow-up', mode: 'Teleconsult' })
 
+  // The newer doctors — referrals later today from this morning's patients,
+  // and visits on the coming days, so their hours read as real.
+  book({ patientId: 'SHRI-0057164', providerId: 'dr-revathi-reddy', offset: 4, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(70), reason: 'Referred by Dr. Vikram Das — palpitations' })
+  book({ patientId: 'SHRI-0063390', providerId: 'dr-ashwin-kamath', offset: 3, status: 'Confirmed', method: 'Card', bookedAt: minutesAgo(95), reason: 'Knee pain' })
+  book({ patientId: 'SHRI-0083041', providerId: 'dr-sanjay-iyer', offset: 3, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(1), reason: 'Tremor review' })
+  book({ patientId: 'SHRI-0087576', providerId: 'dr-farah-ahmed', day: 1, slotIndex: 2, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(40), reason: 'Fever follow-up' })
+  book({ patientId: 'SHRI-0098647', providerId: 'dr-suresh-pillai', day: 2, slotIndex: 1, status: 'Confirmed', method: 'Card', bookedAt: daysAgo(1), reason: 'Lower back pain — MRI review' })
+  book({ patientId: 'SHRI-0108815', providerId: 'dr-harish-menon', day: 3, slotIndex: 3, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(2), reason: 'Breathlessness on exertion' })
+  book({ patientId: 'SHRI-0048305', providerId: 'dr-nandini-hegde', day: 1, slotIndex: 4, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(180), reason: 'Neck pain' })
+
   // Visits and tokens in arrival order; token numbers run per department.
   const visits: Visit[] = []
   const queueTokens: QueueToken[] = []
-  const tokenCounters: TokenCounters = { NEU: 0, CAR: 0, MED: 0, ORT: 0 }
-  const PREFIX: Record<string, string> = { Neurology: 'NEU', Cardiology: 'CAR', 'General Medicine': 'MED', Orthopedics: 'ORT' }
+  const tokenCounters: TokenCounters = { NEU: 0, CAR: 0, MED: 0, ORT: 0, NSG: 0, EMG: 0 }
+  const PREFIX: Record<string, string> = { Neurology: 'NEU', Cardiology: 'CAR', 'General Medicine': 'MED', Orthopedics: 'ORT', Neurosurgery: 'NSG', 'Emergency Medicine': 'EMG' }
   encounters.sort((a, b) => a.arrival - b.arrival)
   encounters.forEach((encounter, index) => {
     const visitId = `visit-${index + 1}`

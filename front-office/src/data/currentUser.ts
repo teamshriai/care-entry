@@ -19,8 +19,8 @@ export interface CurrentUser {
 // (MRD persona only) and no facility.admin (overbooking policy, P-02 only).
 const FRONT_OFFICE: Capability[] = ['registration.write', 'appointment.write']
 
-/** The front-office staff who can sign in at this desk — the name card in
- *  the app bar switches between them. */
+/** The front-office staff of this desk. Only one is signed in for now; the
+ *  rest will sign in through a login page when one exists. */
 export const FRONT_OFFICE_STAFF: CurrentUser[] = [
   { staffId: 'meera-iyer', name: 'Meera Iyer', role: 'Care Entry Executive', initials: 'MI', facilityId: 'shri-main', capabilities: FRONT_OFFICE },
   { staffId: 'pradeep-nambiar', name: 'Pradeep Nambiar', role: 'Front Office Executive', initials: 'PN', facilityId: 'shri-main', capabilities: FRONT_OFFICE },
@@ -29,6 +29,5 @@ export const FRONT_OFFICE_STAFF: CurrentUser[] = [
   { staffId: 'sowmya-deepak', name: 'Sowmya Deepak', role: 'Front Office Supervisor', initials: 'SD', facilityId: 'shri-main', capabilities: FRONT_OFFICE },
 ]
 
-/** Who is signed in when nobody has switched — and the facility every
- *  desk member belongs to. */
-export const currentFrontOfficeUser: CurrentUser = FRONT_OFFICE_STAFF[0]
+/** Who is signed in at this desk. */
+export const currentFrontOfficeUser: CurrentUser = FRONT_OFFICE_STAFF.find((s) => s.staffId === 'gokul-anand')!

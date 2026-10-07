@@ -5,6 +5,7 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
+import { ResponsiveTable } from '../components/ui/ResponsiveTable'
 import { PatientPickField } from '../components/patient/PatientPickField'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
@@ -98,7 +99,7 @@ export function EnquiryEstimatePage() {
         subtitle="Published rate card and cost estimates. Rates are a straight lookup from the hospital tariff — never predicted."
       />
 
-      <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         {/* Patient gate — every estimate belongs to one patient */}
         <Card accentTone="cyan">
           <CardBody className="flex flex-col gap-2 lg:max-w-xl">
@@ -119,20 +120,22 @@ export function EnquiryEstimatePage() {
           {/* Available services */}
           <Card accentTone="stable" className="min-w-0">
             <CardHeader icon={Receipt} iconTone="stable" title="Available Services" subtitle="Displayed rates for enquiries at the counter" />
-            <div className="flex flex-col gap-3 border-b border-border-soft p-4 lg:flex-row lg:items-center">
-              <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-surface px-3 focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500">
-                <Search className="h-4 w-4 shrink-0 text-ink-faint" strokeWidth={1.75} />
+            <div className="flex flex-col gap-3 border-b border-border-soft p-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border-soft bg-surface-1 px-3 transition-colors hover:border-border-strong focus-within:border-primary-600 focus-within:ring-4 focus-within:ring-primary-600/10">
+                <Search className="h-4 w-4 shrink-0 text-ink-subtle" strokeWidth={1.75} />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder="Search services..."
-                  className="h-9 w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-faint"
+                  aria-label="Search services"
+                  className="min-h-11 w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-subtle"
                 />
               </div>
               <select
                 value={department}
                 onChange={(event) => setDepartment(event.target.value)}
-                className="h-9 rounded-lg border border-border bg-surface px-3 text-sm text-ink outline-none focus:border-brand-500"
+                aria-label="Department"
+                className="focus-ring min-h-11 rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink"
               >
                 <option>All departments</option>
                 {departments.map((option) => (
@@ -144,44 +147,53 @@ export function EnquiryEstimatePage() {
             {filtered.length === 0 ? (
               <EmptyState icon={Search} title="No services match" description="Try a different search or department." />
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-border-soft text-left text-xs font-medium uppercase tracking-wide text-ink-faint">
-                      <th className="px-5 py-2.5 font-medium">Service</th>
-                      <th className="px-5 py-2.5 font-medium">Department</th>
-                      <th className="px-5 py-2.5 font-medium text-right">Rate</th>
-                      <th className="px-5 py-2.5 font-medium" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((tariff) => (
-                      <tr key={tariff.code} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-subtle">
-                        <td className="px-5 py-3">
-                          <p className="font-medium text-ink">{tariff.name}</p>
-                          <p className="text-2xs text-ink-faint">{tariff.code}</p>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{tariff.department}</td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right font-medium tabular-nums text-ink">
-                          {formatRupees(tariff.rate)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-right">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            disabled={!patient}
-                            title={patient ? undefined : 'Select a patient first'}
-                            onClick={() => handleAdd(tariff)}
-                          >
-                            <Plus className="h-3.5 w-3.5 text-stable" strokeWidth={2} />
-                            Add
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ResponsiveTable
+                rows={filtered}
+                rowKey={(tariff) => tariff.code}
+                caption="Available services"
+                columns={[
+                  {
+                    key: 'service',
+                    header: 'Service',
+                    mobile: 'title',
+                    sortValue: (tariff) => tariff.name,
+                    cell: (tariff) => (
+                      <>
+                        <span className="block font-medium text-ink">{tariff.name}</span>
+                        <span className="block text-2xs font-normal text-ink-subtle">{tariff.code}</span>
+                      </>
+                    ),
+                  },
+                  { key: 'department', header: 'Department', className: 'whitespace-nowrap text-ink-muted', sortValue: (tariff) => tariff.department, cell: (tariff) => tariff.department },
+                  {
+                    key: 'rate',
+                    header: 'Rate',
+                    numeric: true,
+                    mobile: 'aside',
+                    className: 'whitespace-nowrap font-medium text-ink',
+                    sortValue: (tariff) => tariff.rate,
+                    cell: (tariff) => formatRupees(tariff.rate),
+                  },
+                  {
+                    key: 'actions',
+                    header: <span className="sr-only">Actions</span>,
+                    className: 'whitespace-nowrap text-right',
+                    mobile: 'actions',
+                    cell: (tariff) => (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!patient}
+                        title={patient ? undefined : 'Select a patient first'}
+                        onClick={() => handleAdd(tariff)}
+                      >
+                        <Plus size={14} className="text-success-fg" aria-hidden="true" />
+                        Add
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
             )}
           </Card>
 
@@ -217,7 +229,7 @@ export function EnquiryEstimatePage() {
                                 onClick={() => handleQuantity(item.code, quantity - 1)}
                                 disabled={quantity <= 1}
                                 aria-label={`Decrease quantity for ${item.name}`}
-                                className="flex h-6 w-6 items-center justify-center rounded text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:pointer-events-none disabled:opacity-40"
+                                className="focus-ring tap-reach flex h-7 w-7 items-center justify-center rounded text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:pointer-events-none disabled:opacity-40"
                               >
                                 <Minus className="h-3 w-3" strokeWidth={2} />
                               </button>
@@ -226,7 +238,7 @@ export function EnquiryEstimatePage() {
                                 type="button"
                                 onClick={() => handleQuantity(item.code, quantity + 1)}
                                 aria-label={`Increase quantity for ${item.name}`}
-                                className="flex h-6 w-6 items-center justify-center rounded text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
+                                className="focus-ring tap-reach flex h-7 w-7 items-center justify-center rounded text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
                               >
                                 <Plus className="h-3 w-3" strokeWidth={2} />
                               </button>
@@ -238,7 +250,7 @@ export function EnquiryEstimatePage() {
                               type="button"
                               onClick={() => handleRemove(item.code)}
                               aria-label={`Remove ${item.name}`}
-                              className="rounded p-1.5 text-ink-faint transition-colors hover:bg-surface-muted hover:text-critical"
+                              className="focus-ring tap-target rounded-lg text-ink-subtle transition-colors hover:bg-surface-2 hover:text-critical-fg"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -256,7 +268,7 @@ export function EnquiryEstimatePage() {
                   </div>
                 ) : null}
 
-                <p className="text-xs text-ink-faint">
+                <p className="text-xs text-ink-subtle">
                   An estimate is not an invoice — sending it raises the bill, paid at the billing counter.
                 </p>
 

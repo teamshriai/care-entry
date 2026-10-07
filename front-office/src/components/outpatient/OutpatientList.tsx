@@ -8,6 +8,7 @@ import { appointmentStatusLabel } from '../../utils/appointment'
 import { relativeDayLabel } from '../../utils/dates'
 import type { OutpatientRow } from '../../domain/outpatientSelectors'
 import type { Tone } from '../../utils/tone'
+import { formatTime } from '../../domain/time'
 
 /** What the row's status reads as, and the time beside it. */
 function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string | null } {
@@ -75,7 +76,7 @@ export function OutpatientList({
         return (
           <li key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-surface-2 sm:px-5">
             <div className="w-24 shrink-0">
-              <p className="text-sm font-semibold tabular-nums text-ink">{row.time}</p>
+              <p className="text-sm font-semibold tabular-nums text-ink">{formatTime(row.time)}</p>
               <p className="truncate text-2xs tabular-nums text-ink-subtle">
                 {row.stage === 'upcoming'
                   ? relativeDayLabel(row.date, today)
@@ -89,7 +90,7 @@ export function OutpatientList({
                 <button
                   type="button"
                   onClick={() => row.patient && onOpenPatient(row.patient.patientId)}
-                  className="truncate rounded-sm text-left text-sm font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
+                  className="focus-ring -my-3 truncate rounded py-3 text-left text-sm font-medium text-ink underline-offset-2 hover:underline"
                 >
                   {row.patient?.name ?? '—'}
                 </button>
@@ -101,13 +102,13 @@ export function OutpatientList({
                 · {row.patient?.uhid}
               </p>
             </div>
-            <div className="flex shrink-0 flex-col items-start gap-0.5 sm:w-56">
+            <div className="flex min-w-0 shrink-0 flex-col items-start gap-0.5 sm:w-56">
               <Badge tone={status.tone}>{status.label}</Badge>
               {status.note ? (
-                <span className={row.lateMinutes ? 'text-2xs font-medium text-warning' : 'text-2xs tabular-nums text-ink-muted'}>{status.note}</span>
+                <span className={row.lateMinutes ? 'text-2xs font-medium text-warning-fg' : 'text-2xs tabular-nums text-ink-muted'}>{status.note}</span>
               ) : null}
             </div>
-            <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 sm:w-[21rem]">{renderActions(row)}</div>
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:ml-auto sm:w-[21rem] sm:shrink-0 sm:justify-end">{renderActions(row)}</div>
           </li>
         )
       })}

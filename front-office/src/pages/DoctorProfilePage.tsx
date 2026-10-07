@@ -25,6 +25,7 @@ import { setDoctorStatus } from '../domain/actions'
 import { DoctorLeaveCard } from '../components/doctor/DoctorLeaveCard'
 import { initialsOf } from '../utils/format'
 import { useFlow } from '../flows/useFlow'
+import { formatTimeRange } from '../domain/time'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -47,7 +48,7 @@ export function DoctorProfilePage() {
     return (
       <div>
         <PageHeader title="Doctor not found" />
-        <div className="px-6 py-6 lg:px-8">
+        <div className="mt-5 sm:mt-6">
           <Card accentTone="indigo" className="max-w-xl">
             <CardBody>
               <EmptyState
@@ -95,7 +96,7 @@ export function DoctorProfilePage() {
         }
       />
 
-      <div className="flex flex-col gap-6 px-6 py-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         {error ? <Alert tone="critical">{error}</Alert> : null}
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -104,7 +105,7 @@ export function DoctorProfilePage() {
             <Card accentTone="indigo">
               <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
-                  <Avatar initials={initialsOf(provider.name)} size="lg" />
+                  <Avatar name={provider.name} initials={initialsOf(provider.name)} size="lg" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{provider.name}</p>
                     <p className="truncate text-xs text-ink-muted">{provider.qualification ?? '—'}</p>
@@ -145,7 +146,7 @@ export function DoctorProfilePage() {
                       Activate account
                     </Button>
                   )}
-                  <p className="mt-2 text-xs text-ink-faint">
+                  <p className="mt-2 text-xs text-ink-subtle">
                     An inactive doctor stays in the directory for reference but cannot be booked.
                   </p>
                 </div>
@@ -164,10 +165,10 @@ export function DoctorProfilePage() {
                 title="Today's schedule"
                 subtitle={
                   schedule
-                    ? `${schedule.sessionStart}–${schedule.sessionEnd} · ${schedule.slotMinutes}-minute slots · ${provider.schedule.workingDays.map((d) => DAY_LABELS[d]).join(', ')}`
+                    ? `${formatTimeRange(schedule.sessionStart, schedule.sessionEnd)} · ${schedule.slotMinutes}-minute slots · ${provider.schedule.workingDays.map((d) => DAY_LABELS[d]).join(', ')}`
                     : 'No session configured for today'
                 }
-                action={<span className="text-xs tabular-nums text-ink-faint">{row.openSlotCount} open</span>}
+                action={<span className="text-xs tabular-nums text-ink-subtle">{row.openSlotCount} open</span>}
               />
               <CardBody>
                 {slotEntries.length === 0 ? (

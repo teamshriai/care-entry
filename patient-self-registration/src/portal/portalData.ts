@@ -38,19 +38,35 @@ export interface Visit {
   summary: string;
 }
 
+/** A date `days` from today (negative = past), as YYYY-MM-DD — the sample
+ *  record always reads as current, never as a stale fixed date. */
+function fromToday(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** "10:30" → "10:30 AM" — every time a patient reads is 12-hour. */
+export function formatTime(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
 export const UPCOMING: Appointment[] = [
   {
     id: 'a1',
-    date: '2026-10-02',
+    date: fromToday(3),
     time: '10:30',
     department: 'Neurology',
-    clinician: 'Dr R. Anderson',
-    location: 'Clinic Wing B · Room 311',
+    clinician: 'Dr. Arun Kumar',
+    location: 'Block B · Room 12',
     status: 'confirmed',
   },
   {
     id: 'a2',
-    date: '2026-11-14',
+    date: fromToday(12),
     time: '09:00',
     department: 'Pathology',
     clinician: 'Walk-in',
@@ -62,30 +78,30 @@ export const UPCOMING: Appointment[] = [
 export const VISITS: Visit[] = [
   {
     id: 'v1',
-    date: '2026-08-19',
+    date: fromToday(-49),
     department: 'Neurology',
-    clinician: 'Dr R. Anderson',
+    clinician: 'Dr. Arun Kumar',
     summary: 'Follow-up review. Blood pressure stable, medication continued.',
   },
   {
     id: 'v2',
-    date: '2026-05-04',
-    department: 'General medicine',
-    clinician: 'Dr S. Iyer',
+    date: fromToday(-156),
+    department: 'General Medicine',
+    clinician: 'Dr. Farah Ahmed',
     summary: 'Routine consultation and blood panel.',
   },
 ];
 
 export const MEDICATIONS: Medication[] = [
-  { id: 'm1', name: 'Amlodipine', dose: '5 mg', schedule: 'Once daily, morning', prescribedBy: 'Dr R. Anderson', refillsLeft: 2 },
-  { id: 'm2', name: 'Atorvastatin', dose: '10 mg', schedule: 'Once daily, night', prescribedBy: 'Dr R. Anderson', refillsLeft: 1 },
-  { id: 'm3', name: 'Aspirin', dose: '75 mg', schedule: 'Once daily, after food', prescribedBy: 'Dr S. Iyer', refillsLeft: 4 },
+  { id: 'm1', name: 'Amlodipine', dose: '5 mg', schedule: 'Once daily, morning', prescribedBy: 'Dr. Arun Kumar', refillsLeft: 2 },
+  { id: 'm2', name: 'Atorvastatin', dose: '10 mg', schedule: 'Once daily, night', prescribedBy: 'Dr. Arun Kumar', refillsLeft: 1 },
+  { id: 'm3', name: 'Aspirin', dose: '75 mg', schedule: 'Once daily, after food', prescribedBy: 'Dr. Farah Ahmed', refillsLeft: 4 },
 ];
 
 export const DOCUMENTS: Document[] = [
-  { id: 'd1', title: 'MRI brain — report', kind: 'Radiology', date: '2026-08-19', size: '1.8 MB' },
-  { id: 'd2', title: 'Lipid profile', kind: 'Pathology', date: '2026-08-17', size: '240 KB' },
-  { id: 'd3', title: 'Discharge summary', kind: 'Inpatient', date: '2026-05-06', size: '620 KB' },
+  { id: 'd1', title: 'MRI brain — report', kind: 'Radiology', date: fromToday(-49), size: '1.8 MB' },
+  { id: 'd2', title: 'Lipid profile', kind: 'Pathology', date: fromToday(-51), size: '240 KB' },
+  { id: 'd3', title: 'Discharge summary', kind: 'Inpatient', date: fromToday(-154), size: '620 KB' },
 ];
 
 export const FAQ: { q: string; a: string }[] = [
@@ -150,7 +166,7 @@ export const NOTICES: Notice[] = [
     id: 'n1',
     icon: 'calendar',
     title: 'Appointment confirmed',
-    body: 'Neurology review with Dr R. Anderson on 02 Oct, 10:30. Clinic Wing B, Room 311.',
+    body: `Neurology review with Dr. Arun Kumar on ${formatDate(UPCOMING[0].date)}, ${formatTime(UPCOMING[0].time)}. Block B, Room 12.`,
     when: '2 hours ago',
     unread: true,
   },

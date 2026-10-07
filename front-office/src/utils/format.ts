@@ -1,5 +1,8 @@
 // Small formatting helpers — no date library added, per the plan's
 // "no new dependencies unless genuinely required" constraint.
+import { formatTimestampTime } from '../domain/time'
+
+export { formatHour, formatTime, formatTimeRange } from '../domain/time'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = [
@@ -7,15 +10,14 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-// UI_ATLAS §5.4: dates are DD-MMM-YYYY, times are 24-hour. MM/DD is forbidden.
+// Dates are DD-MMM-YYYY (MM/DD is forbidden); every time people read is
+// 12-hour with AM/PM. (This supersedes UI_ATLAS §5.4's 24-hour rule.)
 export function formatHeaderDateTime(date: Date = new Date()): string {
   const weekday = WEEKDAYS[date.getDay()]
   const day = String(date.getDate()).padStart(2, '0')
   const month = MONTHS[date.getMonth()]
   const year = date.getFullYear()
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${weekday} ${day}-${month}-${year} · ${hours}:${minutes}`
+  return `${weekday} ${day}-${month}-${year} · ${formatTimestampTime(date.getTime())}`
 }
 
 // UI_ATLAS §4.5 — three confidence bands, never a bare percentage.
@@ -31,10 +33,9 @@ export function confidenceLabel(band: ConfidenceBand): string {
   return CONFIDENCE_LABELS[band] ?? 'Confidence unavailable'
 }
 
-/** 24-hour clock label for a timestamp (UI_ATLAS §5.4 — always 24-hour). */
+/** A timestamp's clock time for people to read — 12-hour, "10:45 AM". */
 export function formatClock(timestamp: number): string {
-  const date = new Date(timestamp)
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+  return formatTimestampTime(timestamp)
 }
 
 /** "just now" / "6 min ago" / "2 hr ago" — computed against a supplied

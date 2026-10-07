@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { BedDouble, BedSingle, Hourglass, LogOut } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
@@ -7,6 +6,7 @@ import { AdmissionIllustration } from '../components/ui/illustrations/AdmissionI
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
+import { ResponsiveTable } from '../components/ui/ResponsiveTable'
 import { EmptyState } from '../components/ui/EmptyState'
 import { WardIcon } from '../components/ui/WardIcon'
 import { StatFilter } from '../components/ui/StatFilter'
@@ -104,7 +104,7 @@ export function InpatientsPage() {
         tabs={<PatientsTabs />}
       />
 
-      <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         <StatFilter label="Show" items={items} selected={filter} onSelect={selectFilter} />
 
         {filter === 'admitted' ? (
@@ -112,33 +112,53 @@ export function InpatientsPage() {
             {rows.length === 0 ? (
               <EmptyState icon={BedDouble} title="Nobody is admitted" description="Patients appear here the moment they are admitted." />
             ) : (
-              <Table head={['Patient', 'Ward · bed', 'Day', 'Doctor', 'Bill', '']}>
-                {rows.map(({ admission: a, billing, billStatus }) => (
-                  <tr key={a.admissionId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <WardLabel ward={a.wardLabel} bed={a.bedNumber} />
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 tabular-nums text-ink">Day {billing.days}</td>
-                    <td className="px-5 py-3 text-ink-muted">
-                      <span className="block whitespace-nowrap">{a.doctorName}</span>
-                      <span className="block text-xs text-ink-subtle">{a.department}</span>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <Badge tone={BILL_STATUS_TONE[billStatus]}>
-                        {billing.pending > 0 ? `${BILL_STATUS_LABEL[billStatus]} · ${formatRupees(billing.pending)}` : BILL_STATUS_LABEL[billStatus]}
-                      </Badge>
-                      <span className="mt-1 block text-xs text-ink-subtle">{payerOf(a)}</span>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-right">
+              <ResponsiveTable
+                rows={rows}
+                rowKey={(row) => row.admission.admissionId}
+                caption="Admitted patients"
+                columns={[
+                  { key: 'patient', header: 'Patient', mobile: 'title', sortValue: (r) => r.admission.patientName, cell: ({ admission: a }) => <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} /> },
+                  { key: 'bed', header: 'Ward · bed', mobile: 'subtitle', cell: ({ admission: a }) => <WardLabel ward={a.wardLabel} bed={a.bedNumber} /> },
+                  { key: 'day', header: 'Day', className: 'whitespace-nowrap tabular-nums text-ink', sortValue: (r) => r.billing.days, cell: ({ billing }) => `Day ${billing.days}` },
+                  {
+                    key: 'doctor',
+                    header: 'Doctor',
+                    className: 'text-ink-muted',
+                    sortValue: (r) => r.admission.doctorName,
+                    cell: ({ admission: a }) => (
+                      <>
+                        <span className="block tbl:whitespace-nowrap">{a.doctorName}</span>
+                        <span className="block text-xs text-ink-subtle">{a.department}</span>
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'bill',
+                    header: 'Bill',
+                    mobile: 'aside',
+                    cell: ({ admission: a, billing, billStatus }) => (
+                      <>
+                        <Badge tone={BILL_STATUS_TONE[billStatus]}>
+                          {billing.pending > 0 ? `${BILL_STATUS_LABEL[billStatus]} · ${formatRupees(billing.pending)}` : BILL_STATUS_LABEL[billStatus]}
+                        </Badge>
+                        <span className="mt-1 block text-xs text-ink-subtle">{payerOf(a)}</span>
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    header: <span className="sr-only">Actions</span>,
+                    className: 'whitespace-nowrap text-right',
+                    mobile: 'actions',
+                    cell: ({ admission: a }) => (
                       <Button size="sm" variant="secondary" onClick={() => openFlow('discharge', { uhid: a.patientId })}>
-                        <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        <LogOut size={14} aria-hidden="true" />
                         Discharge
                       </Button>
-                    </td>
-                  </tr>
-                ))}
-              </Table>
+                    ),
+                  },
+                ]}
+              />
             )}
           </Card>
         ) : null}
@@ -148,34 +168,46 @@ export function InpatientsPage() {
             {awaiting.length === 0 ? (
               <EmptyState icon={Hourglass} title="Nobody is waiting for a bed" description="Admission requests appear here until a bed is given." />
             ) : (
-              <Table head={['Patient', 'Requested', 'Doctor', 'Type', 'Reason', '']}>
-                {awaiting.map((a) => (
-                  <tr key={a.admissionId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
-                    <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{at(a.createdAt)}</td>
-                    <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{a.doctorName}</td>
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <Badge tone={a.admissionType === 'Emergency' ? 'critical' : 'neutral'}>{a.admissionType}</Badge>
-                    </td>
-                    <td className="max-w-56 truncate px-5 py-3 text-ink-muted" title={a.reason}>
-                      {a.reason}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-right">
+              <ResponsiveTable
+                rows={awaiting}
+                rowKey={(a) => a.admissionId}
+                caption="Waiting for a bed"
+                columns={[
+                  { key: 'patient', header: 'Patient', mobile: 'title', sortValue: (a) => a.patientName, cell: (a) => <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} /> },
+                  { key: 'requested', header: 'Requested', className: 'whitespace-nowrap text-ink-muted', sortValue: (a) => a.createdAt, cell: (a) => at(a.createdAt) },
+                  { key: 'doctor', header: 'Doctor', className: 'whitespace-nowrap text-ink-muted', cell: (a) => a.doctorName },
+                  { key: 'type', header: 'Type', className: 'whitespace-nowrap', mobile: 'aside', cell: (a) => <Badge tone={a.admissionType === 'Emergency' ? 'critical' : 'neutral'}>{a.admissionType}</Badge> },
+                  {
+                    key: 'reason',
+                    header: 'Reason',
+                    className: 'text-ink-muted',
+                    cell: (a) => (
+                      <span className="block tbl:max-w-56 tbl:truncate" title={a.reason}>
+                        {a.reason}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    header: <span className="sr-only">Actions</span>,
+                    className: 'whitespace-nowrap text-right',
+                    mobile: 'actions',
+                    cell: (a) => (
                       <Button size="sm" onClick={() => openFlow('admit', { uhid: a.patientId })}>
-                        <BedDouble className="h-3.5 w-3.5" strokeWidth={1.75} />
+                        <BedDouble size={14} aria-hidden="true" />
                         Allot bed
                       </Button>
-                    </td>
-                  </tr>
-                ))}
-              </Table>
+                    ),
+                  },
+                ]}
+              />
             )}
           </Card>
         ) : null}
 
         {filter === 'beds' ? (
           <Card accentTone="purple">
-            <div className="flex flex-wrap gap-2 border-b border-border-soft px-5 py-4" role="group" aria-label="Ward">
+            <div className="flex flex-wrap gap-2 border-b border-border-soft px-4 py-4 sm:px-5" role="group" aria-label="Ward">
               {wards.map((w) => {
                 const active = w.ward === activeWard?.ward
                 return (
@@ -185,13 +217,13 @@ export function InpatientsPage() {
                     aria-pressed={active}
                     onClick={() => setWardChoice(w.ward)}
                     className={cn(
-                      'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
+                      'focus-ring flex min-h-11 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors',
                       active ? 'border-primary-600 bg-primary-50 text-primary-text' : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
                     )}
                   >
-                    <WardIcon ward={w.ward} className={cn('h-4 w-4', isCritical(w.ward) && 'text-critical')} />
+                    <WardIcon ward={w.ward} className={cn('h-4 w-4', isCritical(w.ward) && 'text-critical-fg')} />
                     {w.ward}
-                    <span className={cn('text-xs tabular-nums', w.available > 0 ? 'text-stable' : 'text-critical')}>
+                    <span className={cn('text-xs tabular-nums', w.available > 0 ? 'text-success-fg' : 'text-critical-fg')}>
                       {w.available}/{w.total} free
                     </span>
                   </button>
@@ -199,7 +231,7 @@ export function InpatientsPage() {
               })}
             </div>
             {activeWard ? (
-              <ul className="grid grid-cols-1 gap-2 px-5 py-4 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              <ul className="grid grid-cols-1 gap-2 px-4 py-4 sm:px-5 min-[480px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {activeWard.beds.map((bed) => (
                   <BedTile
                     key={bed.bedId}
@@ -218,28 +250,32 @@ export function InpatientsPage() {
             {discharged.length === 0 ? (
               <EmptyState icon={LogOut} title="No discharges yet today" description="Patients appear here as they are discharged." />
             ) : (
-              <Table head={['Patient', 'Ward · bed', 'Discharged', 'Type', 'Final bill']}>
-                {discharged.map(({ admission: a, bill }) => (
-                  <tr key={a.admissionId} className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2">
-                    <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} />
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <WardLabel ward={a.wardLabel} bed={a.bedNumber} />
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{a.dischargedAt ? at(a.dischargedAt) : '—'}</td>
-                    <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{a.dischargeType ?? 'Normal Discharge'}</td>
-                    <td className="whitespace-nowrap px-5 py-3">
-                      {bill ? (
-                        <span className="flex items-center gap-2">
+              <ResponsiveTable
+                rows={discharged}
+                rowKey={(row) => row.admission.admissionId}
+                caption="Discharged today"
+                columns={[
+                  { key: 'patient', header: 'Patient', mobile: 'title', sortValue: (r) => r.admission.patientName, cell: ({ admission: a }) => <PatientCell patientId={a.patientId} name={a.patientName} detail={`${a.patientId} · ${a.admissionNumber}`} onOpen={() => openProfile(a.patientId)} /> },
+                  { key: 'bed', header: 'Ward · bed', mobile: 'subtitle', cell: ({ admission: a }) => <WardLabel ward={a.wardLabel} bed={a.bedNumber} /> },
+                  { key: 'when', header: 'Discharged', className: 'whitespace-nowrap text-ink-muted', sortValue: (r) => r.admission.dischargedAt ?? '', cell: ({ admission: a }) => (a.dischargedAt ? at(a.dischargedAt) : '—') },
+                  { key: 'type', header: 'Type', className: 'whitespace-nowrap text-ink-muted', cell: ({ admission: a }) => a.dischargeType ?? 'Normal Discharge' },
+                  {
+                    key: 'bill',
+                    header: 'Final bill',
+                    className: 'whitespace-nowrap',
+                    mobile: 'aside',
+                    cell: ({ bill }) =>
+                      bill ? (
+                        <span className="flex flex-wrap items-center justify-end gap-2 tbl:justify-start">
                           <span className="tabular-nums text-ink">{formatRupees(bill.totalAmount)}</span>
                           <BillStatusBadge payment={bill} />
                         </span>
                       ) : (
                         '—'
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </Table>
+                      ),
+                  },
+                ]}
+              />
             )}
           </Card>
         ) : null}
@@ -248,49 +284,32 @@ export function InpatientsPage() {
   )
 }
 
-function Table({ head, children }: { head: string[]; children: ReactNode }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-border-soft bg-surface-2 text-left text-xs font-semibold text-ink-muted">
-            {head.map((label, index) => (
-              <th key={index} className="px-5 py-2 font-semibold">
-                {label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
-  )
-}
-
 function PatientCell({ patientId, name, detail, onOpen }: { patientId: string; name: string; detail: string; onOpen: () => void }) {
   const care = usePatientCareStatus()
   return (
-    <td className="px-5 py-3">
-      <span className="flex items-center gap-1.5">
+    <div className="min-w-0">
+      <span className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
           onClick={onOpen}
-          className="rounded-sm text-left font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
+          className="focus-ring -my-3 truncate rounded py-3 text-left font-medium text-ink underline-offset-2 hover:underline"
         >
           {name}
         </button>
         <PatientStatusIcons status={care[patientId]} />
       </span>
-      <span className="block whitespace-nowrap text-xs text-ink-subtle">{detail}</span>
-    </td>
+      <span className="block truncate text-xs font-normal text-ink-subtle">{detail}</span>
+    </div>
   )
 }
 
 function WardLabel({ ward, bed }: { ward: string | null; bed: string | null }) {
   return (
-    <span className={cn('flex items-center gap-1.5', isCritical(ward) ? 'font-medium text-critical' : 'text-ink')}>
+    <span className={cn('flex items-center gap-1.5', isCritical(ward) ? 'font-medium text-critical-fg' : 'text-ink')}>
       <WardIcon ward={ward} className="h-4 w-4 shrink-0" />
-      {ward ?? '—'} · {bed ?? '—'}
+      <span className="min-w-0">
+        {ward ?? '—'} · <span className="whitespace-nowrap">{bed ?? '—'}</span>
+      </span>
     </span>
   )
 }
@@ -311,15 +330,15 @@ function BedTile({ bed, occupant, onOpen }: { bed: Bed; occupant: Admission | nu
       </Badge>
     </>
   )
-  const tileClass = 'flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition-colors'
+  const tileClass = 'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left transition-colors'
   return (
     <li>
       {occupant ? (
-        <button type="button" onClick={() => onOpen(occupant.patientId)} title={`${occupant.patientName} · open profile`} className={cn(tileClass, 'border-info-border bg-info-bg hover:border-primary-600')}>
+        <button type="button" onClick={() => onOpen(occupant.patientId)} title={`${occupant.patientName} · open profile`} className={cn(tileClass, 'focus-ring border-info-fg/25 bg-info-bg hover:border-primary-600')}>
           {body}
         </button>
       ) : (
-        <div className={cn(tileClass, free ? 'border-stable-border bg-stable-bg' : 'border-border-soft bg-surface-2')}>{body}</div>
+        <div className={cn(tileClass, free ? 'border-success-fg/25 bg-success-bg' : 'border-border-soft bg-surface-2')}>{body}</div>
       )}
     </li>
   )

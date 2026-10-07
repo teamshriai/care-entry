@@ -1,12 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CORRECT_OTP, MAX_OTP_ATTEMPTS, MOBILE_ERROR, MOCK_PATIENTS, dobBounds, dobError, formatAadhaar, generateSystemId, isValidMobile, maskAadhaar, maskMobile } from '../data';
-import { Icon, IconBadge } from './Icon';
-import { LockedValue } from './LockedValue';
-import { trackSpotlight } from '../ui';
+import { IconBadge } from './Icon';
 import { MethodChooser, type IdMethod } from '../identity/MethodChooser';
 import { IdentityVerify } from '../identity/IdentityVerify';
 import type { DemoIdentity, RegistrationOrigin } from '../identity/identityData';
 import type { Gender, MockPatient } from '../types';
+import {
+  Alert,
+  BackButton,
+  Button,
+  ButtonRow,
+  Card,
+  Field,
+  LockedValue,
+  Reveal,
+  SampleChip,
+  SampleHint,
+  Select,
+  StepHeader,
+  StepSub,
+  TextButton,
+} from '../ui/kit';
+import { formGridClass, inputClass } from '../ui/classes';
+import { OtpInput } from '../ui/OtpInput';
 
 function ageFromDob(dobStr: string): number | null {
   if (!dobStr) return null;
@@ -67,12 +83,10 @@ export function Step1Search({
   const [otpError, setOtpError] = useState('');
   const [attempts, setAttempts] = useState(0);
   const [resendIn, setResendIn] = useState(0);
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // The resend countdown ticks only while the code screen is showing.
   useEffect(() => {
-    if (view !== 'otp') return;
-    otpRefs.current[0]?.focus();
-    setResendIn(30);
+    if (view !== 'otp') return undefined;
     const t = setInterval(() => setResendIn((n) => (n > 0 ? n - 1 : 0)), 1000);
     return () => clearInterval(t);
   }, [view]);
@@ -82,10 +96,16 @@ export function Step1Search({
     setOtp('');
     setOtpError('');
     setAttempts(0);
+    setResendIn(30);
     setView('otp');
   }
 
   function verifyOtp(code: string) {
+    if (attempts >= MAX_OTP_ATTEMPTS) {
+      setOtp('');
+      setOtpError('Attempt limit reached. Request a new code.');
+      return;
+    }
     if (code === CORRECT_OTP) {
       if (pending) onSignIn(pending);
       return;
@@ -93,25 +113,11 @@ export function Step1Search({
     const next = attempts + 1;
     setAttempts(next);
     setOtp('');
-    otpRefs.current[0]?.focus();
     setOtpError(
       next >= MAX_OTP_ATTEMPTS
         ? 'Attempt limit reached. Request a new code.'
         : `Incorrect code. ${MAX_OTP_ATTEMPTS - next} attempts remaining.`
     );
-  }
-
-  function handleOtpDigit(index: number, raw: string) {
-    const digit = raw.replace(/\D/g, '').slice(-1);
-    const next = (otp.slice(0, index) + digit + otp.slice(index + 1)).slice(0, 6);
-    setOtp(next);
-    setOtpError('');
-    if (digit && index < 5) otpRefs.current[index + 1]?.focus();
-    if (next.length === 6) verifyOtp(next);
-  }
-
-  function handleOtpKey(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) otpRefs.current[index - 1]?.focus();
   }
 
   function handleSignIn() {
@@ -235,334 +241,334 @@ export function Step1Search({
     results.length === 1 ? 'Confirm your identity to continue.' : `${results.length} matching records found. Select your record:`;
 
   return (
-    <div className="card step-enter">
+    <Card>
       {view !== 'verify' && view !== 'otp' && (
         <>
           {view !== 'signin' && (
-            <div className="step-nav">
-              <button className="btn-text" onClick={() => setView(view === 'choose' ? 'signin' : 'choose')}>
-                ← Back
-              </button>
+            <div className="-mt-1 mb-4">
+              <BackButton onClick={() => setView(view === 'choose' ? 'signin' : 'choose')} />
             </div>
           )}
-          <div className="step-head">
-            <IconBadge name={view === 'signin' ? 'userCheck' : 'idCard'} />
-            <h2 className="step-title">
-              {view === 'signin' && 'Sign in'}
-              {view === 'choose' && 'Select a registration method'}
-              {view === 'form' && (identity ? 'Confirm your details' : 'Your details')}
-            </h2>
-          </div>
+          <StepHeader
+            icon={view === 'signin' ? 'userCheck' : 'idCard'}
+            title={
+              <>
+                {view === 'signin' && 'Sign in'}
+                {view === 'choose' && 'Select a registration method'}
+                {view === 'form' && (identity ? 'Confirm your details' : 'Your details')}
+              </>
+            }
+          />
           {view === 'form' && (
-            <p className="step-sub">
-              {identity
-                ? 'Provide your mobile number and confirm the remaining fields.'
-                : 'Provide the following details to complete registration.'}
-            </p>
+            <StepSub>
+              {identity ? 'Provide your mobile number and confirm the remaining fields.' : 'Provide the following details to complete registration.'}
+            </StepSub>
           )}
         </>
       )}
 
       {view === 'signin' && (
-        <>
-          <div className="grid-2" style={{ marginBottom: 20 }}>
-            <label className="field">
-              <span className="field-label">Full name<span className="field-required">*</span></span>
-              <input className="field-input" value={name} onChange={(e) => { setName(e.target.value); setSearchError(''); }} />
-            </label>
-            <label className="field">
-              <span className="field-label">Mobile number<span className="field-required">*</span></span>
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSignIn();
+          }}
+        >
+          <div className={`mt-6 ${formGridClass}`}>
+            <Field label="Full name" required>
               <input
-                className="field-input"
+                className={inputClass}
+                value={name}
+                autoComplete="name"
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setSearchError('');
+                }}
+              />
+            </Field>
+            <Field label="Mobile number" required>
+              <input
+                className={inputClass}
                 value={mobile}
-                onChange={(e) => { setMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setSearchError(''); }}
+                onChange={(e) => {
+                  setMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                  setSearchError('');
+                }}
                 inputMode="numeric"
+                autoComplete="tel-national"
                 placeholder="10-digit number"
               />
-            </label>
-            <label className="field">
-              <span className="field-label">Patient ID</span>
-              <input className="field-input" placeholder="Optional" value={id} onChange={(e) => { setId(e.target.value); setSearchError(''); }} />
-            </label>
+            </Field>
+            <Field label="Patient ID" optional>
+              <input
+                className={inputClass}
+                value={id}
+                onChange={(e) => {
+                  setId(e.target.value);
+                  setSearchError('');
+                }}
+              />
+            </Field>
           </div>
 
-          <p style={{ fontSize: 13, color: 'var(--ink-2)', margin: '2px 0 16px' }}>
-            <span className="field-required" style={{ marginLeft: 0 }}>*</span> Required
+          <p className="mt-3 text-xs text-ink-subtle">
+            <span className="text-critical-fg">*</span> Required
           </p>
 
-          {searchError && (
-            <div className="alert alert-error" style={{ marginBottom: 16 }}>{searchError}</div>
-          )}
+          {searchError && <Alert tone="error" className="mt-4">{searchError}</Alert>}
 
-          <div className="btn-row" style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={handleSignIn}>
-              <span className="btn-ico"><Icon name="login" size={15} /></span>
-              Sign In
-            </button>
-            <span style={{ color: 'var(--ink-3)', fontSize: 13 }}>or</span>
-            <button className="btn btn-secondary" onClick={openRegister}>Register as a new patient</button>
-          </div>
+          <ButtonRow>
+            <Button type="submit" icon="login">
+              Sign in
+            </Button>
+            <span className="hidden text-sm text-ink-subtle sm:inline">or</span>
+            <Button variant="outline" onClick={openRegister}>
+              Register as a new patient
+            </Button>
+          </ButtonRow>
 
-          <div className="demo-hint">
-            <Icon name="lock" size={14} />
-            <span>
-              <strong>Sample records:</strong>
-              {MOCK_PATIENTS.map((p) => (
-                <button key={p.id} className="hint-chip" onClick={() => fillDemoRecord(p)}>
-                  {p.name} · {p.mobile}
-                </button>
-              ))}
-            </span>
-          </div>
-        </>
+          <SampleHint label="Sample records:">
+            {MOCK_PATIENTS.map((p) => (
+              <SampleChip key={p.id} onClick={() => fillDemoRecord(p)}>
+                {p.name} · {p.mobile}
+              </SampleChip>
+            ))}
+          </SampleHint>
+        </form>
       )}
 
       {view === 'otp' && pending && (
-        <div className="step-enter">
-          <button className="btn-text" onClick={() => { setView('signin'); setPending(null); }}>← Back</button>
-
-          <div className="step-head">
-            <IconBadge name="shieldCheck" />
-            <h2 className="step-title">Mobile verification</h2>
+        <Reveal>
+          <div className="-mt-1 mb-4">
+            <BackButton
+              onClick={() => {
+                setView('signin');
+                setPending(null);
+              }}
+            />
           </div>
-          <p className="step-sub">
-            A six-digit code has been sent to{' '}
-            <strong style={{ color: 'var(--ink)', fontWeight: 600 }}>{maskMobile(pending.mobile)}</strong>, the number
-            registered against this record.
-          </p>
 
-          <div className="signin-summary">
-            <IconBadge name="userCheck" size={34} />
-            <div>
-              <div className="signin-summary-name">{pending.name}</div>
-              <div className="signin-summary-meta">
-                <span>{pending.systemId}</span>
-                <span>{pending.age} yrs</span>
-                <span>{pending.gender}</span>
+          <StepHeader icon="shieldCheck" title="Mobile verification" />
+          <StepSub>
+            A six-digit code has been sent to <strong className="font-semibold text-ink">{maskMobile(pending.mobile)}</strong>, the number registered against
+            this record.
+          </StepSub>
+
+          <div className="mt-5 flex min-w-0 items-center gap-3 rounded-xl border border-border-soft bg-surface-2 p-3.5">
+            <IconBadge name="userCheck" size={36} />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-ink">{pending.name}</div>
+              <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-ink-muted">
+                <span className="font-mono">{pending.systemId}</span>
+                {pending.age !== null ? <span>{pending.age} yrs</span> : null}
+                <span className="capitalize">{pending.gender}</span>
               </div>
             </div>
           </div>
 
-          <div className="otp-row" style={{ justifyContent: 'flex-start' }}>
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <input
-                key={i}
-                ref={(el) => { otpRefs.current[i] = el; }}
-                className="otp-box"
-                maxLength={1}
-                inputMode="numeric"
-                value={otp[i] ?? ''}
-                onChange={(e) => handleOtpDigit(i, e.target.value)}
-                onKeyDown={(e) => handleOtpKey(i, e)}
-              />
-            ))}
-          </div>
+          <OtpInput
+            className="mt-6"
+            value={otp}
+            onChange={(next) => {
+              setOtp(next);
+              setOtpError('');
+            }}
+            onComplete={verifyOtp}
+            invalid={Boolean(otpError)}
+            autoFocus
+          />
 
-          {otpError && <div className="alert alert-error" style={{ marginBottom: 14 }}>{otpError}</div>}
+          {otpError && <Alert tone="error" className="mt-4">{otpError}</Alert>}
 
-          <p className="identity-resend">
-            {resendIn > 0 ? `A new code may be requested in ${resendIn}s` : (
-              <button className="btn-text" onClick={() => { setResendIn(30); setAttempts(0); setOtpError(''); }}>
+          <p className="mt-3 text-sm text-ink-muted" aria-live="polite">
+            {resendIn > 0 ? (
+              `A new code may be requested in ${resendIn}s`
+            ) : (
+              <TextButton
+                onClick={() => {
+                  setResendIn(30);
+                  setAttempts(0);
+                  setOtpError('');
+                }}
+              >
                 Request a new code
-              </button>
+              </TextButton>
             )}
           </p>
 
-          <div className="demo-hint">
-            <Icon name="lock" size={14} />
-            <span>
-              <strong>Sample code:</strong>
-              <button className="hint-chip" onClick={() => { setOtp(CORRECT_OTP); setOtpError(''); verifyOtp(CORRECT_OTP); }}>
-                {CORRECT_OTP}
-              </button>
-            </span>
-          </div>
-        </div>
+          <SampleHint label="Sample code:">
+            <SampleChip
+              onClick={() => {
+                setOtp(CORRECT_OTP);
+                setOtpError('');
+                verifyOtp(CORRECT_OTP);
+              }}
+            >
+              {CORRECT_OTP}
+            </SampleChip>
+          </SampleHint>
+        </Reveal>
       )}
 
       {view === 'choose' && (
-        <div className="step-enter">
+        <Reveal className="mt-6">
           <MethodChooser onPick={pickMethod} />
-        </div>
+        </Reveal>
       )}
 
-      {view === 'verify' && method !== 'manual' && (
-        <IdentityVerify
-          method={method}
-          onVerified={applyIdentity}
-          onBack={() => setView('choose')}
-        />
-      )}
+      {view === 'verify' && method !== 'manual' && <IdentityVerify method={method} onVerified={applyIdentity} onBack={() => setView('choose')} />}
 
       {view === 'form' && (
-        <div>
+        <form
+          noValidate
+          className="mt-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitNewPatient();
+          }}
+        >
           {identity && (
-            <div className="prefill-banner">
-              <span className="prefill-icon">
-                <Icon name="checkCircle" size={16} />
-              </span>
-              <span>
-                <strong>Verified via {method === 'aadhaar' ? 'Aadhaar' : 'ABHA'}</strong>
-                {method === 'aadhaar' && identity.aadhaar ? ` · ${maskAadhaar(identity.aadhaar)}` : ''}
-                {method === 'abha' && identity.abhaAddress ? ` · ${identity.abhaAddress}` : ''}
-              </span>
-            </div>
+            <Alert tone="success" className="mb-5">
+              <strong>Verified via {method === 'aadhaar' ? 'Aadhaar' : 'ABHA'}</strong>
+              {method === 'aadhaar' && identity.aadhaar ? ` · ${maskAadhaar(identity.aadhaar)}` : ''}
+              {method === 'abha' && identity.abhaAddress ? ` · ${identity.abhaAddress}` : ''}
+            </Alert>
           )}
 
-          <div className="grid-2" style={{ marginBottom: 8 }}>
-            <label className="field">
-              <span className="field-label">
-                First name<span className="field-required">*</span>
-                {locked && <span className="verified-tag"><Icon name="checkCircle" size={11} /> Verified</span>}
-              </span>
+          <div className={formGridClass}>
+            <Field label="First name" required verified={locked}>
               {locked ? (
                 <LockedValue value={firstName} />
               ) : (
-                <input className="field-input" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus={!identity} />
+                <input className={inputClass} value={firstName} autoComplete="given-name" onChange={(e) => setFirstName(e.target.value)} autoFocus={!identity} />
               )}
-            </label>
-            <label className="field">
-              <span className="field-label">
-                Last name<span className="field-required">*</span>
-                {locked && <span className="verified-tag"><Icon name="checkCircle" size={11} /> Verified</span>}
-              </span>
+            </Field>
+            <Field label="Last name" required verified={locked}>
               {locked ? (
                 <LockedValue value={lastName} />
               ) : (
-                <input className="field-input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                <input className={inputClass} value={lastName} autoComplete="family-name" onChange={(e) => setLastName(e.target.value)} />
               )}
-            </label>
-            <label className="field">
-              <span className="field-label">Mobile number<span className="field-required">*</span></span>
+            </Field>
+            <Field label="Mobile number" required hint={identity ? `Registered on file: ${identity.maskedMobile}` : undefined}>
               <input
-                className="field-input"
+                className={inputClass}
                 value={newMobile}
                 autoFocus={!!identity}
-                onChange={(e) => { setNewMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setFormError(''); }}
+                onChange={(e) => {
+                  setNewMobile(e.target.value.replace(/\D/g, '').slice(0, 10));
+                  setFormError('');
+                }}
                 inputMode="numeric"
+                autoComplete="tel-national"
                 placeholder="10-digit number"
               />
-              {identity && <span className="field-hint">Registered on file: {identity.maskedMobile}</span>}
-            </label>
-            <label className="field">
-              <span className="field-label">
-                Aadhaar number
-                {aadhaarVerified ? (
-                  <span className="verified-tag"><Icon name="checkCircle" size={11} /> Verified</span>
-                ) : (
-                  <span className="field-required">*</span>
-                )}
-              </span>
+            </Field>
+            <Field
+              label="Aadhaar number"
+              required={!aadhaarVerified}
+              verified={aadhaarVerified}
+              hint={aadhaarVerified ? undefined : 'Used to match your record. Only the final four digits are displayed.'}
+            >
               {aadhaarVerified ? (
-                <div className="locked-field">
-                  <Icon name="lock" size={14} />
-                  <span>{maskAadhaar(identity!.aadhaar!)}</span>
-                </div>
+                <LockedValue value={maskAadhaar(identity!.aadhaar!)} />
               ) : (
                 <input
-                  className="field-input"
+                  className={inputClass}
                   value={newAadhaar}
-                  onChange={(e) => { setNewAadhaar(formatAadhaar(e.target.value)); setFormError(''); }}
+                  onChange={(e) => {
+                    setNewAadhaar(formatAadhaar(e.target.value));
+                    setFormError('');
+                  }}
                   inputMode="numeric"
+                  autoComplete="off"
                   placeholder="1234 5678 9012"
                 />
               )}
-            </label>
+            </Field>
           </div>
-          {!aadhaarVerified && (
-            <p style={{ fontSize: 12.5, color: 'var(--ink-2)', margin: '10px 0 0' }}>
-              Used to match your record. Only the final four digits are displayed.
-            </p>
-          )}
 
           {!identity && (
-            <button className="btn-text" style={{ marginBottom: showMore ? 16 : 20 }} onClick={() => setShowMore((v) => !v)}>
+            <TextButton className="mt-3" onClick={() => setShowMore((v) => !v)}>
               {showMore ? 'Hide date of birth and gender' : 'Add date of birth and gender (optional)'}
-            </button>
+            </TextButton>
           )}
 
           {showMore && (
-            <div className="grid-2" style={{ marginTop: identity ? 20 : 0, marginBottom: 20 }}>
-              <label className="field">
-                <span className="field-label">
-                  Date of birth
-                  {locked && <span className="verified-tag"><Icon name="checkCircle" size={11} /> Verified</span>}
-                </span>
+            <Reveal className={`mt-4 ${formGridClass}`}>
+              <Field label="Date of birth" verified={locked}>
                 {locked ? (
                   <LockedValue value={displayDob(dob)} />
                 ) : (
-                  <input className="field-input" type="date" min={dobBounds().min} max={dobBounds().max} value={dob} onChange={(e) => setDob(e.target.value)} />
+                  <input className={inputClass} type="date" min={dobBounds().min} max={dobBounds().max} value={dob} onChange={(e) => setDob(e.target.value)} />
                 )}
-              </label>
-              <label className="field">
-                <span className="field-label">
-                  Gender
-                  {locked && <span className="verified-tag"><Icon name="checkCircle" size={11} /> Verified</span>}
-                </span>
+              </Field>
+              <Field label="Gender" verified={locked}>
                 {locked ? (
                   <LockedValue value={GENDER_LABELS[gender]} />
                 ) : (
-                  <select className="field-input" value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
+                  <Select value={gender} onChange={(e) => setGender(e.target.value as Gender)}>
                     <option value="unknown">Unknown</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                     <option value="other">Other</option>
-                  </select>
+                  </Select>
                 )}
-              </label>
-            </div>
+              </Field>
+            </Reveal>
           )}
 
-          {formError && <div className="alert alert-error" style={{ marginBottom: 16 }}>{formError}</div>}
+          {formError && <Alert tone="error" className="mt-5">{formError}</Alert>}
 
-          <div className="btn-row">
+          <ButtonRow>
             {identity && (
-              <button className="btn btn-secondary" onClick={() => setEditing((v) => !v)}>
-                <span className="btn-ico"><Icon name={editing ? 'checkCircle' : 'edit'} size={15} /></span>
+              <Button variant="outline" icon={editing ? 'checkCircle' : 'edit'} onClick={() => setEditing((v) => !v)}>
                 {editing ? 'Done editing' : 'Edit details'}
-              </button>
+              </Button>
             )}
-            <button className="btn btn-primary" onClick={submitNewPatient}>Save &amp; continue</button>
-          </div>
-        </div>
+            <Button type="submit">Save &amp; continue</Button>
+          </ButtonRow>
+        </form>
       )}
 
       {view === 'signin' && searched && (
-        <div style={{ marginTop: 26, borderTop: '1px solid var(--line)', paddingTop: 26 }}>
+        <Reveal className="mt-7 border-t border-border-soft pt-7">
           {results.length === 0 && (
-            <div className="alert alert-info">
-              <span>No matching record was found. Select a sample record above, or register as a new patient.</span>
-            </div>
+            <Alert tone="info">No matching record was found. Select a sample record above, or register as a new patient.</Alert>
           )}
 
           {results.length > 0 && (
             <>
-              <p style={{ color: 'var(--ink-2)', fontSize: 13.5, marginBottom: 14 }}>{matchHeading}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p className="mb-3.5 text-sm text-ink-muted">{matchHeading}</p>
+              <ul className="flex flex-col gap-3">
                 {results.map((p) => (
-                  <div key={p.id} className="choice-card" onMouseMove={trackSpotlight} style={{ alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 22px', flexWrap: 'wrap' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 16.5, marginBottom: 5 }}>{p.name}</div>
-                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', color: 'var(--ink-2)', fontSize: 13 }}>
-                        <span>{p.systemId}</span>
+                  <li
+                    key={p.id}
+                    className="flex flex-col gap-3 rounded-xl border border-border-soft bg-surface-1 p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-md sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-base font-semibold text-ink">{p.name}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-ink-muted">
+                        <span className="font-mono">{p.systemId}</span>
                         <span>DOB {p.dob}</span>
-                        <span>{p.age} yrs</span>
-                        <span>{p.gender}</span>
+                        {p.age !== null ? <span>{p.age} yrs</span> : null}
+                        <span className="capitalize">{p.gender}</span>
                         <span>{p.mobile}</span>
                         {p.aadhaar && <span>Aadhaar {maskAadhaar(p.aadhaar)}</span>}
                       </div>
                     </div>
-                    <button className="btn btn-primary" onClick={() => startSignIn(p)}>Sign in</button>
-                  </div>
+                    <Button className="shrink-0 max-sm:w-full" onClick={() => startSignIn(p)}>
+                      Sign in
+                    </Button>
+                  </li>
                 ))}
-              </div>
-              <p style={{ color: 'var(--ink-3)', fontSize: 13, marginTop: 14 }}>
-                If none of these is your record, register as a new patient above.
-              </p>
+              </ul>
+              <p className="mt-3.5 text-sm text-ink-subtle">If none of these is your record, register as a new patient above.</p>
             </>
           )}
-        </div>
+        </Reveal>
       )}
-    </div>
+    </Card>
   );
 }

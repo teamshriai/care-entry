@@ -11,6 +11,7 @@ export function PageHeader({
   illustration,
   illustrationTone,
   tabs,
+  pinActions = false,
 }: {
   eyebrow?: ReactNode
   title: ReactNode
@@ -25,28 +26,36 @@ export function PageHeader({
   illustrationTone?: Tone
   /** Tabs between the views of one place, set on the header's bottom edge. */
   tabs?: ReactNode
+  /** Keep the actions in the top-right corner on phones too, beside the
+   *  title, instead of stacking them under it. For one compact action. */
+  pinActions?: boolean
 }) {
   const styles = TONE_STYLES[illustrationTone ?? 'brand']
+  // Compact (staff) page-title recipe, DESIGN_SYSTEM §3.4. It sits inside the
+  // shell's page container, so it carries no padding of its own.
   return (
-    <div className={cn('border-b border-border-soft px-4 sm:px-6 lg:px-8', tabs ? 'pt-5' : 'py-5')}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex items-start gap-3.5">
-        {illustration ? (
-          <div className={cn('hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:flex', styles.bg, styles.text)}>
-            {illustration}
-          </div>
-        ) : null}
-        <div>
-          {eyebrow ? (
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary-text">{eyebrow}</p>
+    <div>
+      <div
+        className={cn(
+          'flex gap-2.5 sm:items-end sm:justify-between sm:gap-3',
+          pinActions ? 'flex-row items-start justify-between gap-3' : 'flex-col sm:flex-row',
+        )}
+      >
+        <div className="flex min-w-0 items-start gap-3.5">
+          {illustration ? (
+            <div className={cn('hidden h-12 w-12 shrink-0 items-center justify-center rounded-[14px] sm:flex', styles.bg, styles.text)}>
+              {illustration}
+            </div>
           ) : null}
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">{title}</h1>
-          {subtitle ? <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">{subtitle}</p> : null}
+          <div className="min-w-0">
+            {eyebrow ? <p className="text-xs font-semibold uppercase tracking-wider text-ink-subtle">{eyebrow}</p> : null}
+            <h1 className={cn('text-balance break-words text-lg font-bold tracking-[-0.025em] text-ink sm:text-xl lg:text-2xl', eyebrow ? 'mt-1' : null)}>{title}</h1>
+            {subtitle ? <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">{subtitle}</p> : null}
+          </div>
         </div>
+        {actions ? <div className={cn('flex flex-wrap gap-2.5 sm:shrink-0 sm:justify-end', pinActions && 'shrink-0')}>{actions}</div> : null}
       </div>
-      {actions ? <div className="flex shrink-0 gap-2.5">{actions}</div> : null}
-      </div>
-      {tabs ? <div className="-mb-px mt-4">{tabs}</div> : null}
+      {tabs ? <div className="mt-3 sm:mt-4">{tabs}</div> : null}
     </div>
   )
 }

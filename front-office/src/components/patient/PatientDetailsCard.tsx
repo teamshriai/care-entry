@@ -16,10 +16,8 @@ import { CreateAbhaLink } from './CreateAbhaLink'
 import { formatDateKey } from '../../utils/dates'
 import { todayKey } from '../../domain/time'
 import type { Patient, Sex } from '../../types/patient'
+import { errorClass, inputClass } from '../../utils/formClasses'
 
-const inputClass =
-  'h-10 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none transition-colors focus:border-primary-600 focus:ring-1 focus:ring-primary-600 placeholder:text-ink-subtle'
-const errorClass = 'border-critical focus:border-critical focus:ring-critical'
 
 interface Draft {
   name: string

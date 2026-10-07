@@ -6,6 +6,8 @@ import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
+import { ResponsiveTable } from '../components/ui/ResponsiveTable'
+import type { Column } from '../components/ui/ResponsiveTable'
 import { StatFilter } from '../components/ui/StatFilter'
 import type { StatFilterItem } from '../components/ui/StatFilter'
 import { useStoreValue } from '../hooks/useStore'
@@ -69,6 +71,64 @@ export function PatientsPage() {
     { key: 'duplicates', label: 'Possible duplicates', value: lists.duplicates.length, context: 'Same mobile number', tone: 'warning', icon: Copy },
   ]
 
+  const openPatient = (uhid: string) => navigate(`/patients/${uhid}`)
+
+  const columns: Column<PatientListRow>[] = [
+    {
+      key: 'patient',
+      header: 'Patient',
+      mobile: 'title',
+      sortValue: (row) => row.patient.name,
+      cell: ({ patient }) => (
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Avatar name={patient.name} initials={initialsOf(patient.name)} size="sm" />
+          <div className="min-w-0">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-medium text-ink tbl:whitespace-nowrap">{patient.name}</span>
+              <PatientStatusIcons status={care[patient.patientId]} showDetail />
+            </span>
+            {patient.nameNative ? <span className="block truncate text-xs font-normal text-ink-subtle">{patient.nameNative}</span> : null}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'ageSex',
+      header: 'Age / Sex',
+      className: 'whitespace-nowrap text-ink-muted',
+      sortValue: (row) => row.patient.age ?? -1,
+      cell: ({ patient }) => `${patient.age ?? '—'} · ${patient.sex}`,
+    },
+    { key: 'uhid', header: 'UHID', className: 'whitespace-nowrap tabular-nums text-ink-muted', sortValue: (row) => row.patient.uhid, cell: ({ patient }) => patient.uhid },
+    { key: 'mobile', header: 'Mobile', className: 'whitespace-nowrap tabular-nums text-ink-muted', cell: ({ patient }) => patient.mobile },
+    {
+      key: 'abha',
+      header: 'ABHA',
+      className: 'text-ink-muted',
+      cell: ({ patient }) => (
+        <span className="block tbl:max-w-[9rem] tbl:truncate xl:max-w-[12rem]" title={patient.abhaId ?? undefined}>
+          {patient.abhaId ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'now',
+      header: 'Now',
+      mobile: 'aside',
+      cell: (row) => (
+        <div className="flex flex-wrap justify-end gap-1.5 tbl:max-w-[13rem] tbl:justify-start">
+          {isToday(row) ? <Badge tone="stable">Registered today</Badge> : null}
+          {row.due > 0 ? (
+            <Badge tone={row.failed ? 'critical' : 'warning'}>
+              {row.failed ? 'Payment failed' : 'Payment pending'} · {formatRupees(row.due)}
+            </Badge>
+          ) : null}
+          {row.duplicate ? <Badge tone="warning">Possible duplicate</Badge> : null}
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div>
       <PageHeader
@@ -79,8 +139,8 @@ export function PatientsPage() {
         tabs={<PatientsTabs />}
       />
 
-      <div className="flex flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
-        <StatFilter label="Show patients" items={items} selected={filter} onSelect={selectFilter} columns="grid-cols-2 sm:grid-cols-3" />
+      <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
+        <StatFilter label="Show patients" items={items} selected={filter} onSelect={selectFilter} columns="sm:grid-cols-3" />
 
         <Card accentTone="teal">
           {shown.length === 0 ? (
@@ -90,74 +150,14 @@ export function PatientsPage() {
               description={EMPTY[filter].description}
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-border-soft bg-surface-2 text-left text-xs font-semibold text-ink-muted">
-                    <th className="px-5 py-2 font-semibold">Patient</th>
-                    <th className="px-5 py-2 font-semibold">Age / Sex</th>
-                    <th className="px-5 py-2 font-semibold">UHID</th>
-                    <th className="px-5 py-2 font-semibold">Mobile</th>
-                    <th className="px-5 py-2 font-semibold">ABHA</th>
-                    <th className="px-5 py-2 font-semibold">Now</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((row) => {
-                    const { patient } = row
-                    const open = () => navigate(`/patients/${patient.uhid}`)
-                    return (
-                      <tr
-                        key={patient.patientId}
-                        onClick={open}
-                        className="cursor-pointer border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2"
-                      >
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <Avatar initials={initialsOf(patient.name)} size="sm" />
-                            <div className="min-w-0">
-                              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    open()
-                                  }}
-                                  className="rounded-sm text-left font-medium text-ink underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary-600"
-                                >
-                                  {patient.name}
-                                </button>
-                                <PatientStatusIcons status={care[patient.patientId]} showDetail />
-                              </span>
-                              {patient.nameNative ? <span className="block text-xs text-ink-subtle">{patient.nameNative}</span> : null}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 text-ink-muted">
-                          {patient.age ?? '—'} · {patient.sex}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3 tabular-nums text-ink-muted">{patient.uhid}</td>
-                        <td className="whitespace-nowrap px-5 py-3 tabular-nums text-ink-muted">{patient.mobile}</td>
-                        <td className="max-w-[14rem] truncate whitespace-nowrap px-5 py-3 text-ink-muted" title={patient.abhaId ?? undefined}>
-                          {patient.abhaId ?? '—'}
-                        </td>
-                        <td className="px-5 py-3">
-                          <div className="flex flex-wrap gap-1.5">
-                            {isToday(row) ? <Badge tone="stable">Registered today</Badge> : null}
-                            {row.due > 0 ? (
-                              <Badge tone={row.failed ? 'critical' : 'warning'}>
-                                {row.failed ? 'Payment failed' : 'Payment pending'} · {formatRupees(row.due)}
-                              </Badge>
-                            ) : null}
-                            {row.duplicate ? <Badge tone="warning">Possible duplicate</Badge> : null}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTable
+              rows={shown}
+              columns={columns}
+              rowKey={(row) => row.patient.patientId}
+              onRowClick={(row) => openPatient(row.patient.uhid)}
+              rowLabel={(row) => `Open ${row.patient.name}`}
+              caption="Patients"
+            />
           )}
         </Card>
       </div>

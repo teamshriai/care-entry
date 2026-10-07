@@ -3,13 +3,15 @@ import { Link } from 'react-router-dom'
 import { Badge } from '../ui/Badge'
 import { EmptyState } from '../ui/EmptyState'
 import { AppointmentIllustration } from '../ui/illustrations/AppointmentIllustration'
-import { cn } from '../../utils/cn'
 import { formatClock } from '../../utils/format'
 import { appointmentStatusLabel } from '../../utils/appointment'
 import type { AppointmentRow } from '../../types/appointment'
 import { PatientStatusIcons } from '../patient/PatientStatusIcons'
 import { ModeBadge } from './ModeBadge'
 import { usePatientCareStatus } from '../../hooks/useCareStatus'
+import { ResponsiveTable } from '../ui/ResponsiveTable'
+import type { Column } from '../ui/ResponsiveTable'
+import { formatTime } from '../../domain/time'
 
 // Arrival column shows the real check-in timestamp from the linked Visit —
 // blank until the patient actually arrives, never a placeholder time.
@@ -52,85 +54,101 @@ export function AppointmentsTable({
 
   const rows = typeof maxRows === 'number' ? appointments.slice(0, maxRows) : appointments
 
+  const columns: Column<AppointmentRow>[] = [
+    {
+      key: 'time',
+      header: 'Time',
+      className: 'whitespace-nowrap font-medium tabular-nums text-ink',
+      mobile: 'subtitle',
+      sortValue: (a) => a.slot,
+      cell: (a) => formatTime(a.slot),
+    },
+    {
+      key: 'patient',
+      header: 'Patient',
+      mobile: 'title',
+      sortValue: (a) => a.patient?.name ?? '',
+      cell: (a) => (
+        <>
+          <span className="flex min-w-0 items-center gap-1.5 text-ink tbl:max-w-[14rem]">
+            {a.patient ? (
+              <Link
+                to={`/patients/${a.patient.uhid}`}
+                title={`Open ${a.patient.name}'s profile`}
+                className="focus-ring -my-3 truncate rounded py-3 font-medium text-ink underline-offset-2 hover:text-primary-text hover:underline"
+              >
+                {a.patient.name}
+              </Link>
+            ) : (
+              <span className="truncate">—</span>
+            )}
+            <PatientStatusIcons status={care[a.patientId]} />
+          </span>
+          {compact ? null : <span className="block text-2xs font-normal text-ink-subtle">{a.patient?.uhid}</span>}
+        </>
+      ),
+    },
+    {
+      key: 'doctor',
+      header: 'Doctor',
+      sortValue: (a) => a.provider?.name ?? '',
+      cell: (a) => (
+        <>
+          <span className="block text-ink-muted tbl:max-w-[11rem] tbl:truncate" title={a.provider?.name}>
+            {a.provider?.name ?? '—'}
+          </span>
+          {a.mode === 'Teleconsult' ? <ModeBadge mode="Teleconsult" /> : null}
+        </>
+      ),
+    },
+    ...(compact
+      ? []
+      : [{ key: 'department', header: 'Department', className: 'whitespace-nowrap text-ink-muted', cell: (a: AppointmentRow) => a.department } satisfies Column<AppointmentRow>]),
+    {
+      key: 'status',
+      header: 'Status',
+      className: 'whitespace-nowrap',
+      mobile: 'aside',
+      cell: (a) =>
+        renderStatus ? (
+          renderStatus(a)
+        ) : (
+          <Badge status={a.status} className={compact ? 'px-2' : undefined}>
+            {appointmentStatusLabel(a.status)}
+          </Badge>
+        ),
+    },
+    ...(compact
+      ? []
+      : [
+          {
+            key: 'checkedIn',
+            header: 'Checked in',
+            className: 'whitespace-nowrap tabular-nums text-ink-muted',
+            cell: (a: AppointmentRow) =>
+              a.visit?.checkInTime ? <span title="When the patient checked in">{formatClock(a.visit.checkInTime)}</span> : <span className="text-ink-subtle">—</span>,
+          } satisfies Column<AppointmentRow>,
+        ]),
+    // Omitted entirely (not just left empty) when there's nothing to act on.
+    ...(renderActions
+      ? [
+          {
+            key: 'actions',
+            header: actionsLabel ?? <span className="sr-only">Actions</span>,
+            className: 'whitespace-nowrap',
+            mobile: 'actions',
+            cell: (a: AppointmentRow) => <div className="flex flex-wrap items-center gap-1.5">{renderActions(a)}</div>,
+          } satisfies Column<AppointmentRow>,
+        ]
+      : []),
+  ]
+
   return (
-    <div className="overflow-x-auto">
-      <table className={cn('w-full border-collapse text-sm', compact ? 'min-w-[380px] [&_td]:px-1.5 [&_th]:px-1.5 [&_td:first-child]:pl-3.5 [&_th:first-child]:pl-3.5 [&_td:last-child]:pr-3.5 [&_th:last-child]:pr-3.5' : 'min-w-[820px]')}>
-        <thead>
-          <tr className="border-b border-border-soft bg-surface-2 text-left text-xs font-semibold text-ink-muted">
-            <th className="px-5 py-2 font-semibold">Time</th>
-            <th className="px-5 py-2 font-semibold">Patient</th>
-            <th className="px-5 py-2 font-semibold">Doctor</th>
-            {compact ? null : <th className="px-5 py-2 font-semibold">Department</th>}
-            <th className="px-5 py-2 font-semibold">Status</th>
-            {compact ? null : <th className="px-5 py-2 font-semibold">Checked in</th>}
-            {/* Omitted entirely (not just left empty) when there's nothing to
-                act on — a view with no per-row action shouldn't carry a
-                trailing blank column just to match this table's usual shape. */}
-            {renderActions ? <th className="px-5 py-2 font-semibold">{actionsLabel}</th> : null}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((appointment) => (
-            <tr
-              key={appointment.appointmentId}
-              className="border-b border-border-soft transition-colors last:border-b-0 hover:bg-surface-2"
-            >
-              <td className="whitespace-nowrap px-5 py-3 font-medium tabular-nums text-ink">{appointment.slot}</td>
-              <td className="px-5 py-3">
-                <p className="flex max-w-[14rem] items-center gap-1.5 text-ink">
-                  {appointment.patient ? (
-                    <Link
-                      to={`/patients/${appointment.patient.uhid}`}
-                      title={`Open ${appointment.patient.name}'s profile`}
-                      className="truncate rounded-sm font-medium text-ink underline-offset-2 hover:text-primary-text hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600"
-                    >
-                      {appointment.patient.name}
-                    </Link>
-                  ) : (
-                    <span className="truncate">—</span>
-                  )}
-                  <PatientStatusIcons status={care[appointment.patientId]} />
-                </p>
-                {compact ? null : (
-                  <p className="text-2xs text-ink-faint">{appointment.patient?.uhid}</p>
-                )}
-              </td>
-              <td className="px-5 py-3">
-                <p className="max-w-[11rem] truncate text-ink-muted" title={appointment.provider?.name}>
-                  {appointment.provider?.name ?? '—'}
-                </p>
-                {appointment.mode === 'Teleconsult' ? <ModeBadge mode="Teleconsult" /> : null}
-              </td>
-              {compact ? null : (
-                <td className="whitespace-nowrap px-5 py-3 text-ink-muted">{appointment.department}</td>
-              )}
-              <td className="whitespace-nowrap px-5 py-3">
-                {renderStatus ? (
-                  renderStatus(appointment)
-                ) : (
-                  <Badge status={appointment.status} className={compact ? 'px-2' : undefined}>
-                    {appointmentStatusLabel(appointment.status)}
-                  </Badge>
-                )}
-              </td>
-              {compact ? null : (
-                <td className="whitespace-nowrap px-5 py-3 text-ink-muted tabular-nums">
-                  {appointment.visit?.checkInTime ? (
-                    <span title="When the patient checked in">{formatClock(appointment.visit.checkInTime)}</span>
-                  ) : (
-                    <span className="text-ink-faint">—</span>
-                  )}
-                </td>
-              )}
-              {renderActions ? (
-                <td className="whitespace-nowrap px-5 py-3">
-                  <div className="flex items-center gap-1.5">{renderActions(appointment)}</div>
-                </td>
-              ) : null}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ResponsiveTable
+      rows={rows}
+      columns={columns}
+      rowKey={(a) => a.appointmentId}
+      caption="Appointments"
+    />
   )
 }

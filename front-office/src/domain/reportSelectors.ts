@@ -6,9 +6,9 @@
 // backend exists, getActivityEvents is the one function to swap for its
 // event feed — everything below works on ActivityEvent only.
 import type { AppState } from '../types/store'
-import { dayStartTimestamp, slotToTimestamp, todayKey } from './time'
+import { dayStartTimestamp, formatHour, slotToTimestamp, todayKey } from './time'
 import { addDaysToKey as addDaysKey } from './selectors'
-import type { StatHue } from '../utils/statHue'
+import type { IconTone } from '../utils/toneHex'
 
 export type ActivityType =
   | 'PATIENT_REGISTERED'
@@ -25,7 +25,7 @@ export interface ActivityTypeInfo {
   label: string
   /** The past-tense line in the activity table. */
   event: string
-  hue: StatHue
+  hue: IconTone
 }
 
 export const ACTIVITY_TYPES: ActivityTypeInfo[] = [
@@ -33,7 +33,7 @@ export const ACTIVITY_TYPES: ActivityTypeInfo[] = [
   { type: 'APPOINTMENT_SCHEDULED', label: 'Appointment Scheduled', event: 'Appointment Scheduled', hue: 'blue' },
   { type: 'PATIENT_CHECKED_IN', label: 'Patient Checked In', event: 'Patient Checked In', hue: 'orange' },
   { type: 'GUEST_PASS_ISSUED', label: 'Guest Pass Issued', event: 'Guest Pass Issued', hue: 'indigo' },
-  { type: 'PATIENT_ADMITTED', label: 'Admission', event: 'Admission', hue: 'purple' },
+  { type: 'PATIENT_ADMITTED', label: 'Admission', event: 'Admission', hue: 'violet' },
   { type: 'PATIENT_DISCHARGED', label: 'Discharge', event: 'Discharge', hue: 'pink' },
   { type: 'PAYMENT_COMPLETED', label: 'Payment', event: 'Payment', hue: 'green' },
 ]
@@ -343,7 +343,7 @@ export function activityTrend(events: ActivityEvent[], range: ReportRange, scale
     const last = isToday ? Math.max(first, new Date(now).getHours(), ...hours) : Math.max(20, ...hours)
     const points: TrendPoint[] = []
     for (let h = first; h <= last; h += 1) {
-      points.push({ key: String(h), label: `${String(h).padStart(2, '0')}:00`, value: hours.filter((x) => x === h).length })
+      points.push({ key: String(h), label: formatHour(h), value: hours.filter((x) => x === h).length })
     }
     return points
   }

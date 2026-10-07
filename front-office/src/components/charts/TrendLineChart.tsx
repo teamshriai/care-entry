@@ -26,15 +26,15 @@ function niceMax(value: number): number {
  */
 export function TrendLineChart({
   points,
-  colorVar = '--color-stat-blue',
+  color = 'var(--color-chart-1)',
   ariaLabel,
   unit = 'activities',
   xTitle,
   yTitle,
 }: {
   points: LinePoint[]
-  /** A CSS custom property holding the line colour. */
-  colorVar?: string
+  /** The line colour — a CSS colour or var(); chart-1 by default. */
+  color?: string
   ariaLabel: string
   unit?: string
   /** What the horizontal axis is, e.g. "Hour of the day". */
@@ -62,7 +62,6 @@ export function TrendLineChart({
   const area = points.length ? `${line} L${x(points.length - 1).toFixed(1)},${y(0)} L${x(0).toFixed(1)},${y(0)} Z` : ''
   // Keep x labels from colliding: show every nth so each has ~56px.
   const every = Math.max(1, Math.ceil((points.length * 56) / Math.max(innerW, 1)))
-  const color = `var(${colorVar})`
   // The busiest point(s) get a filled dot; every point prints its number while
   // there are few enough to read (otherwise only the busiest does).
   const peak = Math.max(0, ...points.map((p) => p.value))
@@ -77,7 +76,7 @@ export function TrendLineChart({
             return (
               <g key={step}>
                 <line x1={PAD.left} x2={width - PAD.right} y1={y(value)} y2={y(value)} stroke="var(--color-border-soft)" strokeWidth={1} />
-                <text x={PAD.left - 8} y={y(value)} textAnchor="end" dominantBaseline="middle" className="fill-ink-subtle text-[11px] tabular-nums">
+                <text x={PAD.left - 8} y={y(value)} textAnchor="end" dominantBaseline="middle" className="fill-ink-subtle text-2xs tabular-nums">
                   {Math.round(value)}
                 </text>
               </g>
@@ -93,25 +92,25 @@ export function TrendLineChart({
                 <title>{`${p.label}: ${p.value} ${unit}`}</title>
               </circle>
               {(showAllValues && p.value > 0) || isPeak ? (
-                <text x={x(i)} y={y(p.value) - 10} textAnchor="middle" className={isPeak ? 'fill-ink text-[12px] font-bold' : 'fill-ink-muted text-[11px] font-semibold'}>
+                <text x={x(i)} y={y(p.value) - 10} textAnchor="middle" className={isPeak ? 'fill-ink text-xs font-bold' : 'fill-ink-muted text-2xs font-semibold'}>
                   {p.value}
                 </text>
               ) : null}
               {i % every === 0 || (i === points.length - 1 && (points.length - 1) % every >= every / 2) ? (
-                <text x={x(i)} y={HEIGHT - 28} textAnchor="middle" className="fill-ink-subtle text-[11px]">
+                <text x={x(i)} y={HEIGHT - 28} textAnchor="middle" className="fill-ink-subtle text-2xs">
                   {p.label}
                 </text>
               ) : null}
             </g>
             )
           })}
-          <text x={PAD.left + innerW / 2} y={HEIGHT - 6} textAnchor="middle" className="fill-ink-muted text-[12px] font-semibold">
+          <text x={PAD.left + innerW / 2} y={HEIGHT - 6} textAnchor="middle" className="fill-ink-muted text-xs font-semibold">
             {xTitle}
           </text>
           <text
             transform={`translate(14 ${PAD.top + innerH / 2}) rotate(-90)`}
             textAnchor="middle"
-            className="fill-ink-muted text-[12px] font-semibold"
+            className="fill-ink-muted text-xs font-semibold"
           >
             {yTitle}
           </text>

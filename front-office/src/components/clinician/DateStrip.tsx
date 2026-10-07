@@ -1,9 +1,18 @@
 import { cn } from '../../utils/cn'
-import { relativeDayLabel } from '../../utils/dates'
+import { tintedChip } from '../../utils/chipTone'
 import type { DateStripDay } from '../../domain/selectors'
+import { addDaysToKey } from '../../domain/selectors'
+import { dayStartTimestamp } from '../../domain/time'
 
-/** Two weeks of one doctor's days — open ones with their free-slot count,
- *  the rest shown as full, on leave or off so the desk can say why. */
+const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * Two weeks of one doctor's days as small calendar cards — the weekday (or
+ * Today / Tomorrow), the date, and how many times are free. A day that
+ * can't be booked says why (Full, Leave, Off) and can't be chosen. Scrolls
+ * sideways where the fortnight is wider than the space.
+ */
 export function DateStrip({
   days,
   selected,
@@ -15,31 +24,41 @@ export function DateStrip({
   onSelect: (date: string) => void
   today: string
 }) {
+  const tomorrow = addDaysToKey(today, 1)
+  const open = tintedChip('blue')
   return (
-    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 scrollbar-hide" role="group" aria-label="Day">
+    <div className="scrollbar-hide scroll-fade-x -mx-1 flex snap-x gap-1.5 overflow-x-auto px-1 py-1" role="group" aria-label="Day">
       {days.map((day) => {
         const selectable = day.state === 'open'
         const isSelected = day.date === selected
+        const date = new Date(dayStartTimestamp(day.date))
+        const top = day.date === today ? 'Today' : day.date === tomorrow ? 'Tmrw' : WEEKDAY[date.getDay()]
+        const bottom = day.state === 'open' ? `${day.open} free` : day.state === 'full' ? 'Full' : day.state === 'leave' ? 'Leave' : 'Off'
+        const spoken = `${day.date === today ? 'Today, ' : day.date === tomorrow ? 'Tomorrow, ' : ''}${WEEKDAY[date.getDay()]} ${date.getDate()} ${MONTH[date.getMonth()]} — ${
+          day.state === 'open' ? `${day.open} free ${day.open === 1 ? 'time' : 'times'}` : day.state === 'full' ? 'fully booked' : day.state === 'leave' ? 'doctor on leave' : 'not working'
+        }`
         return (
           <button
             key={day.date}
             type="button"
             disabled={!selectable}
-            aria-pressed={isSelected}
+            aria-pressed={selectable ? isSelected : undefined}
+            aria-label={spoken}
+            title={spoken}
             onClick={() => onSelect(day.date)}
+            style={!isSelected && selectable ? open.style : undefined}
             className={cn(
-              'flex min-w-[4.5rem] shrink-0 flex-col items-center rounded-lg border px-2 py-1.5 text-xs transition-colors',
+              'focus-ring flex w-[4.25rem] shrink-0 snap-start flex-col items-center gap-0.5 rounded-xl border px-1 py-2 transition-all duration-200',
               isSelected
-                ? 'border-primary-600 bg-primary-600 text-on-primary'
+                ? 'border-transparent bg-[image:var(--gradient-primary)] text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_6px_16px_-6px_rgba(37,99,235,0.6)]'
                 : selectable
-                  ? 'border-border bg-surface-1 text-ink hover:bg-surface-2'
-                  : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle',
+                  ? cn(open.className, 'hover:-translate-y-0.5 hover:shadow-card-md')
+                  : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle opacity-70',
             )}
           >
-            <span className="font-semibold">{relativeDayLabel(day.date, today)}</span>
-            <span className={isSelected ? 'opacity-85' : 'text-ink-muted'}>
-              {day.state === 'open' ? `${day.open} open` : day.state === 'full' ? 'Full' : day.state === 'leave' ? 'Leave' : 'Off'}
-            </span>
+            <span className="text-2xs font-semibold uppercase tracking-wide opacity-85">{top}</span>
+            <span className="text-lg font-bold leading-none tabular-nums">{date.getDate()}</span>
+            <span className={cn('text-2xs font-medium', isSelected ? 'opacity-90' : 'opacity-80')}>{bottom}</span>
           </button>
         )
       })}

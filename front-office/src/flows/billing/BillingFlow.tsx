@@ -167,8 +167,8 @@ export function BillingFlow({ params, onClose }: FlowProps) {
                     setDraft((current) => (active ? current.filter((c) => c.code !== item.code) : [...current, item]))
                   }
                   className={cn(
-                    'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                    active ? 'border-primary-600 bg-primary-600 text-on-primary' : 'border-border bg-surface-1 text-ink-muted hover:bg-surface-2',
+                    'focus-ring flex min-h-11 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors',
+                    active ? 'border-primary-600 bg-primary-600 text-on-primary shadow-card' : 'border-border-soft bg-surface-1 text-ink-muted hover:border-border-strong hover:text-ink',
                   )}
                 >
                   <Plus className="h-3 w-3" strokeWidth={2} />
@@ -206,7 +206,7 @@ export function BillingFlow({ params, onClose }: FlowProps) {
 function BillRow({ bill, action }: { bill: Payment; action?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface-1 px-4 py-3">
-      <Link to={`/payments/${bill.paymentId}`} className="min-w-0 flex-1 basis-48">
+      <Link to={`/payments/${bill.paymentId}`} className="focus-ring -my-1 min-w-0 flex-1 basis-48 rounded-lg py-1">
         <span className="block truncate text-sm font-semibold text-ink hover:text-primary-text">{billServicesSummary(bill)}</span>
         <span className="block truncate text-xs text-ink-muted">
           {billNumberFor(bill)} · {formatRupees(bill.totalAmount)}

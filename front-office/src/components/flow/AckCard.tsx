@@ -8,8 +8,9 @@ export const ACK_DURATION_MS = 2500
 
 /**
  * The end of every flow: a short confirmation of what just happened, then
- * the flow closes by itself — nobody has to click "Done". Enter (or Escape,
- * via the sheet) closes it early.
+ * the flow closes by itself — nobody has to click "Done", though the button
+ * is there for anyone who wants to move on now. Enter (or Escape, via the
+ * sheet) closes it early too.
  */
 export function AckCard({
   title,
@@ -19,6 +20,7 @@ export function AckCard({
   action,
   onDone,
   durationMs = ACK_DURATION_MS,
+  footer,
 }: {
   title: ReactNode
   children?: ReactNode
@@ -28,16 +30,21 @@ export function AckCard({
   action?: ReactNode
   onDone: () => void
   durationMs?: number
+  /** The card's own buttons (e.g. Cancel and Done). With them the card waits
+   *  for a choice — no countdown, no closing by itself. */
+  footer?: ReactNode
 }) {
   const done = useRef(onDone)
   useEffect(() => {
     done.current = onDone
   })
 
+  const waits = Boolean(footer)
   useEffect(() => {
+    if (waits) return undefined
     const timer = window.setTimeout(() => done.current(), durationMs)
     return () => window.clearTimeout(timer)
-  }, [durationMs])
+  }, [durationMs, waits])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -54,15 +61,28 @@ export function AckCard({
   return (
     <div role="status" aria-live="polite" className="flex flex-col items-center px-4 py-10 text-center">
       <IconBadge icon={icon} tone={tone} size="md" />
-      <h3 className="mt-4 text-xl font-semibold tracking-tight text-ink">{title}</h3>
+      <h3 className="mt-4 text-xl font-bold tracking-[-0.02em] text-ink">{title}</h3>
       {children ? <div className="mt-2 space-y-1 text-sm text-ink-muted">{children}</div> : null}
       {action ? <div className="mt-5">{action}</div> : null}
-      <div className="mt-8 h-1 w-40 overflow-hidden rounded-full bg-surface-3" aria-hidden="true">
-        <div
-          className="h-full origin-left rounded-full bg-stable"
-          style={{ animation: `ackProgress ${durationMs}ms linear forwards` }}
-        />
-      </div>
+      {footer ? (
+        <div className="mt-6 flex w-full flex-col-reverse gap-2.5 sm:flex-row sm:justify-center">{footer}</div>
+      ) : (
+        <>
+          <div className="mt-7 h-1 w-40 overflow-hidden rounded-full bg-surface-3" aria-hidden="true">
+            <div
+              className="h-full origin-left rounded-full bg-success-fg"
+              style={{ animation: `ackProgress ${durationMs}ms linear forwards` }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => done.current()}
+            className="focus-ring mt-3 inline-flex min-h-10 items-center rounded-lg px-3 text-sm font-semibold text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+          >
+            Done
+          </button>
+        </>
+      )}
     </div>
   )
 }

@@ -1,18 +1,16 @@
 import type { ElementType } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { cn } from '../../utils/cn'
-import { STAT_HUE } from '../../utils/statHue'
-import type { StatHue } from '../../utils/statHue'
-
+import { Link } from 'react-router-dom'
+import type { IconTone } from '../../utils/toneHex'
+import { FigureBody } from '../ui/Figure'
+import { figureClasses, figureStyle } from '../../utils/figure'
 
 /**
- * One dashboard figure, in the clinician portal's compact style: a tinted
- * card, a solid icon square, the figure in the hue's ink, a label and one
- * line saying what it is made of. The whole card opens the place that holds
- * the figure.
+ * One dashboard figure: a card washed in its hue, a soft icon tile, the
+ * count, a label and one line saying what it is made of. The whole card
+ * opens the place that holds the figure.
  */
 export function StatCard({
-  icon: Icon,
+  icon,
   hue,
   value,
   label,
@@ -23,7 +21,7 @@ export function StatCard({
   onSelect,
 }: {
   icon: ElementType
-  hue: StatHue
+  hue: IconTone
   value: number | string
   label: string
   hint: string
@@ -33,23 +31,10 @@ export function StatCard({
   title?: string
   /** Makes the card a choice on the same page (no navigation): called when it is pressed. */
   onSelect?: () => void
-  /** With onSelect: this is the chosen card — ringed in its hue and lifted. */
+  /** With onSelect: this is the chosen card — ringed and lifted. */
   selected?: boolean
 }) {
-  const navigate = useNavigate()
-  const style = STAT_HUE[hue]
-  const body = (
-    <>
-      <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white', style.icon)}>
-        <Icon className="h-5 w-5" strokeWidth={2} aria-hidden="true" />
-      </span>
-      <span className="min-w-0">
-        <span className={cn('block text-2xl font-bold leading-none tabular-nums', style.ink)}>{value}</span>
-        <span className="mt-1 block text-sm font-semibold leading-tight text-ink">{label}</span>
-        <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-ink-muted">{hint}</span>
-      </span>
-    </>
-  )
+  const body = <FigureBody icon={icon} hue={hue} value={value} label={label} hint={hint} />
   if (onSelect) {
     return (
       <button
@@ -57,11 +42,8 @@ export function StatCard({
         onClick={onSelect}
         aria-pressed={Boolean(selected)}
         title={title}
-        className={cn(
-          'focus-ring flex min-w-0 flex-col items-start gap-2 rounded-2xl p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-card-md sm:flex-row sm:items-center sm:gap-3',
-          style.card,
-          selected && cn('-translate-y-0.5 shadow-card-md ring-2', style.ring),
-        )}
+        className={figureClasses({ interactive: true, selected })}
+        style={figureStyle(hue, selected)}
       >
         {body}
       </button>
@@ -69,23 +51,14 @@ export function StatCard({
   }
   if (!to) {
     return (
-      <div className={cn('flex min-w-0 flex-col items-start gap-2 rounded-2xl p-3 text-left sm:flex-row sm:items-center sm:gap-3', style.card)}>
+      <div className={figureClasses({ interactive: false })} style={figureStyle(hue)}>
         {body}
       </div>
     )
   }
   return (
-    <button
-      type="button"
-      onClick={() => navigate(to)}
-      title={title}
-      className={cn(
-        // A phone stacks the icon over the figure so nothing is cut short.
-        'focus-ring flex min-w-0 flex-col items-start gap-2 rounded-2xl p-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:shadow-card-md sm:flex-row sm:items-center sm:gap-3',
-        style.card,
-      )}
-    >
+    <Link to={to} title={title} className={figureClasses({ interactive: true })} style={figureStyle(hue)}>
       {body}
-    </button>
+    </Link>
   )
 }

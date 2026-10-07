@@ -33,10 +33,12 @@ import { cn } from '../../utils/cn'
 import type { FlowProps } from '../registry'
 import type { Appointment, BookingPlace, ConsultMode, UnavailableParty } from '../../types/appointment'
 import type { Payment } from '../../types/payment'
+import { inputClass } from '../../utils/formClasses'
+import { formatTime } from '../../domain/time'
 
 /** One line for a booking's place: doctor · day date · time · mode. */
 function placeLine(place: BookingPlace, doctorName: string, today: string): string {
-  return `${doctorName} · ${dayWithDate(place.date, today)} · ${place.slot}${place.mode === 'Teleconsult' ? ' · Teleconsult' : ''}`
+  return `${doctorName} · ${dayWithDate(place.date, today)} · ${formatTime(place.slot)}${place.mode === 'Teleconsult' ? ' · Teleconsult' : ''}`
 }
 
 /**
@@ -100,7 +102,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
       >
         <p className="text-base font-semibold text-ink">{movedDoctor}</p>
         <p>
-          {dayWithDate(moved.date, today)} · {moved.slot}
+          {dayWithDate(moved.date, today)} · {formatTime(moved.slot)}
         </p>
         <p className="inline-flex items-center gap-1.5">
           {moved.mode === 'Teleconsult' ? <Video className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" /> : <Building2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />}
@@ -188,7 +190,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
           <span className="text-xs font-medium text-ink-muted" aria-hidden="true">
             Who can't make the booked time?
           </span>
-          <div className="inline-flex rounded-lg border border-border p-0.5" role="radiogroup" aria-label="Who can't make the booked time">
+          <div className="inline-flex flex-wrap gap-1 rounded-xl border border-border-soft bg-surface-2 p-1" role="radiogroup" aria-label="Who can't make the booked time">
             {(['Patient', 'Doctor'] as UnavailableParty[]).map((party) => (
               <button
                 key={party}
@@ -197,8 +199,8 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
                 aria-checked={by === party}
                 onClick={() => setBy(party)}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                  by === party ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
+                  'focus-ring min-h-11 rounded-lg px-3.5 text-sm font-medium transition-colors',
+                  by === party ? 'bg-surface-1 text-ink shadow-card' : 'text-ink-muted hover:text-ink',
                 )}
               >
                 {party === 'Patient' ? 'The patient' : 'The doctor'}
@@ -212,26 +214,26 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
           placeholder="Note (optional) — e.g. patient travelling, doctor in surgery"
           aria-label="Note (optional)"
           maxLength={120}
-          className="h-11 w-full rounded-lg border border-border bg-surface-1 px-3 text-sm text-ink outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600"
+          className={inputClass}
         />
         <Button size="lg" disabled={!ready} onClick={move}>
           <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} />
           {charge > 0 ? `Reschedule & send ${formatRupees(charge)} bill` : 'Reschedule'}
         </Button>
       </div>
-      <p className={cn('text-xs', charge > 0 ? 'font-medium text-warning' : 'text-ink-muted')}>
+      <p className={cn('text-xs', charge > 0 ? 'font-medium text-warning-fg' : 'text-ink-muted')}>
         {provider ? moneyLine() : 'Choose the doctor and time, and who can\'t make the booked time, to confirm.'}
       </p>
     </div>
   )
 
   return sheet(
-    <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-2">
+    <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:h-full lg:grid-cols-2 lg:grid-rows-[minmax(0,2fr)_minmax(0,3fr)]">
       {/* Top-left · Patient — fixed by the booking */}
       <Quadrant step={1} title="Patient" done summary={patient ? `${patient.name} · ${patient.uhid}` : undefined}>
         <div className="flex flex-col gap-3">
           {patient ? (
-            <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3">
+            <div className="rounded-xl border border-primary-200 dark:border-primary-500/35 bg-primary-50 px-4 py-3">
               <p className="truncate text-base font-semibold text-ink">{patient.name}</p>
               <p className="mt-0.5 text-sm text-ink-muted">
                 {patient.uhid}
@@ -273,7 +275,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
             const diff = s.provider.consultationFee - feePaid
             if (diff === 0) return null
             return (
-              <span className={cn('mt-0.5 block text-xs', diff > 0 ? 'text-warning' : 'text-ink-muted')}>
+              <span className={cn('mt-0.5 block text-xs', diff > 0 ? 'text-warning-fg' : 'text-ink-muted')}>
                 {diff > 0 ? `${formatRupees(diff)} more — charged if the patient asks for this doctor` : `${formatRupees(-diff)} less — not refunded`}
               </span>
             )
@@ -286,7 +288,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
         step={4}
         title="Time"
         done={timeDone}
-        summary={date && slot ? `${relativeDayLabel(date, today)} ${slot}${mode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined}
+        summary={date && slot ? `${relativeDayLabel(date, today)} ${formatTime(slot)}${mode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined}
       >
         {!provider ? (
           <Waiting>Choose a doctor to see their open times.</Waiting>
@@ -295,7 +297,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
             {modes.length > 1 ? (
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium text-ink-muted">How</span>
-                <div className="inline-flex rounded-lg border border-border p-0.5" role="group" aria-label="How the patient is seen">
+                <div className="inline-flex flex-wrap gap-1 rounded-xl border border-border-soft bg-surface-2 p-1" role="group" aria-label="How the patient is seen">
                   {modes.map((option) => (
                     <button
                       key={option}
@@ -303,8 +305,8 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
                       aria-pressed={option === mode}
                       onClick={() => setMode(option)}
                       className={cn(
-                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                        option === mode ? 'bg-primary-600 text-on-primary' : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
+                        'focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 text-sm font-medium transition-colors',
+                        option === mode ? 'bg-surface-1 text-ink shadow-card' : 'text-ink-muted hover:text-ink',
                       )}
                     >
                       {option === 'Teleconsult' ? (
@@ -319,7 +321,7 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
               </div>
             ) : modes[0] === 'Teleconsult' ? (
               <p className="inline-flex items-center gap-1.5 text-xs text-ink-muted">
-                <Video className="h-3.5 w-3.5 text-purple" strokeWidth={1.75} aria-hidden="true" />
+                <Video className="h-3.5 w-3.5 text-therapy-fg" strokeWidth={1.75} aria-hidden="true" />
                 Teleconsult only — the patient joins by video.
               </p>
             ) : null}

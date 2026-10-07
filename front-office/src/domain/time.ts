@@ -24,6 +24,34 @@ export function slotLabel(timestamp: number): string {
   return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
 }
 
+/**
+ * A time for people to read: 12-hour with AM/PM ("9:05 AM", "12:30 PM").
+ * Slots stay "HH:MM" everywhere as data — keys, sorting, URL params — and
+ * become this only at the point they are shown.
+ */
+export function formatTime(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  return `${hour12}:${pad2(m)} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+/** "9:00 AM – 1:00 PM" */
+export function formatTimeRange(start: string, end: string): string {
+  return `${formatTime(start)} – ${formatTime(end)}`
+}
+
+/** A timestamp's local time, 12-hour. */
+export function formatTimestampTime(timestamp: number): string {
+  return formatTime(slotLabel(timestamp))
+}
+
+/** An hour of the day as "9 AM" / "12 PM" (axes and hour blocks). */
+export function formatHour(hour: number): string {
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12
+  return `${hour12} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
 export function slotToTimestamp(dateKey: string, slot: string): number {
   const [hours, minutes] = slot.split(':').map(Number)
   return dayStartTimestamp(dateKey) + (hours * 60 + minutes) * 60000

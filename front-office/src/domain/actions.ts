@@ -18,7 +18,7 @@ import {
   getBillsForAppointment,
   getConsultationBillItems,
 } from './selectors'
-import { dayStartTimestamp, slotToTimestamp, todayKey } from './time'
+import { dayStartTimestamp, formatTime, slotToTimestamp, todayKey } from './time'
 import { DomainError } from './errors'
 import { MOBILE_ERROR, formatMobile, isValidMobile } from '../utils/phone'
 import {
@@ -234,7 +234,7 @@ function applyBooking(
       appointments: [...state.appointments, appointment],
       nextIds: { ...state.nextIds, appointment: state.nextIds.appointment + 1 },
     },
-    [{ text: 'Appointment booked', meta: `${patientName(state, patientId)} → ${providerName(state, providerId)} at ${slot}` }],
+    [{ text: 'Appointment booked', meta: `${patientName(state, patientId)} → ${providerName(state, providerId)} at ${formatTime(slot)}` }],
   )
   return { state: next, value: appointment }
 }
@@ -317,7 +317,7 @@ function applyCancelBooking(state: AppState, appointmentId: string, by: Unavaila
   next = logged({ ...next, appointments: next.appointments.map((a) => (a.appointmentId === appointmentId ? cancelled : a)) }, [
     {
       text: 'Appointment cancelled',
-      meta: `${patientName(state, appointment.patientId)} · ${providerName(state, appointment.providerId)} · ${appointment.date} ${appointment.slot} · ${reason}`,
+      meta: `${patientName(state, appointment.patientId)} · ${providerName(state, appointment.providerId)} · ${appointment.date} ${formatTime(appointment.slot)} · ${reason}`,
     },
   ])
   return { state: next, value: cancelled }
@@ -365,7 +365,7 @@ export function markNoShow(appointmentId: string): Appointment {
   const updated: Appointment = { ...appointment, status: 'No-show' }
   setState(
     logged({ ...state, appointments: state.appointments.map((a) => (a.appointmentId === appointmentId ? updated : a)) }, [
-      { text: 'Marked as no-show', meta: `${patientName(state, appointment.patientId)} · ${providerName(state, appointment.providerId)} · ${appointment.slot} · fee kept` },
+      { text: 'Marked as no-show', meta: `${patientName(state, appointment.patientId)} · ${providerName(state, appointment.providerId)} · ${formatTime(appointment.slot)} · fee kept` },
     ]),
   )
   return updated
@@ -460,7 +460,7 @@ export function rescheduleAppointment({ appointmentId, providerId, date, slot, m
     [
       {
         text: 'Appointment rescheduled',
-        meta: `${patientName(state, appointment.patientId)} · ${providerName(state, from.providerId)} ${from.date} ${from.slot} → ${provider.name} ${date} ${slot} · ${by === 'Doctor' ? 'doctor unavailable' : 'patient’s request'}`,
+        meta: `${patientName(state, appointment.patientId)} · ${providerName(state, from.providerId)} ${from.date} ${formatTime(from.slot)} → ${provider.name} ${date} ${formatTime(slot)} · ${by === 'Doctor' ? 'doctor unavailable' : 'patient’s request'}`,
       },
     ],
   )
