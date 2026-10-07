@@ -166,6 +166,8 @@ Large-text mode (`html[data-large-text='true']`) re-defines the *tokens*, so the
 | `text-3xl` | 1.875rem / 30px | 2rem | Page titles (patient portal, sm+) |
 | `text-4xl` | 2.25rem / 36px | 2.375rem | Rare display |
 
+From 1024px the root steps down to 15px for desk density, but the ramp is lifted by 16/15 there (both modes), so these pixel sizes hold on every screen: only spacing tightens, never text.
+
 Below 767px, all `input`, `select` and `textarea` elements get `font-size: max(16px, 1em)`. This stops iOS from zooming when a field gets focus.
 
 ### 3.4 Heading recipes

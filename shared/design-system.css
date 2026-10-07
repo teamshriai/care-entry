@@ -368,6 +368,17 @@ html[data-high-contrast='true'][data-theme='dark'] {
   @media (min-width: 64rem) {
     html {
       font-size: 93.75%;
+      /* Spacing tightens, text does not: the ramp is scaled back up by
+         16/15 so desk text keeps its full 12/13/14/16px sizes. */
+      --text-2xs: calc(0.75rem * 16 / 15);
+      --text-xs: calc(0.8125rem * 16 / 15);
+      --text-sm: calc(0.875rem * 16 / 15);
+      --text-base: calc(1rem * 16 / 15);
+      --text-lg: calc(1.125rem * 16 / 15);
+      --text-xl: calc(1.25rem * 16 / 15);
+      --text-2xl: calc(1.5rem * 16 / 15);
+      --text-3xl: calc(1.875rem * 16 / 15);
+      --text-4xl: calc(2.25rem * 16 / 15);
     }
   }
 
@@ -502,6 +513,20 @@ html[data-high-contrast='true'][data-theme='dark'] {
     --text-4xl: 2.375rem;
     --row-h-compact: 2.375rem;
     --row-h-comfortable: 2.875rem;
+  }
+  /* …and on a desk screen, the same 16/15 lift as the normal ramp. */
+  @media (min-width: 64rem) {
+    html[data-large-text='true'] {
+      --text-2xs: calc(0.875rem * 16 / 15);
+      --text-xs: calc(0.9375rem * 16 / 15);
+      --text-sm: calc(1rem * 16 / 15);
+      --text-base: calc(1.125rem * 16 / 15);
+      --text-lg: calc(1.25rem * 16 / 15);
+      --text-xl: calc(1.375rem * 16 / 15);
+      --text-2xl: calc(1.625rem * 16 / 15);
+      --text-3xl: calc(2rem * 16 / 15);
+      --text-4xl: calc(2.375rem * 16 / 15);
+    }
   }
 
   html[data-high-contrast='true'] :is(input, select, textarea) {

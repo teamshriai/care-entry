@@ -313,7 +313,7 @@ function TimePill({
       onClick={onPick}
       style={kind === 'selected' ? undefined : look.style}
       className={cn(
-        'focus-ring tap-reach inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-[0.8125rem] font-semibold tabular-nums transition-all duration-200',
+        'focus-ring tap-reach inline-flex h-9 items-center gap-1 whitespace-nowrap rounded-full border px-3 text-xs font-semibold tabular-nums transition-all duration-200',
         kind === 'selected' ? SELECTED_CHIP : look.className,
         kind === 'booked' ? 'cursor-not-allowed line-through decoration-1 opacity-60' : kind !== 'selected' && 'hover:-translate-y-0.5 hover:shadow-card-md active:scale-[0.97]',
       )}
