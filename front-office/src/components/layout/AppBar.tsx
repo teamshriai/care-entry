@@ -2,7 +2,6 @@ import type { Ref } from 'react'
 import { useLocation } from 'react-router-dom'
 import { UserMenu } from './UserMenu'
 import { LanguageSwitcher } from './LanguageSwitcher'
-import { NotificationsMenu } from './NotificationsMenu'
 import { ThemeToggle } from './ThemeToggle'
 import { BrandMark } from './BrandMark'
 import { MobileNavRow } from './MobileNavRow'
@@ -65,7 +64,6 @@ export function AppBar({ ref }: { ref?: Ref<HTMLElement> }) {
           <div className="hidden sm:flex">
             <LanguageSwitcher />
           </div>
-          <NotificationsMenu />
           <UserMenu />
 
           {/* IndoStates — an external link, opened in a new tab so the portal stays

@@ -7,7 +7,7 @@ export interface LinePoint {
 }
 
 const HEIGHT = 280
-const PAD = { top: 24, right: 20, bottom: 52, left: 52 }
+const PAD = { top: 24, right: 20, bottom: 52, left: 66 }
 
 /** A rounded-up axis top with 4 even steps (e.g. 0, 10, 20, 30, 40). */
 function niceMax(value: number): number {

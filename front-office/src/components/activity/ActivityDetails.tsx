@@ -3,8 +3,9 @@ import { Avatar } from '../ui/Avatar'
 import { initialsOf } from '../../utils/format'
 import { Activity, ListChecks } from 'lucide-react'
 import type { ActivityEvent, ActivityType } from '../../domain/reportSelectors'
+
+type DetailType = Exclude<ActivityType, 'PAYMENT_COMPLETED'>
 import { timeLabel } from '../../utils/activityFormat'
-import { formatRupees } from '../../utils/billing'
 import { Badge } from '../ui/Badge'
 import { Card, CardHeader } from '../ui/Card'
 import { ResponsiveTable } from '../ui/ResponsiveTable'
@@ -15,14 +16,13 @@ import { EmptyState } from '../ui/EmptyState'
 const MAX_ROWS = 50
 
 /** How each summary card names itself above its records. */
-const DETAIL_TITLE: Record<ActivityType, string> = {
+const DETAIL_TITLE: Record<DetailType, string> = {
   PATIENT_REGISTERED: 'Patients Registered',
   APPOINTMENT_SCHEDULED: 'Appointments Scheduled',
   PATIENT_CHECKED_IN: 'Patients Checked In',
   GUEST_PASS_ISSUED: 'Guest Passes Issued',
   PATIENT_ADMITTED: 'Admissions',
   PATIENT_DISCHARGED: 'Discharges',
-  PAYMENT_COMPLETED: 'Payments',
 }
 
 interface Column {
@@ -61,7 +61,7 @@ const bookedAt: Column = {
       : timeLabel(e.appointmentAt, new Date(e.appointmentAt).toDateString() !== new Date(e.timestamp).toDateString()),
 }
 
-const COLUMNS: Record<ActivityType, Column[]> = {
+const COLUMNS: Record<DetailType, Column[]> = {
   PATIENT_REGISTERED: [at('Time'), patient, patientId('Patient ID / UHID'), { header: 'Registered By', cell: (e) => e.staffName }, status],
   APPOINTMENT_SCHEDULED: [
     at('Time'),
@@ -100,15 +100,6 @@ const COLUMNS: Record<ActivityType, Column[]> = {
     doctor,
     { header: 'Discharge Status', cell: (e) => <Badge tone="stable">{e.dischargeType ?? 'Discharged'}</Badge> },
   ],
-  PAYMENT_COMPLETED: [
-    at('Time'),
-    patient,
-    patientId(),
-    { header: 'Bill / Receipt No.', cell: (e) => <span className="tabular-nums">{text(e.receiptNo)}</span> },
-    { header: 'Amount', numeric: true, cell: (e) => <span className="font-medium text-ink">{e.amount === undefined ? '—' : formatRupees(e.amount)}</span> },
-    { header: 'Payment Type', cell: (e) => text(e.paymentMethod) },
-    status,
-  ],
 }
 
 /**
@@ -122,7 +113,7 @@ export function ActivityDetails({
   periodLabel,
   withDate,
 }: {
-  type: ActivityType
+  type: DetailType
   events: ActivityEvent[]
   periodLabel: string
   withDate: boolean

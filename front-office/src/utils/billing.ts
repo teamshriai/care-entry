@@ -37,8 +37,8 @@ export function billDisplayStatus(payment: Payment): BillDisplayStatus {
  *  only ever reads as where the billing counter has it. */
 export const BILL_STATUS_LABEL: Record<BillDisplayStatus, string> = {
   Paid: 'Payment received',
-  Partial: 'Payment pending',
-  Pending: 'Payment pending',
+  Partial: 'Pending',
+  Pending: 'Pending',
   Failed: 'Payment failed',
   Cancelled: 'Cancelled',
   Refunded: 'Refunded',

@@ -881,6 +881,11 @@ export function getPayments(state: AppState): Payment[] {
   return [...state.payments].sort((a, b) => b.createdAt - a.createdAt)
 }
 
+/** Every bill raised for a patient, newest first. */
+export function getBillsForPatient(state: AppState, patientId: string): Payment[] {
+  return state.payments.filter((p) => p.patientId === patientId).sort((a, b) => b.createdAt - a.createdAt)
+}
+
 export function getPaymentById(state: AppState, paymentId: string): Payment | null {
   return state.payments.find((p) => p.paymentId === paymentId) ?? null
 }

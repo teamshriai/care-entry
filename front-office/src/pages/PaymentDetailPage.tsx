@@ -42,8 +42,8 @@ export function PaymentDetailPage() {
               <EmptyState
                 icon={ReceiptIcon}
                 title="No such bill"
-                description="It may have been removed. Every bill is listed on the Billing page."
-                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Billing</Button>}
+                description="It may have been removed. Every bill is listed under Payment Status."
+                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Payment Status</Button>}
               />
             </CardBody>
           </Card>

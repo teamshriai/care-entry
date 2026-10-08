@@ -20,9 +20,11 @@ export interface AdmissionSeedContext {
   doctor: (providerId: string) => { name: string; department: string }
   /** When the patient's latest finished outpatient visit ended. */
   visitEnd: (patientId: string) => number | null
+  /** Earlier stays already over — numbered after the current ones, so their admission numbers don't move. */
+  historicStays?: StaySeed[]
 }
 
-type StaySeed = Pick<Admission, 'patientId' | 'doctorId' | 'admissionType' | 'reason' | 'referralSource' | 'attendant' | 'paymentType'> & {
+export type StaySeed = Pick<Admission, 'patientId' | 'doctorId' | 'admissionType' | 'reason' | 'referralSource' | 'attendant' | 'paymentType'> & {
   status: AdmissionStatus
   bedId?: string
   insuranceProvider?: string
@@ -178,7 +180,8 @@ export function createAdmissionSeed(now: number, context: AdmissionSeedContext):
   ]
 
   // Numbered in the order they were made, as the admissions desk numbers them.
-  const ordered = [...stays].sort((a, b) => (a.requestedAt ?? a.admittedAt ?? 0) - (b.requestedAt ?? b.admittedAt ?? 0))
+  const byTime = (a: StaySeed, b: StaySeed) => (a.requestedAt ?? a.admittedAt ?? 0) - (b.requestedAt ?? b.admittedAt ?? 0)
+  const ordered = [...[...stays].sort(byTime), ...[...(context.historicStays ?? [])].sort(byTime)]
   const admissions: Admission[] = ordered.map((stay, index) => {
     const seq = index + 1
     const createdAt = stay.requestedAt ?? stay.admittedAt ?? now

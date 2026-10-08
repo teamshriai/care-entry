@@ -31,6 +31,8 @@ import type { Estimate, GuestPass, MlcRecord, RegistrationLogEntry, Tariff } fro
 import type { Payment, PaymentItem, PaymentMethod } from '../types/payment'
 import type { Admission } from '../types/admission'
 import { createAdmissionSeed } from './admissionSeedData'
+import type { StaySeed } from './admissionSeedData'
+import { PATIENT_HISTORY, contactFor } from './seedPatientHistory'
 import { admissionBillItems, formatRupees, stayDays, sumItems } from '../utils/billing'
 import { NO_SHOW_GRACE_MINUTES } from '../utils/appointment'
 
@@ -488,6 +490,18 @@ export function createSeedState(): AppState {
     patient({ uhid: 'SHRI-0129905', name: 'Pooja Sharma', nameNative: 'पूजा शर्मा', age: 24, sex: 'Female', mobile: '+91 99766 31245', email: 'pooja.sharma@example.mock', address: '33 Avinashi Road, Hope College, Coimbatore 641004', createdAt: minutesAgo(8) }),
   ]
 
+  // Longitudinal records — registered from 2022 on, with visits since, and
+  // some arriving today (see seedPatientHistory.ts). Same builders, same list.
+  PATIENT_HISTORY.forEach((h, index) => {
+    const createdAt =
+      typeof h.registered === 'string'
+        ? dayStartTimestamp(h.registered) + 6 * HOUR
+        : typeof h.registered === 'number'
+          ? dayStart + h.registered * DAY + 6 * HOUR
+          : Math.max(dayStart + 5 * MINUTE, minutesAgo(h.registered.minutesAgo))
+    patients.push(patient({ uhid: h.uhid, name: h.name, nameNative: h.nameNative, age: h.age, sex: h.sex, email: h.email, abhaId: h.abhaId, ...contactFor(index), createdAt }))
+  })
+
   const patientOf = (patientId: string) => patients.find((p) => p.patientId === patientId)!
   const providerOf = (providerId: string) => providers.find((p) => p.providerId === providerId)!
 
@@ -779,6 +793,34 @@ export function createSeedState(): AppState {
   book({ patientId: 'SHRI-0108815', providerId: 'dr-harish-menon', day: 3, slotIndex: 3, status: 'Confirmed', method: 'UPI', bookedAt: daysAgo(2), reason: 'Breathlessness on exertion' })
   book({ patientId: 'SHRI-0048305', providerId: 'dr-nandini-hegde', day: 1, slotIndex: 4, status: 'Confirmed', method: 'UPI', bookedAt: minutesAgo(180), reason: 'Neck pain' })
 
+  // The longitudinal patients' visits: earlier days first, each in the
+  // doctor's first free slot of that day, then today's visit.
+  const dayOfIso = (iso: string) => Math.round((dayStartTimestamp(iso) - dayStart) / DAY)
+  PATIENT_HISTORY.forEach((h, patientIndex) => {
+    h.visits.forEach((visit, visitIndex) => {
+      const day = typeof visit.on === 'string' ? dayOfIso(visit.on) : visit.on
+      const slots = slotsOf(visit.doctor)
+      const date = dateFromToday(day)
+      const first = (patientIndex * 5 + visitIndex * 3) % slots.length
+      const slot = slots.map((_, i) => slots[(first + i) % slots.length]).find((candidate) => !taken.has(slotKey(visit.doctor, date, candidate)))
+      if (!slot) return
+      book({
+        patientId: h.uhid, providerId: visit.doctor, day, slot, status: visit.status ?? 'Completed', method: (patientIndex + visitIndex) % 2 ? 'Card' : 'UPI',
+        reason: visit.reason,
+      })
+    })
+    const t = h.today
+    if (!t) return
+    const earlier = typeof h.registered !== 'object'
+    book({
+      patientId: h.uhid, providerId: t.doctor, offset: t.offset, status: t.status, method: patientIndex % 2 ? 'Card' : 'UPI', reason: t.reason,
+      bookedAt: earlier ? daysAgo(1) + patientIndex * 3 * MINUTE : undefined,
+      arrivedAt: t.arrivedMinutesAgo ? minutesAgo(t.arrivedMinutesAgo) : undefined,
+      tokenStatus: t.token,
+      cancel: t.status === 'Cancelled' ? { by: 'Patient', reason: 'Patient unwell — will rebook', at: minutesAgo(45) } : undefined,
+    })
+  })
+
   // Visits and tokens in arrival order; token numbers run per department.
   const visits: Visit[] = []
   const queueTokens: QueueToken[] = []
@@ -832,6 +874,19 @@ export function createSeedState(): AppState {
       const doctor = providerOf(providerId)
       return { name: doctor.name, department: doctor.department }
     },
+    historicStays: PATIENT_HISTORY.flatMap((h): StaySeed[] => {
+      const stay = h.stay
+      if (!stay) return []
+      const admittedAt = dayStartTimestamp(stay.admittedOn) + 11 * HOUR
+      return [
+        {
+          patientId: h.uhid, doctorId: stay.doctor, admissionType: stay.type, reason: stay.reason, referralSource: stay.referral,
+          attendant: { ...stay.attendant, address: null }, paymentType: stay.payment, insuranceProvider: stay.insurer, policyNumber: stay.policy,
+          status: 'Discharged', bedId: stay.bedId, admittedAt, dischargedAt: admittedAt + stay.days * DAY - 2 * HOUR,
+          dischargeType: stay.dischargeType ?? 'Normal Discharge', dischargeRemarks: stay.remarks,
+        },
+      ]
+    }),
   })
   const stayOf = (patientId: string): Admission => admissionSeed.admissions.find((a) => a.patientId === patientId)!
   const afterAdmission = (patientId: string, minutes: number) => (stayOf(patientId).admittedAt ?? now) + minutes * MINUTE
@@ -884,6 +939,14 @@ export function createSeedState(): AppState {
   billStay('SHRI-0125584', { collections: [{ amount: firstDay('SHRI-0125584'), method: 'UPI', at: afterAdmission('SHRI-0125584', 10) }] })
   billStay('SHRI-0125590', { failed: [{ amount: 5000, method: 'UPI', reason: 'Payment not received', at: minutesAgo(45) }] })
   billStay('SHRI-0102234')
+  // Earlier stays are over and settled in full — by the patient at the counter,
+  // or by the insurer, TPA or employer at discharge.
+  for (const h of PATIENT_HISTORY) {
+    if (!h.stay) continue
+    const stay = stayOf(h.uhid)
+    const settled = sumItems(admissionBillItems(stay.roomType ?? 'General', stayDays(stay.admittedAt ?? stay.createdAt, stay.dischargedAt ?? now)))
+    billStay(h.uhid, { collections: [{ amount: settled, method: stay.paymentType === 'Self Pay' ? 'UPI' : 'Insurance/TPA', at: (stay.dischargedAt ?? now) - 15 * MINUTE }] })
+  }
   billStay('SHRI-0129901', { collections: [{ amount: firstDay('SHRI-0129901'), method: 'UPI', at: afterAdmission('SHRI-0129901', 10) }] })
 
   // Every pass is checked before it is printed. One visitor pass per

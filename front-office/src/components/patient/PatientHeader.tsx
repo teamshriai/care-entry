@@ -1,11 +1,12 @@
 import type { ElementType } from 'react'
-import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut, Phone, ShieldCheck } from 'lucide-react'
+import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { useToast } from '../../hooks/useToast'
 import { usePatientCareStatus } from '../../hooks/useCareStatus'
 import { PatientStatusIcons } from './PatientStatusIcons'
+import { PatientDetailsStrip } from './PatientDetailsCard'
 import { formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
 import type { PatientHeaderSummary } from '../../domain/patientSelectors'
@@ -46,14 +47,6 @@ export function PatientHeader({
   const care = usePatientCareStatus()
   const { risk, payment, inpatient, admission } = summary
 
-  function copyAbha() {
-    if (!patient.abhaId) return
-    void navigator.clipboard?.writeText(patient.abhaId).then(
-      () => notify('ABHA copied', { detail: patient.abhaId ?? '' }),
-      () => notify('Could not copy the ABHA', { tone: 'error' }),
-    )
-  }
-
   function copyUhid() {
     void navigator.clipboard?.writeText(patient.uhid).then(
       () => notify('UHID copied', { detail: patient.uhid }),
@@ -62,7 +55,7 @@ export function PatientHeader({
   }
 
   return (
-    <header className="-mx-4 -mt-4 border-b border-border-soft bg-bg/95 px-4 py-3.5 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6 sm:px-6 lg:sticky lg:top-0 lg:z-20">
+    <header className="-mx-4 -mt-4 border-b border-border-soft bg-bg/95 px-4 py-3.5 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6 sm:px-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-start gap-3.5">
           <Avatar name={patient.name} initials={initialsOf(patient.name)} size="lg" />
@@ -90,27 +83,6 @@ export function PatientHeader({
               <span>
                 {patient.age ? `${patient.age} yrs` : 'Age —'} · {patient.sex}
               </span>
-              <a href={`tel:${patient.mobile.replace(/\s/g, '')}`} className="focus-ring -my-3 inline-flex items-center gap-1 rounded py-3 hover:text-primary-text">
-                <Phone className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                {patient.mobile}
-              </a>
-              {patient.abhaId ? (
-                <button
-                  type="button"
-                  onClick={copyAbha}
-                  className="focus-ring -my-3 inline-flex min-w-0 items-center gap-1 rounded py-3 text-success-fg hover:text-primary-text"
-                  title="Copy ABHA"
-                >
-                  <ShieldCheck className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                  <span className="truncate">ABHA {patient.abhaId}</span>
-                  <Copy className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                </button>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-ink-subtle">
-                  <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                  ABHA not linked
-                </span>
-              )}
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <Badge tone={PAYMENT_TONE[payment.status]}>
@@ -138,6 +110,7 @@ export function PatientHeader({
                 </Badge>
               ) : null}
             </div>
+            <PatientDetailsStrip patient={patient} />
           </div>
         </div>
 

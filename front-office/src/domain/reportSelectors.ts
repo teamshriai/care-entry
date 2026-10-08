@@ -6,6 +6,7 @@
 // backend exists, getActivityEvents is the one function to swap for its
 // event feed — everything below works on ActivityEvent only.
 import type { AppState } from '../types/store'
+import { isBillDue } from '../utils/billing'
 import { dayStartTimestamp, formatHour, slotToTimestamp, todayKey } from './time'
 import { addDaysToKey as addDaysKey } from './selectors'
 import type { IconTone } from '../utils/toneHex'
@@ -35,7 +36,7 @@ export const ACTIVITY_TYPES: ActivityTypeInfo[] = [
   { type: 'GUEST_PASS_ISSUED', label: 'Guest Pass Issued', event: 'Guest Pass Issued', hue: 'indigo' },
   { type: 'PATIENT_ADMITTED', label: 'Admission', event: 'Admission', hue: 'violet' },
   { type: 'PATIENT_DISCHARGED', label: 'Discharge', event: 'Discharge', hue: 'pink' },
-  { type: 'PAYMENT_COMPLETED', label: 'Payment', event: 'Payment', hue: 'green' },
+  { type: 'PAYMENT_COMPLETED', label: 'Payment Received', event: 'Payment Received', hue: 'green' },
 ]
 
 export const ACTIVITY_INFO = Object.fromEntries(ACTIVITY_TYPES.map((info) => [info.type, info])) as Record<
@@ -264,6 +265,32 @@ export function eventsInRange(events: ActivityEvent[], range: ReportRange): Acti
 
 // ---------------------------------------------------------------- summaries
 
+/** The overall payment position — every bill to date, as counts and money,
+ *  never a patient. Pending is exactly what Payment Status lists as pending
+ *  (a bill with money still owed), so the two always agree; paid + pending =
+ *  total. Cancelled and refunded bills are left out. */
+export interface PaymentOverview {
+  totalBills: number
+  billedAmount: number
+  receivedAmount: number
+  pendingAmount: number
+  paidBills: number
+  pendingBills: number
+}
+
+export function paymentOverview(state: AppState): PaymentOverview {
+  const bills = state.payments.filter((bill) => bill.status !== 'Cancelled' && bill.status !== 'Refunded')
+  const pending = bills.filter(isBillDue)
+  return {
+    totalBills: bills.length,
+    billedAmount: bills.reduce((sum, bill) => sum + bill.totalAmount, 0),
+    receivedAmount: bills.reduce((sum, bill) => sum + bill.paidAmount, 0),
+    pendingAmount: pending.reduce((sum, bill) => sum + bill.balance, 0),
+    paidBills: bills.length - pending.length,
+    pendingBills: pending.length,
+  }
+}
+
 export interface ActivitySummary {
   counts: Record<ActivityType, number>
   paymentsAmount: number
@@ -335,7 +362,14 @@ const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 /** Activity over the range. Hour by hour: the desk's working hours, widened to
  *  any activity outside them — and for today only up to the current hour, so
  *  hours still to come don't read as zero. Day by day: one point per date, named by weekday (Sun, Mon …) when asked, else by date (Oct 1). */
-export function activityTrend(events: ActivityEvent[], range: ReportRange, scale: TrendScale, now: number = Date.now(), weekdayLabels = false): TrendPoint[] {
+export function activityTrend<T extends { timestamp: number }>(
+  events: T[],
+  range: ReportRange,
+  scale: TrendScale,
+  now: number = Date.now(),
+  weekdayLabels = false,
+  weight: (event: T) => number = () => 1,
+): TrendPoint[] {
   if (scale === 'hour') {
     const hours = events.map((e) => new Date(e.timestamp).getHours())
     const first = Math.min(8, ...hours)
@@ -343,14 +377,14 @@ export function activityTrend(events: ActivityEvent[], range: ReportRange, scale
     const last = isToday ? Math.max(first, new Date(now).getHours(), ...hours) : Math.max(20, ...hours)
     const points: TrendPoint[] = []
     for (let h = first; h <= last; h += 1) {
-      points.push({ key: String(h), label: formatHour(h), value: hours.filter((x) => x === h).length })
+      points.push({ key: String(h), label: formatHour(h), value: events.reduce((sum, e, i) => (hours[i] === h ? sum + weight(e) : sum), 0) })
     }
     return points
   }
   const byDay = new Map<string, number>()
   for (const e of events) {
     const key = todayKey(new Date(e.timestamp))
-    byDay.set(key, (byDay.get(key) ?? 0) + 1)
+    byDay.set(key, (byDay.get(key) ?? 0) + weight(e))
   }
   const total = daysIn(range)
   const points: TrendPoint[] = []

@@ -10,7 +10,8 @@ import { PaymentsTable } from '../components/payment/PaymentsTable'
 import { useStoreValue } from '../hooks/useStore'
 import { getBillingOverview, getBillsByFilter } from '../domain/selectors'
 import type { BillFilter } from '../domain/selectors'
-import { formatRupees } from '../utils/billing'
+import { formatRupees, isBillDue } from '../utils/billing'
+import { printBill } from '../utils/printBill'
 
 const FILTERS: BillFilter[] = ['due', 'failed', 'collected-today', 'all']
 
@@ -26,8 +27,8 @@ const EMPTY: Record<BillFilter, { title: string; description: string }> = {
   all: { title: 'No bills yet', description: 'Bills appear here as they are raised.' },
 }
 
-/** One Billing page, to view only: Care Entry raises bills, and payments
- *  are taken at the billing counter. What is pending, what failed, what the
+/** Payment Status, to view only: Care Entry raises and prints bills, the
+ *  patient pays at the bill counter, and this page tracks the result. What is pending, what failed, what the
  *  counter received today, and every bill — each figure is also the filter
  *  for the list under it; a bill opens to its items and history. */
 export function BillingPage() {
@@ -45,11 +46,11 @@ export function BillingPage() {
   }
 
   const items: StatFilterItem<BillFilter>[] = [
-    { key: 'due', label: 'Payment pending', value: formatRupees(overview.dueAmount), context: `${overview.dueCount} bills`, tone: 'warning', icon: HandCoins },
+    { key: 'due', label: 'Pending', value: formatRupees(overview.dueAmount), context: `${overview.dueCount} bills`, tone: 'warning', icon: HandCoins },
     { key: 'failed', label: 'Payment failed', value: overview.failedCount, context: 'Not completed at the counter', tone: 'critical', icon: AlertCircle },
     {
       key: 'collected-today',
-      label: 'Received today',
+      label: 'Payment received today',
       value: formatRupees(overview.collectedToday),
       context: `${overview.collectedTodayCount} bills`,
       tone: 'stable',
@@ -61,8 +62,8 @@ export function BillingPage() {
   return (
     <div>
       <PageHeader
-        title="Billing"
-        subtitle="Bills and their payment status — payments are taken at the billing counter."
+        title="Payment Status"
+        subtitle="Each patient’s bills and whether they are pending or paid — payment is taken at the bill counter, not here."
         illustration={<PaymentIllustration className="h-8 w-8" />}
         illustrationTone="stable"
       />
@@ -77,9 +78,16 @@ export function BillingPage() {
             emptyTitle={EMPTY[filter].title}
             emptyDescription={EMPTY[filter].description}
             renderActions={(payment) => (
-              <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${payment.paymentId}`)}>
-                View bill
-              </Button>
+              <>
+                {isBillDue(payment) ? (
+                  <Button size="sm" variant="ghost" onClick={() => printBill(payment.paymentId)}>
+                    Print bill
+                  </Button>
+                ) : null}
+                <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${payment.paymentId}`)}>
+                  Bill details
+                </Button>
+              </>
             )}
           />
         </Card>

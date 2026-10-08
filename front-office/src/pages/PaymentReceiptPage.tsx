@@ -51,8 +51,8 @@ export function PaymentReceiptPage() {
             <CardBody>
               <EmptyState
                 title="No such receipt"
-                description="Every bill is listed on the Billing page."
-                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Billing</Button>}
+                description="Every bill is listed under Payment Status."
+                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Payment Status</Button>}
               />
             </CardBody>
           </Card>

@@ -21,7 +21,7 @@ import { usePatientCareStatus } from '../../hooks/useCareStatus'
 export function PaymentsTable({
   payments,
   emptyTitle = 'No payments to show',
-  emptyDescription = 'Payment records appear here as bills are raised and collected.',
+  emptyDescription = 'Bills appear here as they are raised; their status updates once the patient pays at the bill counter.',
   renderActions,
   showBalance = false,
 }: {
@@ -55,7 +55,7 @@ export function PaymentsTable({
     },
     {
       key: 'patient',
-      header: 'Patient',
+      header: 'Patient / UHID',
       mobile: 'title',
       sortValue: (payment) => payment.patientName,
       cell: (payment) => (
@@ -78,7 +78,7 @@ export function PaymentsTable({
     },
     {
       key: 'when',
-      header: 'Date & Time',
+      header: 'Bill date',
       className: 'whitespace-nowrap text-ink-muted',
       sortValue: (payment) => payment.createdAt,
       cell: (payment) => (
@@ -91,7 +91,7 @@ export function PaymentsTable({
     },
     {
       key: 'description',
-      header: 'Description',
+      header: 'Visit / service',
       className: 'text-ink-muted',
       cell: (payment) => (
         <span className="block tbl:max-w-[10rem] tbl:truncate 2xl:max-w-[16rem]" title={payment.items.map((i) => i.description).join(', ')}>
@@ -101,7 +101,7 @@ export function PaymentsTable({
     },
     {
       key: 'amount',
-      header: 'Amount',
+      header: 'Bill amount',
       numeric: true,
       className: 'whitespace-nowrap font-medium text-ink',
       sortValue: (payment) => payment.totalAmount,
@@ -111,7 +111,7 @@ export function PaymentsTable({
       ? [
           {
             key: 'balance',
-            header: 'Balance',
+            header: 'Pending amount',
             numeric: true,
             className: 'whitespace-nowrap font-medium',
             sortValue: (payment: Payment) => payment.balance,
@@ -123,7 +123,7 @@ export function PaymentsTable({
       : []),
     {
       key: 'status',
-      header: 'Status',
+      header: 'Payment status',
       className: 'whitespace-nowrap',
       mobile: 'aside',
       cell: (payment) => <BillStatusBadge payment={payment} />,

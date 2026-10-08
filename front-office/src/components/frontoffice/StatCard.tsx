@@ -1,4 +1,4 @@
-import type { ElementType } from 'react'
+import type { ElementType, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { IconTone } from '../../utils/toneHex'
 import { FigureBody } from '../ui/Figure'
@@ -23,7 +23,7 @@ export function StatCard({
 }: {
   icon: ElementType
   hue: IconTone
-  value: number | string
+  value: ReactNode
   label: string
   hint: string
   /** Where the card opens. Leave out for an information-only card (no button, no click). */

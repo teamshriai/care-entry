@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button'
 import { EmptyState } from '../components/ui/EmptyState'
 import { PatientHeader } from '../components/patient/PatientHeader'
 import { PatientTimeline } from '../components/patient/PatientTimeline'
-import { PatientDetailsCard } from '../components/patient/PatientDetailsCard'
+import { PatientBillingCard } from '../components/patient/PatientBillingCard'
 import { CurrentAdmissionCard } from '../components/patient/CurrentAdmissionCard'
 import { BookingDialog } from '../components/appointment/BookingDialog'
 import { useStoreValue } from '../hooks/useStore'
@@ -71,17 +71,11 @@ export function PatientProfilePage() {
         }}
       />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px] mt-4 sm:mt-5">
-        <div className="flex min-w-0 flex-col gap-6">
-          {header.admission ? <CurrentAdmissionCard admission={header.admission} now={now} /> : null}
-          <PatientTimeline
-            timeline={timeline}
-            today={today}
-            onChangeBooking={setChangingBooking}
-          />
-        </div>
-        <div className="min-w-0">
-          <PatientDetailsCard patient={patient} />
+      <div className="mt-4 flex min-w-0 flex-col gap-6 sm:mt-5">
+        {header.admission ? <CurrentAdmissionCard admission={header.admission} now={now} /> : null}
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <PatientTimeline timeline={timeline} today={today} onChangeBooking={setChangingBooking} />
+          <PatientBillingCard patientId={patient.patientId} due={header.payment.due} />
         </div>
       </div>
 

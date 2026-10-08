@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, BedDouble, CalendarPlus, ChartNoAxesCombined, IdCard, IndianRupee, ListChecks, LogOut, UserCheck, UserPlus } from 'lucide-react'
+import { Activity, BedDouble, CalendarPlus, ChartNoAxesCombined, IdCard, IndianRupee, ListChecks, LogOut, ReceiptText, UserCheck, UserPlus } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { Card, CardHeader } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
@@ -16,6 +16,7 @@ import {
   MAX_RANGE_DAYS,
   REPORT_PERIODS,
   activityTrend,
+  paymentOverview,
   daysIn,
   eventsInRange,
   getActivityEvents,
@@ -37,6 +38,10 @@ import { cn } from '../utils/cn'
 import { inputClass } from '../utils/formClasses'
 
 /** The most recent rows the activity table lists (it scrolls inside its card). */
+/** The activities the desk performs. Payments are not one of them: Care Entry takes no payment. */
+const PAGE_TYPES = ACTIVITY_TYPES.filter((info) => info.type !== 'PAYMENT_COMPLETED')
+type DetailType = Exclude<ActivityType, 'PAYMENT_COMPLETED'>
+
 const RECENT_ROWS = 50
 
 
@@ -62,12 +67,14 @@ function rangeLabel(range: ReportRange): string {
 export function ActivityAnalyticsPage() {
   const today = useStoreValue(getToday)
   const now = useNow(60000)
-  const allEvents = useStoreValue(getActivityEvents)
+  // Payments are summarised in their own overview below; the patient-level
+  // records live in Payment Status, so they are not part of this activity list.
+  const allEvents = useStoreValue(getActivityEvents).filter((e) => e.activityType !== 'PAYMENT_COMPLETED')
 
   const [period, setPeriod] = useState<ReportPeriod>('today')
   const [custom, setCustom] = useState<ReportRange>(() => ({ from: addDaysToKey(today, -6), to: today }))
   const [activityType, setActivityType] = useState<ActivityType | 'ALL'>('ALL')
-  const [selected, setSelected] = useState<ActivityType>('PATIENT_REGISTERED')
+  const [selected, setSelected] = useState<DetailType | 'PAYMENT_STATUS'>('PATIENT_REGISTERED')
 
   const range = rangeFor(period, today, custom)
   const capped = period === 'custom' && daysIn({ from: custom.from <= custom.to ? custom.from : custom.to, to: range.to }) > MAX_RANGE_DAYS
@@ -88,6 +95,7 @@ export function ActivityAnalyticsPage() {
   const trendColor = activityType === 'ALL' ? 'var(--color-chart-1)' : TONE_HEX[ACTIVITY_INFO[activityType].hue]
 
   const counts = summary.counts
+  const payments = useStoreValue(paymentOverview)
   // Each summary card's own trend over the chosen period — its sparkline.
   const sparkOf = (type: ActivityType) =>
     activityTrend(
@@ -157,13 +165,13 @@ export function ActivityAnalyticsPage() {
               onChange={(e) => {
                 const next = e.target.value as ActivityType | 'ALL'
                 setActivityType(next)
-                if (next !== 'ALL') setSelected(next)
+                if (next !== 'ALL' && next !== 'PAYMENT_COMPLETED') setSelected(next)
               }}
               className={cn(inputClass, 'w-full min-w-0 sm:w-auto sm:min-w-[13rem]')}
               aria-label="Activity type"
             >
               <option value="ALL">All Activities</option>
-              {ACTIVITY_TYPES.map((info) => (
+              {PAGE_TYPES.map((info) => (
                 <option key={info.type} value={info.type}>
                   {info.label}
                 </option>
@@ -209,19 +217,43 @@ export function ActivityAnalyticsPage() {
             onSelect={() => setSelected('PATIENT_DISCHARGED')}
             trend={sparkOf('PATIENT_DISCHARGED')} hue="pink" icon={LogOut} value={counts.PATIENT_DISCHARGED} label="Discharges" hint="Patients discharged" />
           <StatCard
-            selected={selected === 'PAYMENT_COMPLETED'}
-            onSelect={() => setSelected('PAYMENT_COMPLETED')}
-            trend={sparkOf('PAYMENT_COMPLETED')}
+            selected={selected === 'PAYMENT_STATUS'}
+            onSelect={() => setSelected('PAYMENT_STATUS')}
             hue="green"
             icon={IndianRupee}
-            value={formatRupees(summary.paymentsAmount)}
-            label="Payments"
-            hint={`${counts.PAYMENT_COMPLETED} ${counts.PAYMENT_COMPLETED === 1 ? 'payment' : 'payments'} collected`}
+            value={
+              <span className="flex flex-col gap-0.5 text-base leading-tight">
+                <span>Pending: {payments.pendingBills}</span>
+                <span>Paid: {payments.paidBills}</span>
+              </span>
+            }
+            label="Payment Status"
+            hint={`${formatRupees(payments.pendingAmount)} pending`}
           />
         </section>
 
         {/* The records behind the chosen card */}
-        <ActivityDetails type={selected} events={detailEvents} periodLabel={rangeLabel(range)} withDate={multiDay} />
+        {selected === 'PAYMENT_STATUS' ? (
+          <Card accentTone="stable">
+            <CardHeader icon={IndianRupee} iconTone="stable" title="Payment Status" subtitle="All bills to date — totals only; which patient owes what is on the Payment Status page" />
+            <div className="flex flex-col gap-3 p-4 sm:p-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                <StatCard hue="blue" icon={ReceiptText} value={payments.totalBills} label="Total Bills" hint="Bills raised so far" />
+                <StatCard hue="indigo" icon={IndianRupee} value={formatRupees(payments.billedAmount)} label="Total Billed" hint="Value of all bills" />
+                <StatCard hue="green" icon={IndianRupee} value={formatRupees(payments.receivedAmount)} label="Payment Received" hint="Paid at the bill counter" />
+                <StatCard hue="orange" icon={IndianRupee} value={formatRupees(payments.pendingAmount)} label="Pending Amount" hint="Total − received" />
+                <StatCard hue="teal" icon={ReceiptText} value={payments.paidBills} label="Paid Bills" hint="Nothing left to pay" />
+                <StatCard hue="red" icon={ReceiptText} value={payments.pendingBills} label="Pending Bills" hint="Some amount still unpaid" />
+              </div>
+              <p className="text-xs text-ink-muted">
+                <span className="font-semibold text-ink">Paid</span> = nothing left to pay · <span className="font-semibold text-ink">Pending</span> = some amount still unpaid (a part-paid bill is
+                pending) · Total Billed = Payment Received + Pending Amount, and Paid Bills + Pending Bills = Total Bills.
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <ActivityDetails type={selected} events={detailEvents} periodLabel={rangeLabel(range)} withDate={multiDay} />
+        )}
 
         {/* Trend + breakdown */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
@@ -246,7 +278,7 @@ export function ActivityAnalyticsPage() {
                   />
                   <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-[color-mix(in_oklab,var(--color-hue-violet)_20%,var(--color-border-soft))] bg-[linear-gradient(135deg,color-mix(in_oklab,var(--color-hue-violet)_9%,var(--color-surface-1)),color-mix(in_oklab,var(--color-hue-blue)_5%,var(--color-surface-1)))] px-4 py-3 text-sm text-ink-muted">
                     <p>
-                      <span className="font-semibold text-ink">How to read this:</span> each dot is how many {typeLabel === 'All activities' ? 'activities (registrations, bookings, check-ins, passes, admissions, discharges and payments together)' : typeLabel.toLowerCase()} were recorded in that {unitWord}. The higher the dot, the busier the desk.
+                      <span className="font-semibold text-ink">How to read this:</span> each dot is how many {typeLabel === 'All activities' ? 'activities (registrations, bookings, check-ins, passes, admissions, discharges together)' : typeLabel.toLowerCase()} were recorded in that {unitWord}. The higher the dot, the busier the desk.
                     </p>
                     <p>
                       <span className="font-semibold text-ink">Busiest {unitWord}:</span> {list(insight.busiest)} with {insight.busiestValue}
@@ -269,12 +301,11 @@ export function ActivityAnalyticsPage() {
               ) : (
                 <BreakdownBars
                   highlight={activityType === 'ALL' ? null : activityType}
-                  items={ACTIVITY_TYPES.map((info) => ({
+                  items={PAGE_TYPES.map((info) => ({
                     key: info.type,
                     label: info.label,
                     value: counts[info.type],
                     hue: info.hue,
-                    note: info.type === 'PAYMENT_COMPLETED' && counts[info.type] ? formatRupees(summary.paymentsAmount) : undefined,
                   }))}
                 />
               )}

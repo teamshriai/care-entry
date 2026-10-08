@@ -18,8 +18,6 @@ import { Badge } from '../components/ui/Badge'
 import { Card, CardHeader } from '../components/ui/Card'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatCard } from '../components/frontoffice/StatCard'
-import { DoctorAvailability } from '../components/clinician/DoctorAvailability'
-import { getDoctorTimeline } from '../domain/timelineSelectors'
 import { figureRowClass } from '../utils/figure'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
 import { useStoreValue } from '../hooks/useStore'
@@ -68,7 +66,6 @@ export function FrontOfficeHomePage() {
   const trends = useStoreValue(getTodayTrends, now)
   const inpatients = useStoreValue(getInpatientRows, now)
   const wards = useStoreValue(getWardSummaries)
-  const timeline = useStoreValue(getDoctorTimeline, now)
   const needsAttention = useStoreValue(getNeedsAttention, now)
   const outpatients = useStoreValue(getOutpatients, now, 'today', false, '')
   const patientRows = useStoreValue(getPatientRows)
@@ -217,7 +214,7 @@ export function FrontOfficeHomePage() {
               <AppointmentsTable
                 appointments={todaysList}
                 compact
-                maxRows={5}
+                maxRows={8}
                 // Not here yet → Check in; checked in → Waiting (a second click
                 // undoes a mistaken check-in); called or in the room → With
                 // doctor; then how the visit ended.
@@ -279,18 +276,6 @@ export function FrontOfficeHomePage() {
             </Card>
           </section>
         </div>
-
-        {/* Doctor Availability — each doctor's day hour by hour; an open hour books that slot */}
-        <section className="min-w-0" aria-label="Doctor Availability">
-          <DoctorAvailability
-            timeline={timeline}
-            onViewAll={() => navigate('/doctors')}
-            onOpenProfile={(provider) => navigate(`/doctors/${provider.providerId}`)}
-            onBookSlot={(provider, slot) =>
-              openFlow('schedule', slot ? { doctor: provider.providerId, date: today, slot } : { doctor: provider.providerId })
-            }
-          />
-        </section>
       </div>
     </div>
   )
