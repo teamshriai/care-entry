@@ -10,8 +10,9 @@ const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'O
 /**
  * Two weeks of one doctor's days as small calendar cards — the weekday (or
  * Today / Tomorrow), the date, and how many times are free. A day that
- * can't be booked says why (Full, Leave, Off) and can't be chosen. Scrolls
- * sideways where the fortnight is wider than the space.
+ * can't be booked says why (Full, Leave, Off) and is greyed, but can still
+ * be shown: the day chart below draws why. Scrolls sideways where the
+ * fortnight is wider than the space.
  */
 export function DateStrip({
   days,
@@ -41,8 +42,7 @@ export function DateStrip({
           <button
             key={day.date}
             type="button"
-            disabled={!selectable}
-            aria-pressed={selectable ? isSelected : undefined}
+            aria-pressed={isSelected}
             aria-label={spoken}
             title={spoken}
             onClick={() => onSelect(day.date)}
@@ -53,7 +53,7 @@ export function DateStrip({
                 ? 'border-transparent bg-[image:var(--gradient-primary)] text-on-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_6px_16px_-6px_rgba(37,99,235,0.6)]'
                 : selectable
                   ? cn(open.className, 'hover:-translate-y-0.5 hover:shadow-card-md')
-                  : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle opacity-70',
+                  : 'border-border-soft bg-surface-2 text-ink-subtle opacity-70 hover:opacity-100',
             )}
           >
             <span className="text-2xs font-semibold uppercase tracking-wide opacity-85">{top}</span>

@@ -90,7 +90,7 @@ export function DoctorDirectoryPage() {
     <div>
       <PageHeader
         title="Doctors"
-        subtitle="Every doctor's open times by speciality — tap a time to book it for a patient."
+        subtitle="Every doctor's day, by speciality. Tap free time on a doctor's chart to book it for a patient."
         illustration={<DoctorIllustration className="h-8 w-8" />}
         illustrationTone="indigo"
         actions={

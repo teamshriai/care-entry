@@ -10,7 +10,7 @@ import { doctorStatusLabel } from '../utils/appointment'
 import { Avatar } from '../components/ui/Avatar'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
-import { SlotBoard } from '../components/clinician/SlotBoard'
+import { DoctorDayChart } from '../components/clinician/DoctorDayChart'
 import { AppointmentsTable } from '../components/appointment/AppointmentsTable'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
@@ -181,10 +181,7 @@ export function DoctorProfilePage() {
                     }
                   />
                 ) : (
-                  <SlotBoard
-                    entries={slotEntries}
-                    onSelect={(slot) => openFlow('schedule', { doctor: id, date: today, slot })}
-                  />
+                  <DoctorDayChart providerId={id} date={today} now={now} onPick={(date, slot) => openFlow('schedule', { doctor: id, date, slot })} />
                 )}
               </CardBody>
             </Card>

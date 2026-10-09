@@ -1,0 +1,208 @@
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarCheck2 } from 'lucide-react'
+import { DayTimeline, DayTimelineKey } from '../dayTimeline/DayTimeline'
+import { clock12, dayModel, minutesFrom, time12 } from '../dayTimeline/dayModel'
+import type { DayModel, Span } from '../dayTimeline/dayModel'
+import { Modal } from '../ui/Modal'
+import { Button } from '../ui/Button'
+import { useStoreValue } from '../../hooks/useStore'
+import { getState } from '../../domain/store'
+import { getProviderById, getToday } from '../../domain/selectors'
+import type { FreeSlot } from '../../domain/selectors'
+import { getDoctorDay, getDoctorNextPatient, getNextFreeSlotFrom } from '../../domain/doctorDaySelectors'
+import type { DoctorDay } from '../../domain/doctorDaySelectors'
+import { dayStartTimestamp, formatTime } from '../../domain/time'
+import { relativeDayLabel } from '../../utils/dates'
+
+/** What a tap on time that can't be booked says, and what it offers instead. */
+interface Notice {
+  title: string
+  text: string
+  /** The doctor's next free time, to book instead. */
+  book: FreeSlot | null
+  /** Leave is managed on the doctor's profile. */
+  profile: boolean
+}
+
+/** "Wednesday 15 October". */
+function longDate(date: string): string {
+  return new Date(dayStartTimestamp(date)).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+/** The off hours tapped, whole: the chart splits them at now. */
+function wholeOff(model: DayModel, [from, to]: Span): Span {
+  const off = model.items.filter((i) => i.kind === 'off')
+  let [a, b] = [from, to]
+  let before = off.find((i) => i.end === a && i.start < a)
+  while (before) {
+    a = before.start
+    before = off.find((i) => i.end === a && i.start < a)
+  }
+  let after = off.find((i) => i.start === b && i.end > b)
+  while (after) {
+    b = after.end
+    after = off.find((i) => i.start === b && i.end > b)
+  }
+  return [a, b]
+}
+
+/** Off hours in one sentence: a day off, before or after the session, or a break. */
+function offHoursText(name: string, day: DoctorDay, off: Span, date: string, today: string): string {
+  const when = date === today ? 'today' : `on ${longDate(date)}`
+  if (day.work.length === 0) return `${name} does not see patients ${when}.`
+  const [from, to] = off
+  const first = day.work[0][0]
+  const last = day.work[day.work.length - 1][1]
+  if (to <= first) return `${name} does not see patients before ${time12(first)} ${when}.`
+  if (from >= last) return `${name} does not see patients after ${time12(last)} ${when}.`
+  return `${name} does not see patients from ${time12(from)} to ${time12(to)} ${when}.`
+}
+
+/** The free slot a tap at `at` books: the slot under it, or — where that one
+ *  has started or is a break — the next free slot in the same free stretch. */
+function slotForTap(day: DoctorDay, at: number, until: number): string | null {
+  const under = day.board.find((e) => minutesFrom(e.slot) <= at && at < minutesFrom(e.slot) + day.slotMinutes)
+  if (under?.status === 'available') return under.slot
+  return day.board.find((e) => e.status === 'available' && minutesFrom(e.slot) > at && minutesFrom(e.slot) < until)?.slot ?? null
+}
+
+/**
+ * One doctor's day as the clinicians' Dashboard chart (components/dayTimeline),
+ * with its key — on every screen that lists doctors. Tapping free time books
+ * the slot under the pointer, as tapping a time does (`onPick`); off hours
+ * and leave explain themselves in a small dialog; a booked bar opens its
+ * patient.
+ */
+export function DoctorDayChart({
+  providerId,
+  date,
+  now,
+  onPick,
+  currentAppointmentId,
+}: {
+  providerId: string
+  date: string
+  /** The app's clock (useNow): the Now line and what has gone. */
+  now: number
+  /** Free time tapped: the slot to book, on that screen's terms. */
+  onPick: (date: string, slot: string) => void
+  /** Reschedule: the booking being moved, drawn as "Current: …"; tapping it does nothing. */
+  currentAppointmentId?: string
+}) {
+  const navigate = useNavigate()
+  const today = useStoreValue(getToday)
+  const day = useStoreValue(getDoctorDay, providerId, now, date)
+  const provider = useStoreValue(getProviderById, providerId)
+  const nextPatient = useStoreValue(getDoctorNextPatient, providerId, now)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const name = provider?.name ?? 'The doctor'
+
+  const model = useMemo(() => {
+    const bookings = day.input.bookings?.map((b) => (b.id === currentAppointmentId ? { ...b, title: `Current: ${b.title}` } : b))
+    const drawn = dayModel({ ...day.input, bookings })
+    // "Next free" names the first slot that can be booked, as the day tabs and
+    // the doctor's card do, not the first free minute (which can fall inside a
+    // slot that has already started).
+    const first = day.board.find((e) => e.status === 'available')
+    const nextFree = first ? minutesFrom(first.slot) : null
+    const summary = drawn.summary.replace(/, next free [^,]*$/, '') + (nextFree !== null ? `, next free ${clock12(nextFree)}` : '')
+    return { ...drawn, nextFree, summary }
+  }, [day, currentAppointmentId])
+
+  const nextFreeFrom = (minute: number) => getNextFreeSlotFrom(getState(), providerId, now, date, minute)
+
+  function schedule(at: number, until: number) {
+    const slot = slotForTap(day, at, until)
+    if (slot) {
+      onPick(date, slot)
+      return
+    }
+    const under = day.board.find((e) => minutesFrom(e.slot) <= at && at < minutesFrom(e.slot) + day.slotMinutes)
+    const started = under?.status === 'past'
+    setNotice({
+      title: started ? 'This slot has started' : 'No slot at this time',
+      text: started
+        ? `The ${formatTime(under.slot)} slot with ${name} has already started, so it can no longer be booked.`
+        : `${name} has no slot that starts at ${time12(at)}.`,
+      book: nextFreeFrom(at),
+      profile: false,
+    })
+  }
+
+  function offHours(at: number, off: Span) {
+    setNotice({ title: 'Off hours', text: offHoursText(name, day, wholeOff(model, off), date, today), book: nextFreeFrom(at), profile: false })
+  }
+
+  function blocked() {
+    const reason = (day.leave?.reason ?? 'Leave').trim().replace(/\.+$/, '')
+    setNotice({
+      title: 'On leave',
+      text: `${name} is on leave ${date === today ? 'today' : `on ${longDate(date)}`}: ${reason}.`,
+      book: null,
+      profile: true,
+    })
+  }
+
+  /** "Book 2:00 PM" on the day shown; "Book tomorrow, 9:30 AM" or "Book Thu 16 Oct, 9:30 AM" on another. */
+  const bookLabel = (free: FreeSlot) => {
+    if (free.date === date) return `Book ${formatTime(free.slot)}`
+    const label = relativeDayLabel(free.date, today)
+    return `Book ${label === 'Today' || label === 'Tomorrow' ? label.toLowerCase() : label}, ${formatTime(free.slot)}`
+  }
+
+  return (
+    <div className="min-w-0">
+      <DayTimeline
+        model={model}
+        nextPatient={nextPatient ?? undefined}
+        onSchedule={schedule}
+        onOffHours={offHours}
+        onBlocked={blocked}
+        onOpen={(item) => {
+          if (item.id === currentAppointmentId) return
+          const uhid = day.uhids[item.id]
+          if (uhid) navigate(`/patients/${uhid}`)
+        }}
+      />
+      <DayTimelineKey model={model} />
+
+      <Modal
+        open={notice !== null}
+        onClose={() => setNotice(null)}
+        title={notice?.title}
+        className="sm:max-w-sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setNotice(null)} className="max-sm:flex-1">
+              Close
+            </Button>
+            {notice?.profile ? (
+              <Button onClick={() => navigate(`/doctors/${providerId}`)} className="max-sm:flex-1">
+                Open profile
+              </Button>
+            ) : null}
+            {notice?.book ? (
+              <Button
+                onClick={() => {
+                  const free = notice.book!
+                  setNotice(null)
+                  onPick(free.date, free.slot)
+                }}
+                className="max-sm:flex-1"
+              >
+                <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                {bookLabel(notice.book)}
+              </Button>
+            ) : null}
+          </>
+        }
+      >
+        <p className="text-sm text-ink">{notice?.text}</p>
+        {notice && !notice.profile && !notice.book ? (
+          <p className="mt-2 text-sm text-ink-muted">{name} has no free time in the next two weeks.</p>
+        ) : null}
+      </Modal>
+    </div>
+  )
+}

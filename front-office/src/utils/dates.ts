@@ -44,6 +44,12 @@ export function relativeDayLabel(dateKey: string, today: string = todayKey()): s
   return `${WEEKDAYS[date.getDay()]} ${day} ${MONTHS[month - 1]}`
 }
 
+/** "Tue 14 Oct", whatever the day — where the date itself is wanted. */
+export function shortDayLabel(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return `${WEEKDAYS[new Date(year, month - 1, day).getDay()]} ${day} ${MONTHS[month - 1]}`
+}
+
 /** "Today · Fri 02-Oct-2026", "Tomorrow · Sat 03-Oct-2026", else just
  *  "Sun 04-Oct-2026" — a confirmation's day, never said twice. */
 export function dayWithDate(dateKey: string, today: string = todayKey()): string {

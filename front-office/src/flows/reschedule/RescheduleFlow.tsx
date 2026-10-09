@@ -6,7 +6,7 @@ import { AckCard } from '../../components/flow/AckCard'
 import { Quadrant, SummaryItem, Waiting } from '../../components/flow/Quadrant'
 import { BillAtCounter } from '../../components/payment/BillAtCounter'
 import { printBill } from '../../utils/printBill'
-import { SlotBoard } from '../../components/clinician/SlotBoard'
+import { DoctorDayChart } from '../../components/clinician/DoctorDayChart'
 import { DateStrip } from '../../components/clinician/DateStrip'
 import { DoctorChoiceList } from '../../components/clinician/DoctorChoiceList'
 import { Badge } from '../../components/ui/Badge'
@@ -22,12 +22,11 @@ import {
   getDoctorSuggestions,
   getPatientById,
   getProviderById,
-  getSlotBoard,
   getToday,
 } from '../../domain/selectors'
 import { rescheduleAppointment } from '../../domain/actions'
 import { formatRupees } from '../../utils/billing'
-import { dayWithDate, relativeDayLabel } from '../../utils/dates'
+import { dayWithDate, relativeDayLabel, shortDayLabel } from '../../utils/dates'
 import { appointmentStatusLabel, modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
 import type { FlowProps } from '../registry'
@@ -73,7 +72,6 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
   const suggestions = useStoreValue(getDoctorSuggestions, was?.department ?? '', now)
   const provider = useStoreValue(getProviderById, providerId ?? '')
   const dateStrip = useStoreValue(getDoctorDateStrip, providerId ?? '', now)
-  const slotEntries = useStoreValue(getSlotBoard, providerId ?? '__none__', now, date ?? today)
   const modes = provider ? modesFor(provider) : (['In person'] as ConsultMode[])
 
   const subtitle = patient ? `${patient.name} · ${patient.uhid}` : 'Booking'
@@ -337,19 +335,25 @@ export function RescheduleFlow({ params, onClose }: FlowProps) {
                   }}
                   today={today}
                 />
-                <SlotBoard
-                  entries={slotEntries}
-                  selectedSlot={slot}
+                <DoctorDayChart
+                  providerId={provider.providerId}
+                  date={date}
+                  now={now}
                   currentAppointmentId={was.appointmentId}
-                  onSelect={(next) => {
+                  onPick={(nextDate, nextSlot) => {
                     setError(null)
-                    setSlot(next)
+                    setDate(nextDate)
+                    setSlot(nextSlot)
                   }}
-                  emptyMessage="No session on this day."
                 />
+                {slot ? (
+                  <p className="text-sm text-ink" aria-live="polite">
+                    Chosen: <span className="font-semibold tabular-nums">{shortDayLabel(date)}, {formatTime(slot)}</span>.
+                  </p>
+                ) : null}
               </>
             ) : (
-              <p className="text-sm text-ink-muted">No open time with this doctor in the next two weeks — choose another doctor.</p>
+              <p className="text-sm text-ink-muted">This doctor has no open time in the next two weeks. Choose another doctor.</p>
             )}
           </div>
         )}
