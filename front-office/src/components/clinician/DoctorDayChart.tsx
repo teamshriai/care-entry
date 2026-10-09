@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { CalendarCheck2 } from 'lucide-react'
 import { DayTimeline, DayTimelineKey } from '../dayTimeline/DayTimeline'
 import { clock12, dayModel, minutesFrom, time12 } from '../dayTimeline/dayModel'
-import type { DayModel, Span } from '../dayTimeline/dayModel'
 import { Modal } from '../ui/Modal'
 import { Button } from '../ui/Button'
 import { useStoreValue } from '../../hooks/useStore'
@@ -30,35 +29,6 @@ function longDate(date: string): string {
   return new Date(dayStartTimestamp(date)).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-/** The off hours tapped, whole: the chart splits them at now. */
-function wholeOff(model: DayModel, [from, to]: Span): Span {
-  const off = model.items.filter((i) => i.kind === 'off')
-  let [a, b] = [from, to]
-  let before = off.find((i) => i.end === a && i.start < a)
-  while (before) {
-    a = before.start
-    before = off.find((i) => i.end === a && i.start < a)
-  }
-  let after = off.find((i) => i.start === b && i.end > b)
-  while (after) {
-    b = after.end
-    after = off.find((i) => i.start === b && i.end > b)
-  }
-  return [a, b]
-}
-
-/** Off hours in one sentence: a day off, before or after the session, or a break. */
-function offHoursText(name: string, day: DoctorDay, off: Span, date: string, today: string): string {
-  const when = date === today ? 'today' : `on ${longDate(date)}`
-  if (day.work.length === 0) return `${name} does not see patients ${when}.`
-  const [from, to] = off
-  const first = day.work[0][0]
-  const last = day.work[day.work.length - 1][1]
-  if (to <= first) return `${name} does not see patients before ${time12(first)} ${when}.`
-  if (from >= last) return `${name} does not see patients after ${time12(last)} ${when}.`
-  return `${name} does not see patients from ${time12(from)} to ${time12(to)} ${when}.`
-}
-
 /** The free slot a tap at `at` books: the slot under it, or — where that one
  *  has started or is a break — the next free slot in the same free stretch. */
 function slotForTap(day: DoctorDay, at: number, until: number): string | null {
@@ -70,9 +40,10 @@ function slotForTap(day: DoctorDay, at: number, until: number): string | null {
 /**
  * One doctor's day as the clinicians' Dashboard chart (components/dayTimeline),
  * with its key — on every screen that lists doctors. Tapping free time books
- * the slot under the pointer, as tapping a time does (`onPick`); off hours
- * and leave explain themselves in a small dialog; a booked bar opens its
- * patient.
+ * the slot under the pointer, as tapping a time does (`onPick`); leave
+ * explains itself in a small dialog; a booked bar opens its patient. Only the
+ * doctor's working hours are drawn — breaks and leave show as such, and a day
+ * the doctor does not work says so instead of drawing a chart.
  */
 export function DoctorDayChart({
   providerId,
@@ -130,10 +101,6 @@ export function DoctorDayChart({
     })
   }
 
-  function offHours(at: number, off: Span) {
-    setNotice({ title: 'Off hours', text: offHoursText(name, day, wholeOff(model, off), date, today), book: nextFreeFrom(at), profile: false })
-  }
-
   function blocked() {
     const reason = (day.leave?.reason ?? 'Leave').trim().replace(/\.+$/, '')
     setNotice({
@@ -151,13 +118,28 @@ export function DoctorDayChart({
     return `Book ${label === 'Today' || label === 'Tomorrow' ? label.toLowerCase() : label}, ${formatTime(free.slot)}`
   }
 
+  // A day the doctor does not work has no hours to draw — nothing to book.
+  if (day.work.length === 0 && !day.leave) {
+    const free = nextFreeFrom(0)
+    return (
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-border-soft px-4 py-5 text-sm text-ink-muted">
+        <p>{`${name} does not work ${date === today ? 'today' : `on ${longDate(date)}`}.`}</p>
+        {free ? (
+          <Button size="sm" onClick={() => onPick(free.date, free.slot)}>
+            <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            {bookLabel(free)}
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <div className="min-w-0">
       <DayTimeline
         model={model}
         nextPatient={nextPatient ?? undefined}
         onSchedule={schedule}
-        onOffHours={offHours}
         onBlocked={blocked}
         onOpen={(item) => {
           if (item.id === currentAppointmentId) return

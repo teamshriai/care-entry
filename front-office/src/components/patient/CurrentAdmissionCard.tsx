@@ -51,8 +51,8 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
         subtitle={`${admission.admissionNumber} · ${admission.doctorName} · ${admission.department}`}
         action={<Badge status={admission.status} />}
       />
-      <CardBody className="flex flex-col gap-3">
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 2xl:grid-cols-4">
+      <CardBody className="flex flex-col gap-2 !py-3">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
           <Fact label={admitted ? 'Admitted' : 'Requested'} value={`${formatDateKey(todayKey(new Date(since)))} · ${formatClock(since)}`} />
           {admitted ? <Fact label="Stay" value={`Day ${stayDays(since, now)}`} /> : <Fact label="Type" value={admission.admissionType} />}
           <Fact
@@ -83,8 +83,8 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
             </dd>
           </div>
         </dl>
-        <div className="flex justify-end">
-          <Button size="sm" variant="ghost" onClick={() => setCancelling(true)}>
+        <div className="-mb-1 flex justify-end">
+          <Button size="xs" variant="ghost" onClick={() => setCancelling(true)}>
             <XCircle className="h-3.5 w-3.5" strokeWidth={1.75} />
             Cancel admission
           </Button>

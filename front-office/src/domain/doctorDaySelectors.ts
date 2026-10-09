@@ -29,12 +29,14 @@ export interface DoctorDay {
 /**
  * The chart's input for one doctor on one date:
  *   · work: the session, from its start to the end of its last slot, less
- *     breaks (drawn as off hours). The slot grid includes a slot that starts
+ *     breaks (drawn as breaks). The slot grid includes a slot that starts
  *     at the session's end time, so the session is drawn to that slot's end.
  *     A day the doctor doesn't work, or is on leave, has none;
  *   · leave: one all-day block carrying the reason;
  *   · bookings: the slot board's booked slots, one bar each, titled with the
- *     patient's name — a teleconsult in the teleconsult colour.
+ *     patient's name — a teleconsult in the teleconsult colour;
+ *   · activities: the doctor's own day around the bookable hours (see
+ *     doctorActivities) — never over a bookable slot.
  */
 export function getDoctorDay(state: AppState, providerId: string, now: number, date: string): DoctorDay {
   const schedule = getDoctorSchedule(state, providerId, date)
@@ -73,13 +75,55 @@ export function getDoctorDay(state: AppState, providerId: string, now: number, d
   }
 
   return {
-    input: { date: new Date(dayStartTimestamp(date)), now: new Date(now), activities: [], bookings, blocks, work },
+    input: { date: new Date(dayStartTimestamp(date)), now: new Date(now), activities: doctorActivities(work, offersTeleconsult(state, providerId)), bookings, blocks, work },
     board,
     slotMinutes,
     work,
     leave: leave ? { leaveId: leave.leaveId, reason: leave.reason } : null,
     uhids,
   }
+}
+
+function offersTeleconsult(state: AppState, providerId: string): boolean {
+  return state.providers.find((p) => p.providerId === providerId)?.consultationType !== 'Outpatient'
+}
+
+/**
+ * The doctor's own activities on a working day, placed around the bookable
+ * hours so they never cover a slot the desk can book:
+ *   · a morning brief in the half hour before the session;
+ *   · the ward round — before the brief when the session starts at 9 AM or
+ *     later, otherwise straight after the session;
+ *   · a teleconsult block after the session, for doctors who offer teleconsults;
+ *   · the discharge round to close the day.
+ * There is no paperwork or co-sign block. A day off or on leave has none.
+ * They are drawn as icons only — no names on the chart.
+ * These are the doctor's standing routine (no record behind them yet) — swap
+ * this for the doctors' own calendar when that feed exists.
+ */
+function doctorActivities(work: Span[], tele: boolean): DayActivity[] {
+  if (work.length === 0) return []
+  const start = work[0][0]
+  const end = work[work.length - 1][1]
+  const out: DayActivity[] = []
+  const add = (kind: DayActivity['kind'], from: number, minutes: number, title: string, detail?: string) => {
+    if (from < 6 * 60 || from + minutes > 22 * 60) return
+    out.push({ id: `${kind}-${from}`, kind, start: from, end: from + minutes, title, detail, iconOnly: true })
+  }
+  add('brief', start - 30, 30, 'Morning brief')
+  const wardFirst = start >= 9 * 60
+  if (wardFirst) add('ward', start - 90, 60, 'Ward round', 'Inpatients')
+  let at = end
+  if (!wardFirst) {
+    add('ward', at, 60, 'Ward round', 'Inpatients')
+    at += 60
+  }
+  if (tele) {
+    add('tele', at, 45, 'Teleconsult', 'Video consultations')
+    at += 45
+  }
+  add('discharge', at, 30, 'Discharge round', 'Discharge summaries and handover')
+  return out
 }
 
 /** The doctor's next waiting patient today — first in the order the

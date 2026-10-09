@@ -14,7 +14,7 @@ import { cn } from '../../utils/cn'
  * Care Entry never takes the money itself: the desk prints the bill and the
  * patient pays it at the billing counter.
  */
-export function BillAtCounter({ paymentId, className }: { paymentId: string; className?: string }) {
+export function BillAtCounter({ paymentId, className, readOnly = false }: { paymentId: string; className?: string; readOnly?: boolean }) {
   const bill = useStoreValue(getPaymentById, paymentId)
   if (!bill) return null
   const due = isBillDue(bill)
@@ -29,9 +29,15 @@ export function BillAtCounter({ paymentId, className }: { paymentId: string; cla
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link to={`/payments/${bill.paymentId}`} className="text-sm font-semibold text-primary-text hover:underline">
-          {billNumberFor(bill)} · {formatRupees(bill.totalAmount)}
-        </Link>
+        {readOnly ? (
+          <span className="text-sm font-semibold text-ink">
+            {billNumberFor(bill)} · {formatRupees(bill.totalAmount)}
+          </span>
+        ) : (
+          <Link to={`/payments/${bill.paymentId}`} className="text-sm font-semibold text-primary-text hover:underline">
+            {billNumberFor(bill)} · {formatRupees(bill.totalAmount)}
+          </Link>
+        )}
         <BillStatusBadge payment={bill} />
       </div>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
@@ -40,7 +46,7 @@ export function BillAtCounter({ paymentId, className }: { paymentId: string; cla
             ? `${bill.patientName} pays ${formatRupees(bill.balance)} at the billing counter.`
             : `Paid at the billing counter — thank you, ${bill.patientName}.`}
         </p>
-        {due ? (
+        {due && !readOnly ? (
           <Button size="xs" variant="secondary" onClick={() => printBill(bill.paymentId)}>
             <Printer className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
             Print bill

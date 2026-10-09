@@ -17,6 +17,7 @@ import {
   getBillLock,
   getBillsForAppointment,
   getConsultationBillItems,
+  getDoctorSchedule,
 } from './selectors'
 import { dayStartTimestamp, formatTime, slotToTimestamp, todayKey } from './time'
 import { DomainError } from './errors'
@@ -199,6 +200,26 @@ export function registerPatient(input: RegisterPatientInput): Patient {
 // ------------------------------------------------------------ appointments
 
 /** Reserves the slot and records the booking, awaiting its payment. */
+/** A patient's bookings still to happen, or under way — a completed,
+ *  cancelled or missed one never stands in the way of a new booking. */
+const ACTIVE_FOR_PATIENT = ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in']
+
+/** The patient's own booking that overlaps a new one on the same day, if any.
+ *  A patient can hold any number of bookings — with the same doctor or
+ *  others, on any days — just not two at the same time. */
+function patientOverlap(state: AppState, patientId: string, providerId: string, date: string, slot: string): Appointment | null {
+  const minutes = (doctorId: string) => getDoctorSchedule(state, doctorId, date)?.slotMinutes ?? state.providers.find((p) => p.providerId === doctorId)?.schedule.slotMinutes ?? 15
+  const start = slotToTimestamp(date, slot)
+  const end = start + minutes(providerId) * 60000
+  return (
+    state.appointments.find((a) => {
+      if (a.patientId !== patientId || a.date !== date || !ACTIVE_FOR_PATIENT.includes(a.status)) return false
+      const theirStart = slotToTimestamp(a.date, a.slot)
+      return theirStart < end && start < theirStart + minutes(a.providerId) * 60000
+    }) ?? null
+  )
+}
+
 function applyBooking(
   state: AppState,
   { patientId, providerId, department, slot, date, reason, mode = 'In person' }: BookAppointmentInput,
@@ -207,6 +228,13 @@ function applyBooking(
   const targetDate = date ?? todayKey(new Date(now))
   if (!getAvailableSlots(state, providerId, now, targetDate).includes(slot)) {
     throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken (or has passed). Please choose another one.')
+  }
+  const clash = patientOverlap(state, patientId, providerId, targetDate, slot)
+  if (clash) {
+    throw new DomainError(
+      'PATIENT_OVERLAP',
+      `${patientName(state, patientId)} already has an appointment with ${providerName(state, clash.providerId)} at ${formatTime(clash.slot)} on that day — choose a time that does not overlap it.`,
+    )
   }
   const appointment: Appointment = {
     appointmentId: `apt-${state.nextIds.appointment}`,
@@ -327,6 +355,33 @@ export function cancelAppointment({ appointmentId, by, note = '' }: { appointmen
   const { state, value } = applyCancelBooking(getState(), appointmentId, by, note, Date.now())
   setState(state)
   return value
+}
+
+/** How long a booking holds its time while its bill is unpaid. */
+export const PAYMENT_HOLD_MS = 5 * 60000
+
+/** An unpaid booking older than the hold is released: it is cancelled, its
+ *  bill withdrawn, and the time is free for anyone else. Returns what it
+ *  released. The patient pays at the billing counter; a booking is only
+ *  really confirmed once that payment is recorded. */
+export function releaseUnpaidBookings(now: number = Date.now()): Appointment[] {
+  const state = getState()
+  const expired = state.appointments.filter(
+    (a) =>
+      (a.status === 'Payment Pending' || a.status === 'Scheduled') &&
+      now - a.createdAt >= PAYMENT_HOLD_MS &&
+      getBillsForAppointment(state, a.appointmentId).some((bill) => bill.balance > 0 && bill.paidAmount === 0),
+  )
+  if (expired.length === 0) return []
+  let next = state
+  const released: Appointment[] = []
+  for (const appointment of expired) {
+    const step = applyCancelBooking(next, appointment.appointmentId, 'Patient', 'Payment not received within 5 minutes — time released', now)
+    next = step.state
+    released.push(step.value)
+  }
+  setState(next)
+  return released
 }
 
 /** Every open booking a doctor has on one day, cancelled as doctor

@@ -11,8 +11,7 @@ import type { QueueToken } from '../types/queue'
 import type { Patient } from '../types/patient'
 import { computeAdmissionBilling } from './admissionSelectors'
 import { getAppointmentsForPatient, getBillsForAppointment, getPatientFlags, getPossibleDuplicates, getProviderById } from './selectors'
-import { billDisplayStatus, billNumberFor, billServicesSummary, formatRupees, isBillDue, stayDays } from '../utils/billing'
-import { appointmentStatusLabel } from '../utils/appointment'
+import { billDisplayStatus, isBillDue, stayDays } from '../utils/billing'
 import { formatDateKey } from '../utils/dates'
 import { formatTime, todayKey } from './time'
 
@@ -122,7 +121,7 @@ export function getTodaysEncounterDoctor(state: AppState, patientId: string): st
 
 /** What is coming up today and after: booked encounters and open walk-ins. */
 export type UpcomingItem =
-  | { kind: 'appointment'; id: string; at: number; appointment: PatientAppointmentRow; bill: Payment | null }
+  | { kind: 'appointment'; id: string; at: number; appointment: PatientAppointmentRow; bill: Payment | null; token: QueueToken | null }
   | { kind: 'walk-in'; id: string; at: number; token: QueueToken; provider: Provider | null }
 
 export type TimelineKind = 'registered' | 'encounter' | 'walk-in' | 'bill' | 'admitted' | 'discharged' | 'admission-cancelled' | 'mlc' | 'guest-pass'
@@ -133,14 +132,25 @@ export interface TimelineEvent {
   kind: TimelineKind
   title: string
   detail: string
-  /** A status word, shown as a badge. */
+  /** A status word, shown as a badge — it picks the badge's colour. */
   status?: string
+  /** What the badge says, where that is plainer than the status word. */
+  statusLabel?: string
   paymentId?: string
 }
 
 export interface PatientTimeline {
   upcoming: UpcomingItem[]
   history: TimelineEvent[]
+}
+
+/** How a past visit ended: Completed, Cancelled, or Incomplete — registered
+ *  but never completed (a visit still waiting or in consultation is not past:
+ *  it is shown under Today & upcoming with its current status). */
+function visitOutcome(status: string): { status: string; statusLabel: string } {
+  if (status === 'Completed') return { status: 'Completed', statusLabel: 'Completed' }
+  if (status === 'Cancelled') return { status: 'Cancelled', statusLabel: 'Cancelled' }
+  return { status: 'Incomplete', statusLabel: 'Incomplete' }
 }
 
 const OPEN_APPOINTMENT = ['Scheduled', 'Payment Pending', 'Confirmed', 'Checked-in']
@@ -164,6 +174,7 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
         at: appointment.slotTimestamp,
         appointment,
         bill: getBillsForAppointment(state, appointment.appointmentId)[0] ?? null,
+        token: appointment.visitId ? (state.queueTokens.find((t) => t.visitId === appointment.visitId) ?? null) : null,
       })
       continue
     }
@@ -171,9 +182,9 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
       id: `enc-${appointment.appointmentId}`,
       at: appointment.slotTimestamp,
       kind: 'encounter',
-      title: `Outpatient encounter · ${doctor}`,
+      title: `Doctor visit · ${doctor}`,
       detail: `${appointment.department} · ${formatDateKey(appointment.date)} ${formatTime(appointment.slot)}`,
-      status: appointmentStatusLabel(appointment.status),
+      ...visitOutcome(appointment.status),
     })
   }
 
@@ -188,25 +199,14 @@ export function getPatientTimeline(state: AppState, patientId: string): PatientT
         id: `walk-${visit.visitId}`,
         at: visit.arrivalTime,
         kind: 'walk-in',
-        title: `Walk-in encounter · ${provider?.name ?? 'Doctor'}`,
+        title: `Walk-in visit · ${provider?.name ?? 'Doctor'}`,
         detail: `${provider?.department ?? ''}${token ? ` · ${token.tokenNumber}` : ''}`,
-        status: token?.status === 'No-show' ? 'No-show' : 'Completed',
+        ...visitOutcome(token?.status === 'No-show' ? 'No-show' : 'Completed'),
       })
     }
   }
 
-  for (const bill of state.payments) {
-    if (bill.patientId !== patientId) continue
-    history.push({
-      id: `bill-${bill.paymentId}`,
-      at: bill.createdAt,
-      kind: 'bill',
-      title: billServicesSummary(bill),
-      detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}${isBillDue(bill) ? ` · ${formatRupees(bill.balance)} due` : ''}`,
-      status: billDisplayStatus(bill),
-      paymentId: bill.paymentId,
-    })
-  }
+  // Bills are not part of the story here: the patient's Payment Status card lists them.
 
   for (const admission of state.admissions) {
     if (admission.patientId !== patientId) continue

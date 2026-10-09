@@ -6,6 +6,7 @@ import { pageTitleFor } from '../components/layout/navigation'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { FlowHost } from '../flows/FlowHost'
 import { BillingCounterNotices } from '../components/payment/BillingCounterNotices'
+import { PaymentHoldSweeper } from '../components/payment/PaymentHoldSweeper'
 
 /**
  * The app shell (DESIGN_SYSTEM §8, with this portal's sidebar):
@@ -57,6 +58,7 @@ export function AppLayout() {
       {/* Schedule / reschedule / billing / admit / discharge open here, over the page. */}
       <FlowHost />
       <BillingCounterNotices />
+      <PaymentHoldSweeper />
     </div>
   )
 }

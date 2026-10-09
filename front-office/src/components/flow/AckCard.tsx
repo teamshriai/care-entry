@@ -20,6 +20,7 @@ export function AckCard({
   action,
   onDone,
   durationMs = ACK_DURATION_MS,
+  showDone = true,
 }: {
   title: ReactNode
   children?: ReactNode
@@ -29,6 +30,8 @@ export function AckCard({
   action?: ReactNode
   onDone: () => void
   durationMs?: number
+  /** False for a confirmation with no buttons at all: it closes by itself. */
+  showDone?: boolean
 }) {
   const done = useRef(onDone)
   useEffect(() => {
@@ -64,6 +67,7 @@ export function AckCard({
           style={{ animation: `ackProgress ${durationMs}ms linear forwards` }}
         />
       </div>
+      {showDone ? (
       <button
         type="button"
         onClick={() => done.current()}
@@ -71,6 +75,7 @@ export function AckCard({
       >
         Done
       </button>
+      ) : null}
     </div>
   )
 }

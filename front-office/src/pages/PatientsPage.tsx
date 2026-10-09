@@ -90,7 +90,6 @@ export function PatientsPage() {
               <span className="truncate font-medium text-ink tbl:whitespace-nowrap">{patient.name}</span>
               <PatientStatusIcons status={care[patient.patientId]} showDetail />
             </span>
-            {patient.nameNative ? <span className="block truncate text-xs font-normal text-ink-subtle">{patient.nameNative}</span> : null}
           </div>
         </div>
       ),

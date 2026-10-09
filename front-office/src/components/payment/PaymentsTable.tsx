@@ -148,7 +148,6 @@ export function PaymentsTable({
       columns={columns}
       rowKey={(payment) => payment.paymentId}
       caption="Bills"
-      showFooter
     />
   )
 }

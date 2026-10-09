@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ElementType, ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '../../utils/cn'
+import { TONE_HEX } from '../../utils/toneHex'
+import type { IconTone } from '../../utils/toneHex'
 
 /** One quarter of the full-screen appointment page (Schedule and Reschedule):
  *  a numbered heading with the current choice, and the picker below it,
@@ -16,6 +18,8 @@ export function Quadrant({
   allowOverflow = false,
   scrollFrom = 'lg',
   className,
+  icon: Icon,
+  hue,
   children,
 }: {
   /** An anchor for the step rail to scroll to. */
@@ -32,13 +36,21 @@ export function Quadrant({
   scrollFrom?: 'lg' | 'xl'
   /** Grid placement. */
   className?: string
+  /** With a hue: an icon tile in that colour leads the heading, which is tinted
+   *  with it — the section's own colour. Without, the plain numbered heading. */
+  icon?: ElementType
+  hue?: IconTone
   children: ReactNode
 }) {
+  const toned = Boolean(Icon && hue)
+
   return (
     <section
       id={id}
       aria-label={title}
+      style={toned ? ({ '--tone': TONE_HEX[hue!] } as CSSProperties) : undefined}
       className={cn(
+        toned && 'overflow-hidden rounded-2xl border-t-[3px] !border-t-[var(--tone)] shadow-card-md',
         'surface-raised flex min-w-0 scroll-mt-3 flex-col rounded-xl border bg-surface-1 transition-[border-color,box-shadow] duration-300',
         scrollFrom === 'lg' ? 'lg:min-h-0' : 'xl:min-h-0',
         current
@@ -48,25 +60,42 @@ export function Quadrant({
         className,
       )}
     >
-      <header className="flex items-center gap-2.5 border-b border-border-soft px-3.5 py-2.5 sm:px-4">
-        <span
-          aria-hidden="true"
-          className={cn(
-            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-2xs font-bold',
-            done
-              ? 'bg-success-bg text-success-fg'
-              : current
-                ? 'bg-[image:var(--gradient-primary)] text-on-primary shadow-card-sm'
-                : 'bg-surface-2 text-ink-subtle',
-          )}
-        >
-          {done ? <Check size={13} strokeWidth={3} /> : step}
-        </span>
-        <h3 className="text-sm font-semibold text-ink">
+      <header
+        className={cn(
+          'flex items-center gap-2.5 border-b border-border-soft px-3.5 py-2.5 sm:px-4',
+          toned && 'bg-[linear-gradient(100deg,color-mix(in_oklab,var(--tone)_13%,var(--color-surface-1))_0%,var(--color-surface-1)_75%)] py-3',
+        )}
+      >
+        {toned && Icon ? (
+          <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tone)] text-white shadow-card-sm">
+            <Icon size={16} strokeWidth={2} />
+          </span>
+        ) : null}
+        {toned ? null : (
+          <span
+            aria-hidden="true"
+            className={cn(
+              'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-2xs font-bold',
+              done
+                ? 'bg-success-bg text-success-fg'
+                : current
+                  ? 'bg-[image:var(--gradient-primary)] text-on-primary shadow-card-sm'
+                  : 'bg-surface-2 text-ink-subtle',
+            )}
+          >
+            {done ? <Check size={13} strokeWidth={3} /> : step}
+          </span>
+        )}
+        <h3 className={cn('font-semibold text-ink', toned ? 'text-base' : 'text-sm')}>
           <span className="sr-only">Step {step}: </span>
           {title}
           {done ? <span className="sr-only"> (done)</span> : null}
         </h3>
+        {toned && done ? (
+          <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-bg text-success-fg">
+            <Check size={12} strokeWidth={3} />
+          </span>
+        ) : null}
         {summary ? <span className="ml-auto min-w-0 truncate text-sm font-medium text-ink-muted">{summary}</span> : null}
       </header>
       <div

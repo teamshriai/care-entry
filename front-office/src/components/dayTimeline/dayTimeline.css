@@ -34,7 +34,7 @@
   --act-patient: var(--act-opd); --act-patient-ink: var(--act-opd-ink); /* a booked patient is an OPD visit: the OPD's green */
   --act-procedure: #0369a1; --act-procedure-ink: #ffffff;
   --act-other: #57534e; --act-other-ink: #ffffff;
-  /* Free time a dashed green, off hours hatched grey, the Now line red. */
+  /* Free time a dashed green, breaks hatched grey, the Now line red. */
   --avail-fill: #ecfaf1; --avail-edge: #22a55a; --avail-ink: #146c3a;
   --off-fill: #f4f4f6; --off-hatch: #dcdce2;
   --now-line: #e5342f; --now-ink: #c42f2f;

@@ -8,7 +8,7 @@ hover card, and the key with the day's busy and free time underneath.
 | File | What it holds |
 |---|---|
 | `DayTimeline.tsx` | `<DayTimeline>` (the row) and `<DayTimelineKey>` (the key and totals) |
-| `dayModel.ts` | `dayModel()`, which turns a doctor's day into bars, free time and off hours, plus the 12-hour time helpers |
+| `dayModel.ts` | `dayModel()`, which turns a doctor's day into bars, free time and breaks, plus the 12-hour time helpers |
 | `dayTimeline.css` | All the styling, in plain CSS with `dtl-` classes and the Dashboard's light and dark colours. The component imports it. |
 
 It needs only `react` and `lucide-react`, which Care Entry already has, and no Tailwind classes.
@@ -24,7 +24,7 @@ const model = useMemo(() => dayModel({ date, now, activities, bookings, blocks, 
 <DayTimeline
   model={model}
   onSchedule={(at, until) => /* open Schedule Appointment at minute `at` */}
-  onOffHours={(at, [from, to]) => /* ask: open extra hours here, or schedule here anyway */}
+  // (breaks are drawn and never tapped; there is no off-hours callback)
   onBlocked={(blockId) => /* offer to unblock */}
   onOpen={(item) => /* optional: an activity bar was tapped */}
 />
@@ -79,12 +79,10 @@ The chart only reports a tap; the dialogs are Care Entry's own.
   the start of the free time. `until` is where that free time ends. The Dashboard opens
   "Schedule an appointment" at that minute and does not ask for the time again. Round `at` to the
   doctor's slot length if bookings must sit on the slot grid.
-- **Off hours still to come** call `onOffHours(at, [from, to])`. The Dashboard asks whether to open
-  extra hours there or to schedule there anyway, for example a 6 AM operation. Pass opened
-  hours back in `openings`.
+- **Breaks** (lunch, inside the working day) are drawn and never tapped. Hours outside the working day are not drawn.
 - **Blocked time** calls `onBlocked(blockId)`. The Dashboard offers to unblock it.
 - **An activity** calls `onOpen(item)` when it is given. Without `onOpen`, activities are not buttons.
-- Free time and off hours that have already gone are drawn but cannot be tapped.
+- Free time and breaks that have already gone are drawn but cannot be tapped.
 
 `nextPatient={{ name, token }}` is optional. When it is given, hovering the OPD that is on now names
 the queue's next patient, as on the Dashboard.

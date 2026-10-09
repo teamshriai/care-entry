@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { Printer, ArrowRight, Building2, CalendarCheck2, CalendarPlus, Check, Pencil, Sparkles, Video, XCircle } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, Building2, CalendarPlus, Check, ClipboardCheck, Pencil, Sparkles, Video, XCircle } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { DoctorSlotCard } from '../../components/clinician/DoctorSlotCard'
-import { AppointmentPeople, AppointmentSummary, AppointmentWhen } from '../../components/appointment/AppointmentSummary'
+import { AppointmentPeople, AppointmentWhen } from '../../components/appointment/AppointmentSummary'
 import { BillStatusBadge } from '../../components/payment/BillStatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Alert } from '../../components/ui/Alert'
-import { Modal } from '../../components/ui/Modal'
 import { useToast } from '../../hooks/useToast'
 import { useStoreValue } from '../../hooks/useStore'
 import { useNow } from '../../hooks/useNow'
@@ -23,9 +22,7 @@ import {
   getToday,
 } from '../../domain/selectors'
 import { bookAppointment, cancelAppointment } from '../../domain/actions'
-import { sendToBillingCounter } from '../../domain/billingCounter'
-import { printBill } from '../../utils/printBill'
-import { billNumberFor, formatRupees, isBillDue, sumItems } from '../../utils/billing'
+import { formatRupees, sumItems } from '../../utils/billing'
 import { dayWithDate, relativeDayLabel } from '../../utils/dates'
 import { modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
@@ -52,9 +49,6 @@ interface Done {
   bill: Payment
 }
 
-/** How long the booking's confirmation stays before closing by itself. */
-const ACK_MS = 10000
-
 /** A doctor and a time, chosen together. */
 interface Pick {
   providerId: string
@@ -65,7 +59,7 @@ interface Pick {
 /**
  * Schedule — booking an appointment: patient → department → Doctor
  * Availability (each of the department's doctors with their own times, in
- * one list) → review → book; the patient pays at the billing counter.
+ * one list) → book; the patient pays at the billing counter.
  * Once the patient and department are known, the soonest doctor's earliest
  * time is chosen as a smart choice, said so, and changeable with one tap.
  * Every step stays editable. (`?flow=consult`, the old Start Consultation,
@@ -135,10 +129,8 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   const [changingPatient, setChangingPatient] = useState(false)
   const [done, setDone] = useState<Done | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Booking is two-step: Book Appointment opens a review of every detail,
-  // and only its own Book Appointment books. After booking, Cancel asks once.
-  const [reviewing, setReviewing] = useState(false)
-  const [askCancel, setAskCancel] = useState(false)
+  // Tapping a free time books it at once and shows the appointment; Cancel
+  // there cancels it straight away, and Confirm closes the flow.
   // The smart choice on show — cleared the moment the desk picks another.
   const [smart, setSmart] = useState<Pick | null>(() => (start.smart && start.providerId && start.date && start.slot ? { providerId: start.providerId, date: start.date, slot: start.slot } : null))
   const { notify } = useToast()
@@ -178,6 +170,11 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   function choosePatient(next: Patient) {
     setPatientId(next.patientId)
     setChangingPatient(false)
+    // A time the desk already chose on the doctor's page is booked for this patient.
+    if (providerId && date && slot && !smart) {
+      bookPick(next, { providerId, date, slot })
+      return
+    }
     if (!department) reveal('book-department')
     else if (!slot) {
       pickSoonest(department, providerId ?? undefined)
@@ -211,38 +208,41 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   // Only a time that is still free can be chosen — the cards disable the
   // rest, and this guards against a time taken since they were drawn.
   function pickTime(nextProvider: string, nextDate: string, nextSlot: string) {
-    if (!getAvailableSlots(getState(), nextProvider, Date.now(), nextDate).includes(nextSlot)) {
+    if (!getAvailableSlots(getState(), nextProvider, now, nextDate).includes(nextSlot)) {
       setError(`${formatTime(nextSlot)} has just been taken or has passed — choose another time.`)
       if (nextProvider === providerId && nextDate === date && nextSlot === slot) setSlot(null)
       return
     }
-    applyPick({ providerId: nextProvider, date: nextDate, slot: nextSlot }, false)
+    // Tapping a free time books it for the patient straight away.
+    if (patient) bookPick(patient, { providerId: nextProvider, date: nextDate, slot: nextSlot })
+    else applyPick({ providerId: nextProvider, date: nextDate, slot: nextSlot }, false)
   }
 
-  // Booking raises the bill for the patient to pay at the billing counter — Care Entry
-  // takes no money. The booking is confirmed once the counter records it.
-  function book() {
-    setReviewing(false)
-    if (!patient || !provider) return
+  // Booking holds the time and raises the bill. The bill is printed from the
+  // patient's Payment History and paid at the billing counter — Care Entry takes
+  // no money — and the booking is only confirmed once that payment is recorded.
+  // Unpaid after five minutes, the time is released (see PaymentHoldSweeper).
+  function bookPick(who: Patient, pick: Pick) {
+    const doctor = getProviderById(getState(), pick.providerId)
+    if (!doctor) return
     setError(null)
     try {
-      if (!date || !slot) return
+      const mode = pick.providerId === providerId ? consultMode : (modesFor(doctor)[0] ?? 'In person')
       const result = bookAppointment({
-        patientId: patient.patientId,
-        providerId: provider.providerId,
-        date,
-        slot,
-        mode: consultMode,
+        patientId: who.patientId,
+        providerId: doctor.providerId,
+        date: pick.date,
+        slot: pick.slot,
+        mode,
         reason: reason.trim() || undefined,
       })
-      sendToBillingCounter(result.bill.paymentId)
       setDone({
-        patient,
-        provider,
+        patient: who,
+        provider: doctor,
         appointmentId: result.appointment.appointmentId,
-        date,
-        slot,
-        mode: consultMode,
+        date: pick.date,
+        slot: pick.slot,
+        mode,
         bill: result.bill,
       })
     } catch (err) {
@@ -263,7 +263,6 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
       notify('Appointment cancelled', { detail: `${done.provider.name} · ${dayWithDate(done.date, today)}, ${formatTime(done.slot)}` })
       onClose()
     } catch (err) {
-      setAskCancel(false)
       notify(err instanceof Error ? err.message : String(err), { tone: 'error' })
     }
   }
@@ -283,27 +282,18 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
       <FlowSheet title="Schedule Appointment" subtitle={subtitle} icon={CalendarPlus} onClose={onClose} size="full">
         <div className="flex min-h-full items-center justify-center py-4 sm:py-8">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border-soft bg-surface-1 shadow-modal">
-            {/* The outcome, for the patient. */}
+            {/* The details to confirm with the patient before the booking goes ahead. */}
             <div
-              role="status"
-              aria-live="polite"
               className="px-5 pb-3 pt-5 text-center sm:px-6 sm:pb-4 sm:pt-6"
-              style={{ backgroundImage: 'radial-gradient(120% 100% at 50% 0%, color-mix(in oklab, var(--color-success-fg) 13%, transparent) 0%, transparent 70%)' }}
+              style={{ backgroundImage: 'radial-gradient(120% 100% at 50% 0%, color-mix(in oklab, var(--color-primary-500) 12%, transparent) 0%, transparent 70%)' }}
             >
-              <span
-                className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-fg text-surface-1 shadow-[0_8px_20px_-8px_var(--color-success-fg)] ring-[6px] ring-success-bg"
-                aria-hidden="true"
-              >
-                <Check className="h-6 w-6" strokeWidth={3} />
+              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-text ring-[6px] ring-primary-50/60" aria-hidden="true">
+                <ClipboardCheck className="h-6 w-6" strokeWidth={2} />
               </span>
-              <h3 className="mt-3.5 text-lg font-bold tracking-tight text-ink">Appointment booked</h3>
+              <h3 className="mt-3.5 text-lg font-bold tracking-tight text-ink">Confirm appointment details</h3>
               <p className="mt-0.5 text-sm text-ink-muted">
-                <span className="font-semibold text-ink">{done.patient.name}</span> is all set with{' '}
-                <span className="font-semibold text-ink">{done.provider.name}</span>.
+                Please check these details with <span className="font-semibold text-ink">{done.patient.name}</span> before confirming.
               </p>
-              <span className="mt-2.5 inline-flex items-center rounded-full border border-border-soft bg-surface-1 px-2.5 py-0.5 text-2xs font-semibold tabular-nums tracking-wide text-ink-muted">
-                {done.appointmentId.toUpperCase()}
-              </span>
             </div>
 
             {/* When, who, and the fee — the essentials, read back. */}
@@ -313,7 +303,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
               <div className="flex items-center justify-between gap-3 rounded-xl border border-border-soft px-3.5 py-2.5">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink">Consultation fee</p>
-                  <p className="text-xs text-ink-muted">Paid at the billing counter</p>
+                  <p className="text-xs text-ink-muted">Paid at the billing counter — the time is held for 5 minutes</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="text-base font-bold tabular-nums text-ink">{formatRupees(fee.totalAmount)}</span>
@@ -323,62 +313,17 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
             </div>
 
             <div className="grid grid-cols-2 gap-2.5 border-t border-border-soft bg-surface-2/40 px-5 py-3.5 sm:flex sm:px-6">
-              <Button variant="danger" onClick={() => setAskCancel(true)} className="sm:flex-none">
+              <Button variant="danger" onClick={cancelBooking} className="sm:flex-none">
                 <XCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
                 Cancel
               </Button>
-              <Button variant="secondary" onClick={() => printBill(done.bill.paymentId)} className="sm:ml-auto sm:flex-none">
-                <Printer className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                Print bill
-              </Button>
-              <Button onClick={onClose} className="order-first col-span-2 sm:order-none sm:min-w-28 sm:flex-none">
+              <Button onClick={onClose} className="order-first col-span-2 sm:order-none sm:ml-auto sm:min-w-28 sm:flex-none">
                 <Check className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                Done
+                Confirm
               </Button>
             </div>
-            <AutoClose ms={ACK_MS} paused={askCancel} onDone={onClose} />
           </div>
         </div>
-        <Modal
-          open={askCancel}
-          onClose={() => setAskCancel(false)}
-          title="Cancel this appointment?"
-          description={
-            <>
-              {done.patient.name} with {done.provider.name} · <span className="whitespace-nowrap">{dayWithDate(done.date, today)}</span>,{' '}
-              <span className="whitespace-nowrap">{formatTime(done.slot)}</span>
-            </>
-          }
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => setAskCancel(false)} className="max-sm:w-full">
-                Keep appointment
-              </Button>
-              <Button variant="danger" onClick={cancelBooking} className="max-sm:w-full">
-                Cancel appointment
-              </Button>
-            </>
-          }
-        >
-          <p className="text-sm text-ink-muted">
-            {doneBill && doneBill.paidAmount > 0 ? (
-              <>
-                {done.patient.name} has already paid {formatRupees(doneBill.paidAmount)} for{' '}
-                <span className="whitespace-nowrap">{billNumberFor(doneBill)}</span>. A cancellation by the patient keeps the consultation fee.
-              </>
-            ) : doneBill && isBillDue(doneBill) ? (
-              <>
-                The time is freed, and {done.patient.name} won’t need to pay{' '}
-                <span className="whitespace-nowrap">
-                  {billNumberFor(doneBill)} ({formatRupees(doneBill.balance)})
-                </span>
-                .
-              </>
-            ) : (
-              'The time is freed for other patients.'
-            )}
-          </p>
-        </Modal>
       </FlowSheet>
     )
   }
@@ -456,16 +401,12 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
             </p>
             <p className="text-lg font-bold tabular-nums tracking-tight text-ink">{formatRupees(total)}</p>
           </div>
-          <Button size="lg" onClick={() => setReviewing(true)} disabled={!ready} className="shrink-0">
-            <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} />
-            Book Appointment
-          </Button>
         </div>
       </div>
       <p className="hidden text-xs text-ink-subtle sm:block">
         {ready
-          ? `${patient?.name ?? 'The patient'} pays at the billing counter; the appointment is confirmed as soon as it is paid.`
-          : 'Every choice stays editable — tap any section to change it.'}
+          ? `${patient?.name ?? 'The patient'} pays at the billing counter within 5 minutes — print the bill from Payment History. The appointment is confirmed once it is paid.`
+          : 'Tap a free time to book it for the patient. Every choice stays editable — tap any section to change it.'}
       </p>
     </div>
   )
@@ -643,61 +584,6 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         </Quadrant>
       </div>
       </div>
-      {patient && provider && date && slot ? (
-        <Modal
-          open={reviewing}
-          onClose={() => setReviewing(false)}
-          title="Review appointment"
-          description={`Please read this back to ${patient.name} before booking.`}
-          className="sm:max-w-xl"
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => setReviewing(false)} className="max-sm:flex-1">
-                Go back
-              </Button>
-              <Button onClick={book} disabled={!ready} className="max-sm:flex-1">
-                <CalendarCheck2 className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                Book Appointment
-              </Button>
-            </>
-          }
-        >
-          <AppointmentSummary
-            patient={patient}
-            provider={provider}
-            date={date}
-            slot={slot}
-            mode={consultMode}
-            reason={reason.trim() || null}
-            items={billItems}
-            today={today}
-          />
-        </Modal>
-      ) : null}
     </FlowSheet>
-  )
-}
-
-/**
- * A bar that runs out over `ms`, then calls `onDone` — the confirmation's
- * quiet timer. While `paused` it stops and resets, so it starts over once
- * the pause ends.
- */
-function AutoClose({ ms, paused, onDone }: { ms: number; paused: boolean; onDone: () => void }) {
-  const done = useRef(onDone)
-  useEffect(() => {
-    done.current = onDone
-  })
-  useEffect(() => {
-    if (paused) return undefined
-    const timer = window.setTimeout(() => done.current(), ms)
-    return () => window.clearTimeout(timer)
-  }, [ms, paused])
-  return (
-    <div className="h-1 w-full bg-surface-3" aria-hidden="true">
-      {paused ? null : (
-        <div className="h-full origin-left bg-[image:var(--gradient-primary)]" style={{ animation: `ackProgress ${ms}ms linear forwards` }} />
-      )}
-    </div>
   )
 }

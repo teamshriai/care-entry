@@ -7,6 +7,7 @@ export type DomainErrorCode =
   | 'NOT_FOUND'
   | 'INVALID_TRANSITION'
   | 'SLOT_ALREADY_BOOKED'
+  | 'PATIENT_OVERLAP'
   | 'HAS_OPEN_APPOINTMENTS'
   | 'DUPLICATE'
   | 'PASS_LIMIT'

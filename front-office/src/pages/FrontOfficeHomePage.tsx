@@ -25,6 +25,7 @@ import { getTodayTrends } from '../domain/reportSelectors'
 import { useNow } from '../hooks/useNow'
 import { useToast } from '../hooks/useToast'
 import { useFlow } from '../flows/useFlow'
+import { TodoCard } from '../components/todo/TodoCard'
 import { getAppointmentsForDate, getBillingOverview, getNeedsAttention, getQueueView } from '../domain/selectors'
 import { getOutpatients } from '../domain/outpatientSelectors'
 import { getPatientRows } from '../domain/patientSelectors'
@@ -235,6 +236,7 @@ export function FrontOfficeHomePage() {
             </Card>
           </section>
 
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
           {/* Needs attention — most urgent first, one action each */}
           <section className="min-w-0" aria-label="Needs attention">
             <Card accentTone="warning">
@@ -275,6 +277,12 @@ export function FrontOfficeHomePage() {
               )}
             </Card>
           </section>
+
+          {/* The desk's own quick to-do notes, kept in this browser */}
+          <section className="min-w-0" aria-label="To-do">
+            <TodoCard />
+          </section>
+          </div>
         </div>
       </div>
     </div>

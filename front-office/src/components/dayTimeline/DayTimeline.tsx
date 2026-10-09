@@ -10,9 +10,7 @@
  *   · free time a dashed green bar with a +, no words — from now on, tapping it
  *     schedules a patient at the minute tapped (the hover card's minute); free
  *     time already gone is drawn, never offered; extra hours carry a clock with a +;
- *   · off hours (lunch among them) hatched grey — from now on, tapping them asks
- *     whether to open extra hours there or to schedule there anyway; blocked
- *     time hatched red with ⊘;
+ *   · breaks (lunch) hatched grey and not bookable; leave hatched red with ⊘;
  *   · the Now line, red, labelled with the time.
  *
  * One size on every screen: PX_PER_MIN, and every stretch of five minutes or
@@ -28,7 +26,7 @@
  *
  * Usage:
  *   const model = useMemo(() => dayModel({ date, activities, bookings, blocks }), [...])
- *   <DayTimeline model={model} onSchedule={…} onOffHours={…} onBlocked={…} onOpen={…} />
+ *   <DayTimeline model={model} onSchedule={…} onBlocked={…} onOpen={…} />
  *   <DayTimelineKey model={model} />
  */
 
@@ -49,7 +47,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 
-import { KIND_LABEL, duration, hourLine, isActivity, range12, span12, time12, type ActivityKind, type DayModel, type Span, type TimelineItem } from './dayModel'
+import { KIND_LABEL, duration, hourLine, isActivity, range12, span12, time12, type ActivityKind, type DayModel, type TimelineItem } from './dayModel'
 import './dayTimeline.css'
 
 /** The row's scale on every screen: twelve hours are about 1,330px, before the short stretches widen. */
@@ -136,7 +134,6 @@ export function DayTimeline({
   nextPatient,
   onOpen,
   onSchedule,
-  onOffHours,
   onBlocked,
 }: {
   model: DayModel
@@ -146,8 +143,6 @@ export function DayTimeline({
   onOpen?: (item: TimelineItem) => void
   /** Schedule a patient at a minute of free time; `until` is where that free time ends. */
   onSchedule: (at: number, until: number) => void
-  /** Off hours tapped at a minute: open extra hours there, or schedule there anyway. */
-  onOffHours: (at: number, off: Span) => void
   /** Blocked time tapped: offer to unblock it. */
   onBlocked: (blockId: string) => void
 }) {
@@ -190,7 +185,7 @@ export function DayTimeline({
   }
   const tap = (item: TimelineItem, clientX?: number) => {
     if (item.kind === 'blocked') return item.block && onBlocked(item.block.id)
-    if (item.kind === 'off') return onOffHours(tapped(item, clientX), [item.start, item.end])
+    if (item.kind === 'break') return
     onSchedule(tapped(item, clientX), item.end)
   }
 
@@ -294,7 +289,7 @@ function Ticks({ marks, scale }: { marks: number[]; scale: Scale }) {
   )
 }
 
-/** One bar: an activity, free time, off hours or blocked time — a button where it does something and is wide enough to tap. */
+/** One bar: an activity, free time, a break or blocked time — a button where it does something and is wide enough to tap. */
 function Bar({ item, scale, px, onOpen, onTap }: { item: TimelineItem; scale: Scale; px: number; onOpen?: (item: TimelineItem) => void; onTap: (item: TimelineItem, clientX?: number) => void }) {
   const place: CSSProperties = { left: `calc(${at(scale, item.start)} + 2px)`, width: `calc(${between(scale, item.start, item.drawEnd)} - 4px)` }
   const when = range12(item.start, item.end)
@@ -308,27 +303,16 @@ function Bar({ item, scale, px, onOpen, onTap }: { item: TimelineItem; scale: Sc
     </>
   )
 
-  if (item.kind === 'off') {
-    if (item.past || !tappable) return <span aria-hidden="true" title={`${item.title} · ${when}`} className="dtl-bar dtl-off" style={place} />
-    return (
-      <button
-        type="button"
-        onClick={(e) => onTap(item, e.detail > 0 ? e.clientX : undefined)}
-        aria-label={`${item.title} ${when} — open extra hours or schedule here`}
-        title={`${item.title} ${when} — tap to open extra hours or schedule here`}
-        className="dtl-bar dtl-off"
-        style={place}
-      />
-    )
-  }
+  // A break is shown, never bookable.
+  if (item.kind === 'break') return <span title={`Break · ${when} — not bookable`} className="dtl-bar dtl-off" style={place} />
 
   if (item.kind === 'blocked') {
     const inner = (
       <span className="dtl-bar-in">
         <Icon icon={Ban} size={15} />
         <span className="dtl-words">
-          <span className="dtl-title">Blocked</span>
-          <span className="dtl-time">{item.title.replace(/^Blocked · /, '')}</span>
+          <span className="dtl-title">{item.block?.allDay ? 'Leave' : 'Blocked'}</span>
+          <span className="dtl-time">{item.title.replace(/^(Blocked|Leave) · /, '')}</span>
         </span>
       </span>
     )
@@ -365,8 +349,17 @@ function Bar({ item, scale, px, onOpen, onTap }: { item: TimelineItem; scale: Sc
     )
   }
 
-  // An activity, or a patient booked outside a session.
+  // An activity, or a patient booked outside a session. A routine activity is its icon alone.
   const detail = item.activity?.detail
+  if (item.activity?.iconOnly) {
+    return (
+      <span aria-label={`${item.title}, ${when}`} role="img" className="dtl-bar dtl-act" data-kind={item.kind} data-tight="" style={place}>
+        <span className="dtl-bar-in" style={{ justifyContent: 'center', width: '100%' }}>
+          <Icon icon={iconOf(item)} size={18} />
+        </span>
+      </span>
+    )
+  }
   const inner = (
     <span className="dtl-bar-in">
       <Icon icon={iconOf(item)} size={18} />
@@ -406,11 +399,13 @@ function HoverCard({ min, item, next, nextPatient, style }: { min: number; item?
       ? item.past
         ? { dot: 'var(--dtl-line-strong)', name: 'Free', aside: 'gone' }
         : { dot: 'var(--avail-edge)', name: item.extra ? 'Available · extra hours' : 'Available', aside: `${left} min free` }
-      : item.kind === 'off'
-        ? { dot: 'var(--off-hatch)', name: 'Off hours', aside: item.past ? '' : 'Tap for options' }
+      : item.kind === 'break'
+        ? { dot: 'var(--off-hatch)', name: 'Break', aside: 'Not bookable' }
         : item.kind === 'blocked'
           ? { dot: 'var(--dtl-crit)', name: item.title, aside: range12(item.start, item.end) }
-          : { dot: `var(--act-${item.kind})`, name: item.title, aside: range12(item.start, item.end) }
+          : item.activity?.iconOnly
+            ? { dot: `var(--act-${item.kind})`, name: 'Not bookable', aside: range12(item.start, item.end) }
+            : { dot: `var(--act-${item.kind})`, name: item.title, aside: range12(item.start, item.end) }
   return (
     <div aria-hidden="true" className="dtl-card" style={style}>
       <p className="dtl-card-time">{time12(min)}</p>
@@ -432,7 +427,7 @@ function HoverCard({ min, item, next, nextPatient, style }: { min: number; item?
         ) : next ? (
           <>
             <span className="dtl-card-next-what">
-              Next: <b>{next.title}</b>
+              Next: <b>{next.activity?.iconOnly ? 'Not bookable' : next.title}</b>
             </span>
             <span className="dtl-card-next-when">{time12(next.start)}</span>
           </>
@@ -446,7 +441,7 @@ function HoverCard({ min, item, next, nextPatient, style }: { min: number; item?
 
 /** The key under the row — and, for a screen reader, the day in one sentence and hour by hour — with the day's busy and free time. */
 export function DayTimelineKey({ model }: { model: DayModel }) {
-  const events = model.items.filter((i) => isActivity(i.kind))
+  const events = model.items.filter((i) => isActivity(i.kind) && !i.activity?.iconOnly)
   // A booked patient is an OPD visit, in the OPD's green: the key names it once, as OPD.
   const kinds = [...new Set(events.map((e) => (e.kind === 'patient' ? 'opd' : e.kind) as ActivityKind))]
   const has = (k: string) => model.items.some((i) => i.kind === k && !i.past)
@@ -456,7 +451,7 @@ export function DayTimelineKey({ model }: { model: DayModel }) {
         {kinds.map((k) => (
           <span key={k} className="dtl-key-item">
             <span className="dtl-swatch" data-kind={k} />
-            {KIND_LABEL[k]}
+            {k === 'opd' ? 'Booked' : KIND_LABEL[k]}
           </span>
         ))}
         {model.items.some((i) => i.kind === 'free' && !i.past && !i.extra) && (
@@ -478,13 +473,13 @@ export function DayTimelineKey({ model }: { model: DayModel }) {
         {has('blocked') && (
           <span className="dtl-key-item">
             <span className="dtl-swatch-blocked" />
-            Blocked
+            {model.items.some((i) => i.kind === 'blocked' && !i.block?.allDay) ? 'Blocked' : 'Leave'}
           </span>
         )}
-        {has('off') && (
+        {has('break') && (
           <span className="dtl-key-item">
             <span className="dtl-swatch-off" />
-            Off hours
+            Break
           </span>
         )}
       </div>

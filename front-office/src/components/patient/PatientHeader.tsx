@@ -1,5 +1,5 @@
 import type { ElementType } from 'react'
-import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut } from 'lucide-react'
+import { BedDouble, CalendarPlus, Copy, LogOut } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
@@ -7,7 +7,6 @@ import { useToast } from '../../hooks/useToast'
 import { usePatientCareStatus } from '../../hooks/useCareStatus'
 import { PatientStatusIcons } from './PatientStatusIcons'
 import { PatientDetailsStrip } from './PatientDetailsCard'
-import { formatRupees } from '../../utils/billing'
 import { initialsOf } from '../../utils/format'
 import type { PatientHeaderSummary } from '../../domain/patientSelectors'
 import type { Patient } from '../../types/patient'
@@ -15,14 +14,6 @@ import type { Tone } from '../../utils/tone'
 
 const RISK_LABEL = { High: 'High risk', Watch: 'Watch', Normal: 'Normal' } as const
 const RISK_TONE: Record<keyof typeof RISK_LABEL, Tone> = { High: 'critical', Watch: 'warning', Normal: 'info' }
-const PAYMENT_TONE: Record<PatientHeaderSummary['payment']['status'], Tone> = {
-  Failed: 'critical',
-  Pending: 'warning',
-  Partial: 'warning',
-  Paid: 'stable',
-  'No bills': 'neutral',
-}
-
 export interface PatientActions {
   schedule: () => void
   admit: () => void
@@ -45,7 +36,7 @@ export function PatientHeader({
 }) {
   const { notify } = useToast()
   const care = usePatientCareStatus()
-  const { risk, payment, inpatient, admission } = summary
+  const { risk, inpatient } = summary
 
   function copyUhid() {
     void navigator.clipboard?.writeText(patient.uhid).then(
@@ -56,7 +47,8 @@ export function PatientHeader({
 
   return (
     <header className="-mx-4 -mt-4 border-b border-border-soft bg-bg/95 px-4 py-3.5 backdrop-blur sm:-mx-5 sm:-mt-5 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6 sm:px-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+      {/* Who the patient is, with the actions level with the name at the top right. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3.5">
           <Avatar name={patient.name} initials={initialsOf(patient.name)} size="lg" />
           <div className="min-w-0">
@@ -68,7 +60,6 @@ export function PatientHeader({
               </span>
               <span className="sr-only">Risk: {risk.reason}</span>
             </div>
-            {patient.nameNative ? <p className="truncate text-sm text-ink-muted">{patient.nameNative}</p> : null}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-ink-muted">
               <button
                 type="button"
@@ -84,33 +75,6 @@ export function PatientHeader({
                 {patient.age ? `${patient.age} yrs` : 'Age —'} · {patient.sex}
               </span>
             </div>
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <Badge tone={PAYMENT_TONE[payment.status]}>
-                <IndianRupee className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-                {payment.status === 'Paid'
-                  ? 'Payment received'
-                  : payment.status === 'No bills'
-                    ? 'No bills'
-                    : `${payment.status === 'Failed' ? 'Payment failed' : 'Payment pending'} · ${formatRupees(payment.due)}`}
-              </Badge>
-              {inpatient ? (
-                <span title={`Inpatient · ${inpatient.ward} · ${inpatient.bed} · Day ${inpatient.day}`} className="flex min-w-0 max-w-full">
-                  <Badge tone={inpatient.critical ? 'critical' : 'info'} className="max-w-full">
-                    <BedDouble className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
-                    <span className="min-w-0 truncate">
-                      <span className="hidden sm:inline">Inpatient · </span>
-                      {inpatient.ward} · {inpatient.bed} · Day {inpatient.day}
-                    </span>
-                  </Badge>
-                </span>
-              ) : admission ? (
-                <Badge tone="warning">
-                  <BedDouble className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
-                  Admission waiting for a bed
-                </Badge>
-              ) : null}
-            </div>
-            <PatientDetailsStrip patient={patient} />
           </div>
         </div>
 
@@ -122,6 +86,10 @@ export function PatientHeader({
             <Action icon={BedDouble} label="Admit" onClick={actions.admit} />
           )}
         </div>
+      </div>
+      {/* Contact and ABHA across the full width, lined up under the name. */}
+      <div className="sm:pl-[3.875rem]">
+        <PatientDetailsStrip patient={patient} />
       </div>
     </header>
   )

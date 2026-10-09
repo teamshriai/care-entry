@@ -13,8 +13,8 @@ export interface HistoryVisit {
   on: string | number
   doctor: string
   reason: string
-  /** Completed unless said otherwise. */
-  status?: 'Completed' | 'Cancelled' | 'No-show'
+  /** Completed unless said otherwise. Incomplete is a registered visit that was never completed (and not cancelled). */
+  status?: 'Completed' | 'Cancelled' | 'Incomplete'
 }
 
 export interface TodayVisit {
@@ -22,7 +22,7 @@ export interface TodayVisit {
   reason: string
   /** Slots from the doctor's next one; negative = already past. */
   offset: number
-  status: 'Completed' | 'Checked-in' | 'Confirmed' | 'No-show' | 'Cancelled'
+  status: 'Completed' | 'Checked-in' | 'Confirmed' | 'Cancelled'
   /** Checked in and still here: Waiting (default) or Called. */
   token?: 'Waiting' | 'Called'
   arrivedMinutesAgo?: number
@@ -87,11 +87,11 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     uhid: 'SHRI-0031042', name: 'Gopinath Rangasamy', nameNative: 'கோபிநாத் ரங்கசாமி', age: 67, sex: 'Male', abhaId: 'gopinath.r@abdm', registered: '2022-02-08',
     visits: [
       { on: '2022-02-08', doctor: GEN.rahul, reason: 'Fever and body ache' },
-      { on: '2022-09-14', doctor: GEN.vikram, reason: 'Diabetes screening' },
+      { on: '2022-09-14', doctor: GEN.vikram, reason: 'Diabetes screening', status: 'Incomplete' },
       { on: '2023-03-21', doctor: GEN.vikram, reason: 'Diabetes review — HbA1c' },
       { on: '2023-11-07', doctor: CAR.harish, reason: 'Chest discomfort on exertion' },
       { on: '2024-06-18', doctor: CAR.harish, reason: 'Cardiac follow-up — echo review' },
-      { on: '2025-04-09', doctor: GEN.vikram, reason: 'Diabetes review' },
+      { on: '2025-04-09', doctor: GEN.vikram, reason: 'Diabetes review', status: 'Cancelled' },
       { on: '2025-12-02', doctor: CAR.harish, reason: 'Cardiac follow-up' },
       { on: -34, doctor: GEN.vikram, reason: 'Sugar review' },
     ],
@@ -102,7 +102,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     visits: [
       { on: '2022-05-17', doctor: ORT.meera, reason: 'Right knee pain' },
       { on: '2022-11-29', doctor: ORT.meera, reason: 'Knee pain — X-ray review' },
-      { on: '2023-08-03', doctor: ORT.ashwin, reason: 'Physiotherapy advice' },
+      { on: '2023-08-03', doctor: ORT.ashwin, reason: 'Physiotherapy advice', status: 'Incomplete' },
       { on: '2024-02-20', doctor: GEN.rahul, reason: 'Hypertension check' },
       { on: '2025-01-15', doctor: CAR.revathi, reason: 'Palpitations' },
       { on: '2026-03-11', doctor: CAR.revathi, reason: 'Palpitations — Holter review' },
@@ -116,7 +116,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-07-25', doctor: NEU.arun, reason: 'Tremor in right hand' },
       { on: '2023-01-12', doctor: NEU.arun, reason: 'Tremor — medication review' },
       { on: '2023-09-26', doctor: NEU.sanjay, reason: 'Movement disorder assessment' },
-      { on: '2024-05-14', doctor: NEU.sanjay, reason: 'Movement disorder follow-up' },
+      { on: '2024-05-14', doctor: NEU.sanjay, reason: 'Movement disorder follow-up', status: 'Cancelled' },
       { on: '2025-02-04', doctor: NEU.sanjay, reason: 'Medication adjustment' },
       { on: '2025-10-21', doctor: NEU.sanjay, reason: 'Six-monthly review' },
       { on: -62, doctor: NEU.sanjay, reason: 'Six-monthly review' },
@@ -141,7 +141,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2023-01-09', doctor: CAR.priya, reason: 'Chest pain' },
       { on: '2023-01-30', doctor: CAR.priya, reason: 'Stress test review' },
       { on: '2023-07-11', doctor: CAR.priya, reason: 'Cardiac follow-up' },
-      { on: '2024-01-16', doctor: CAR.harish, reason: 'Lipid review' },
+      { on: '2024-01-16', doctor: CAR.harish, reason: 'Lipid review', status: 'Incomplete' },
       { on: '2024-09-03', doctor: CAR.harish, reason: 'Cardiac follow-up' },
       { on: '2025-06-10', doctor: CAR.harish, reason: 'Annual cardiac review' },
       { on: -90, doctor: CAR.harish, reason: 'Cardiac follow-up' },
@@ -154,11 +154,11 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     visits: [
       { on: '2023-03-14', doctor: NEU.ananya, reason: 'Recurrent headache' },
       { on: '2023-06-27', doctor: NEU.ananya, reason: 'Migraine — preventive treatment' },
-      { on: '2023-12-19', doctor: NEU.ananya, reason: 'Migraine review' },
+      { on: '2023-12-19', doctor: NEU.ananya, reason: 'Migraine review', status: 'Cancelled' },
       { on: '2024-08-06', doctor: NEU.arun, reason: 'Migraine review' },
       { on: '2025-03-25', doctor: NEU.arun, reason: 'Headache diary review' },
       { on: -140, doctor: NEU.arun, reason: 'Migraine review' },
-      { on: -41, doctor: NEU.ananya, reason: 'Giddiness' },
+      { on: -41, doctor: NEU.ananya, reason: 'Giddiness', status: 'Incomplete' },
     ],
     today: { doctor: NEU.ananya, reason: 'Giddiness — review', offset: 3, status: 'Confirmed' },
   },
@@ -169,12 +169,12 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-08-30', doctor: GEN.vikram, reason: 'Diabetes — insulin started' },
       { on: '2023-02-14', doctor: GEN.vikram, reason: 'Diabetes review' },
       { on: '2023-10-24', doctor: GEN.farah, reason: 'Foot care advice' },
-      { on: '2024-05-07', doctor: GEN.vikram, reason: 'Diabetes review' },
+      { on: '2024-05-07', doctor: GEN.vikram, reason: 'Diabetes review', status: 'Incomplete' },
       { on: '2025-02-18', doctor: GEN.vikram, reason: 'Diabetes review — kidney profile' },
       { on: '2025-11-11', doctor: ORT.ashwin, reason: 'Heel pain' },
-      { on: -73, doctor: GEN.farah, reason: 'Sugar review' },
+      { on: -73, doctor: GEN.farah, reason: 'Sugar review', status: 'Cancelled' },
     ],
-    today: { doctor: GEN.farah, reason: 'Sugar review', offset: -5, status: 'No-show' },
+    today: { doctor: GEN.farah, reason: 'Sugar review', offset: -5, status: 'Checked-in', token: 'Waiting', arrivedMinutesAgo: 25 },
   },
   {
     uhid: 'SHRI-0032015', name: 'Vasantha Kumari', nameNative: 'வசந்தா குமாரி', age: 66, sex: 'Female', abhaId: '62-1180-4457-2093', registered: '2022-12-06',
@@ -182,7 +182,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-12-06', doctor: CAR.priya, reason: 'Breathlessness' },
       { on: '2023-05-23', doctor: CAR.priya, reason: 'Echo review' },
       { on: '2023-11-14', doctor: CAR.harish, reason: 'Heart failure follow-up' },
-      { on: '2024-06-04', doctor: CAR.harish, reason: 'Heart failure follow-up' },
+      { on: '2024-06-04', doctor: CAR.harish, reason: 'Heart failure follow-up', status: 'Incomplete' },
       { on: '2025-01-28', doctor: CAR.harish, reason: 'Heart failure follow-up' },
       { on: '2025-09-30', doctor: CAR.harish, reason: 'Cardiac review' },
       { on: -19, doctor: CAR.harish, reason: 'Swelling in both legs' },
@@ -198,11 +198,11 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-03-08', doctor: GEN.rahul, reason: 'Blood reports review' },
       { on: '2022-08-16', doctor: GEN.vikram, reason: 'Diabetes diagnosis' },
       { on: '2023-02-07', doctor: GEN.vikram, reason: 'Diabetes review' },
-      { on: '2023-09-12', doctor: GEN.vikram, reason: 'Diabetes review' },
+      { on: '2023-09-12', doctor: GEN.vikram, reason: 'Diabetes review', status: 'Incomplete' },
       { on: '2024-03-26', doctor: CAR.harish, reason: 'Chest tightness' },
       { on: '2024-10-15', doctor: CAR.harish, reason: 'Cardiac follow-up' },
       { on: '2025-06-24', doctor: GEN.vikram, reason: 'Diabetes review' },
-      { on: '2026-02-17', doctor: GEN.vikram, reason: 'Diabetes review' },
+      { on: '2026-02-17', doctor: GEN.vikram, reason: 'Diabetes review', status: 'Cancelled' },
       { on: -112, doctor: GEN.farah, reason: 'Cold and cough' },
     ],
   },
@@ -213,7 +213,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-07-04', doctor: ORT.meera, reason: 'Shoulder — physiotherapy plan' },
       { on: '2022-12-20', doctor: ORT.ashwin, reason: 'Frozen shoulder review' },
       { on: '2023-07-18', doctor: ORT.ashwin, reason: 'Knee pain' },
-      { on: '2024-04-02', doctor: ORT.nandini, reason: 'Neck pain' },
+      { on: '2024-04-02', doctor: ORT.nandini, reason: 'Neck pain', status: 'Cancelled' },
       { on: '2024-12-10', doctor: ORT.nandini, reason: 'Cervical spondylosis review' },
       { on: '2025-08-19', doctor: NEU.arun, reason: 'Tingling in fingers' },
       { on: -150, doctor: NEU.arun, reason: 'Nerve conduction review' },
@@ -226,7 +226,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-09-20', doctor: NEU.arun, reason: 'Memory assessment' },
       { on: '2023-04-11', doctor: NEU.sanjay, reason: 'Cognitive follow-up' },
       { on: '2023-12-12', doctor: NEU.sanjay, reason: 'Cognitive follow-up' },
-      { on: '2024-08-27', doctor: NEU.sanjay, reason: 'Cognitive follow-up' },
+      { on: '2024-08-27', doctor: NEU.sanjay, reason: 'Cognitive follow-up', status: 'Incomplete' },
       { on: '2025-05-06', doctor: NEU.sanjay, reason: 'Medication review' },
       { on: '2026-01-13', doctor: NEU.sanjay, reason: 'Six-monthly review' },
       { on: -84, doctor: NEU.sanjay, reason: 'Six-monthly review' },
@@ -237,7 +237,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     visits: [
       { on: '2023-05-30', doctor: GEN.farah, reason: 'Thyroid symptoms' },
       { on: '2023-08-22', doctor: GEN.farah, reason: 'Thyroid review' },
-      { on: '2024-02-13', doctor: GEN.rahul, reason: 'Thyroid review' },
+      { on: '2024-02-13', doctor: GEN.rahul, reason: 'Thyroid review', status: 'Incomplete' },
       { on: '2024-09-17', doctor: GEN.rahul, reason: 'Thyroid review' },
       { on: '2025-04-29', doctor: GEN.rahul, reason: 'Annual health check' },
       { on: -96, doctor: GEN.farah, reason: 'Thyroid review' },
@@ -249,7 +249,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2024-02-05', doctor: CAR.priya, reason: 'Hypertension' },
       { on: '2024-05-21', doctor: CAR.priya, reason: 'Blood pressure review' },
       { on: '2024-11-12', doctor: CAR.revathi, reason: 'Palpitations' },
-      { on: '2025-07-01', doctor: CAR.revathi, reason: 'Cardiac follow-up' },
+      { on: '2025-07-01', doctor: CAR.revathi, reason: 'Cardiac follow-up', status: 'Cancelled' },
       { on: -57, doctor: CAR.revathi, reason: 'Cardiac follow-up' },
     ],
   },
@@ -258,7 +258,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     visits: [
       { on: '2023-09-18', doctor: GEN.farah, reason: 'Fever and joint pain' },
       { on: '2024-03-12', doctor: ORT.meera, reason: 'Joint pain' },
-      { on: '2024-12-03', doctor: ORT.ashwin, reason: 'Knee pain' },
+      { on: '2024-12-03', doctor: ORT.ashwin, reason: 'Knee pain', status: 'Incomplete' },
       { on: '2025-09-09', doctor: ORT.ashwin, reason: 'Knee — physiotherapy review' },
       { on: -28, doctor: ORT.ashwin, reason: 'Knee pain follow-up' },
     ],
@@ -270,7 +270,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2022-09-06', doctor: NSG.raj, reason: 'MRI spine review' },
       { on: '2023-03-28', doctor: NSG.suresh, reason: 'Surgical opinion — lumbar canal stenosis' },
       { on: '2023-10-10', doctor: NSG.suresh, reason: 'Post-operative follow-up' },
-      { on: '2024-04-23', doctor: NSG.suresh, reason: 'Post-operative follow-up' },
+      { on: '2024-04-23', doctor: NSG.suresh, reason: 'Post-operative follow-up', status: 'Cancelled' },
       { on: '2025-01-21', doctor: NSG.suresh, reason: 'Annual spine review' },
       { on: -130, doctor: NSG.suresh, reason: 'Annual spine review' },
     ],
@@ -286,7 +286,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     uhid: 'SHRI-0033104', name: 'Poornima Ganesan', nameNative: 'பூர்ணிமா கணேசன்', age: 34, sex: 'Female', registered: '2024-04-11',
     visits: [
       { on: '2024-04-11', doctor: GEN.farah, reason: 'Viral fever' },
-      { on: -45, doctor: GEN.farah, reason: 'Stomach pain' },
+      { on: -45, doctor: GEN.farah, reason: 'Stomach pain', status: 'Incomplete' },
     ],
   },
   {
@@ -309,7 +309,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
   // ------------------------------------------ recent only, no visit today
   {
     uhid: 'SHRI-0033679', name: 'Vignesh Natarajan', age: 31, sex: 'Male', email: 'vignesh.n@example.mock', registered: '2026-06-02',
-    visits: [{ on: -64, doctor: ORT.nandini, reason: 'Lower back pain after a long drive' }, { on: -23, doctor: ORT.nandini, reason: 'Back pain — review' }],
+    visits: [{ on: -64, doctor: ORT.nandini, reason: 'Lower back pain after a long drive' }, { on: -23, doctor: ORT.nandini, reason: 'Back pain — review', status: 'Cancelled' }],
   },
   {
     uhid: 'SHRI-0033795', name: 'Revathi Chandran', nameNative: 'ரேவதி சந்திரன்', age: 38, sex: 'Female', registered: '2026-07-14',
@@ -317,7 +317,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
   },
   {
     uhid: 'SHRI-0033812', name: 'Anwar Hussain', nameNative: 'انور حسین', age: 47, sex: 'Male', registered: '2026-08-03',
-    visits: [{ on: -37, doctor: CAR.priya, reason: 'Palpitations' }, { on: -9, doctor: CAR.priya, reason: 'Holter results' }],
+    visits: [{ on: -37, doctor: CAR.priya, reason: 'Palpitations' }, { on: -9, doctor: CAR.priya, reason: 'Holter results', status: 'Incomplete' }],
   },
   {
     uhid: 'SHRI-0033926', name: 'Saranya Mohan', nameNative: 'சரண்யா மோகன்', age: 26, sex: 'Female', registered: '2026-09-01',
@@ -376,7 +376,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
       { on: '2023-05-02', doctor: ORT.meera, reason: 'Post-operative review' },
       { on: '2023-08-08', doctor: ORT.meera, reason: 'Knee replacement — three-month review' },
       { on: '2024-05-14', doctor: ORT.ashwin, reason: 'Knee replacement — annual review' },
-      { on: -118, doctor: ORT.ashwin, reason: 'Left knee pain' },
+      { on: -118, doctor: ORT.ashwin, reason: 'Left knee pain', status: 'Incomplete' },
     ],
     stay: {
       doctor: ORT.meera, type: 'Elective', reason: 'Right total knee replacement', referral: 'Outpatient',

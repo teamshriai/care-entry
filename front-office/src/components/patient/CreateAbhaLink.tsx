@@ -76,7 +76,9 @@ function placePopup(anchor: DOMRect, popup: { width: number; height: number }, h
  * moves away. A tap on a touch screen just opens ABDM — there is no hover to
  * show the card on, and it would only cover the form the patient is filling.
  */
-export function CreateAbhaLink() {
+/** `compact` sizes it like the small buttons beside it; `choice` is the patient
+ *  header's chip — "Create new ABHA" — beside "Link existing ABHA". */
+export function CreateAbhaLink({ compact = false, choice = false }: { compact?: boolean; choice?: boolean } = {}) {
   const [open, setOpen] = useState(false)
   const [place, setPlace] = useState<Placement | null>(null)
   const anchorRef = useRef<HTMLAnchorElement>(null)
@@ -128,10 +130,26 @@ export function CreateAbhaLink() {
         target="_blank"
         rel="noopener noreferrer"
         aria-describedby={open ? tipId : undefined}
-        className="focus-ring inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border border-primary-200 dark:border-primary-500/35 bg-primary-50 px-3.5 text-sm font-semibold text-primary-text transition-colors hover:bg-primary-100 hover:border-primary-300"
+        className={
+          choice
+            ? 'focus-ring inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[color-mix(in_oklab,var(--color-hue-teal)_35%,transparent)] bg-[color-mix(in_oklab,var(--color-hue-teal)_10%,var(--color-surface-1))] px-3 text-xs font-semibold text-[var(--color-hue-teal)] transition-colors hover:bg-[color-mix(in_oklab,var(--color-hue-teal)_18%,var(--color-surface-1))]'
+            : cn(
+                'focus-ring inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary-200 dark:border-primary-500/35 bg-primary-50 text-sm font-semibold text-primary-text transition-colors hover:bg-primary-100 hover:border-primary-300',
+                compact ? 'min-h-9 px-3' : 'min-h-11 px-3.5',
+              )
+        }
       >
-        <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-        Create ABHA
+        {choice ? (
+          <>
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+            Create ABHA
+          </>
+        ) : (
+          <>
+            <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+            Create ABHA
+          </>
+        )}
       </a>
       {open
         ? createPortal(

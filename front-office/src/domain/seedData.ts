@@ -804,9 +804,12 @@ export function createSeedState(): AppState {
       const first = (patientIndex * 5 + visitIndex * 3) % slots.length
       const slot = slots.map((_, i) => slots[(first + i) % slots.length]).find((candidate) => !taken.has(slotKey(visit.doctor, date, candidate)))
       if (!slot) return
+      // A cancelled booking was cancelled by the patient the evening before; the fee stays.
+      const slotAt = slotToTimestamp(date, slot)
       book({
-        patientId: h.uhid, providerId: visit.doctor, day, slot, status: visit.status ?? 'Completed', method: (patientIndex + visitIndex) % 2 ? 'Card' : 'UPI',
+        patientId: h.uhid, providerId: visit.doctor, day, slot, status: visit.status === 'Incomplete' ? 'Confirmed' : (visit.status ?? 'Completed'), method: (patientIndex + visitIndex) % 2 ? 'Card' : 'UPI',
         reason: visit.reason,
+        cancel: visit.status === 'Cancelled' ? { by: 'Patient', reason: 'Patient could not come', at: slotAt - 14 * HOUR } : undefined,
       })
     })
     const t = h.today

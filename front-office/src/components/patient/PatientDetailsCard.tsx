@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Copy, Pencil } from 'lucide-react'
+import { Copy, Link2, Pencil } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { Alert } from '../ui/Alert'
 import { MobileInput } from '../ui/MobileInput'
@@ -12,8 +12,6 @@ import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mo
 import { cn } from '../../utils/cn'
 import { AgeConfirm, FieldError } from './AgeConfirm'
 import { CreateAbhaLink } from './CreateAbhaLink'
-import { formatDateKey } from '../../utils/dates'
-import { todayKey } from '../../domain/time'
 import type { Patient, Sex } from '../../types/patient'
 import { errorClass, inputClass } from '../../utils/formClasses'
 
@@ -37,6 +35,8 @@ export function PatientDetailsStrip({ patient }: { patient: Patient }) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [abha, setAbha] = useState('')
   const [abhaTouched, setAbhaTouched] = useState(false)
+  // Link ABHA opens a single field for the number; Create ABHA goes to the ABDM site.
+  const [linking, setLinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abhaHolder = useStoreValue(findAbhaHolder, abha)
 
@@ -91,6 +91,7 @@ export function PatientDetailsStrip({ patient }: { patient: Patient }) {
       notify('ABHA linked', { detail: abha.trim() })
       setAbha('')
       setAbhaTouched(false)
+      setLinking(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -166,45 +167,75 @@ export function PatientDetailsStrip({ patient }: { patient: Patient }) {
           </div>
         </form>
       ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <CopyChip label="Mobile" value={patient.mobile} onCopy={copy} />
-          <CopyChip label="Email" value={patient.email} onCopy={copy} />
-          <CopyChip label="Address" value={patient.address} onCopy={copy} wide />
-          <CopyChip label="Registered" value={formatDateKey(todayKey(new Date(patient.createdAt)))} onCopy={copy} />
-          <CopyChip label="ABHA" value={patient.abhaId} empty="Not linked" onCopy={copy} />
-          {!patient.abhaId ? <CreateAbhaLink /> : null}
-          <Button size="sm" variant="ghost" onClick={startEditing} aria-label="Edit details">
-            <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
-            Edit
-          </Button>
-        </div>
-      )}
-
-      {!patient.abhaId && !draft ? (
-        <form onSubmit={link} noValidate className="flex max-w-xl flex-col gap-2">
-          {connectivity.abha === 'unavailable' ? (
-            <p className="text-xs text-ink-muted">ABHA lookup is unavailable — record an existing ABHA by hand. Care is never blocked on it.</p>
-          ) : null}
-          <div className="flex gap-2">
-            <input
-              value={abha}
-              onChange={(event) => {
-                setAbha(event.target.value)
-                setError(null)
-              }}
-              onBlur={() => setAbhaTouched(true)}
-              placeholder="Already have an ABHA? name@abdm or 14-digit number"
-              aria-label="ABHA address or number"
-              aria-invalid={Boolean(abhaTouched && abhaProblem)}
-              className={cn(inputClass, abhaTouched && abhaProblem && errorClass)}
-            />
-            <Button type="submit" size="sm" variant="secondary" disabled={!abha.trim()} className="shrink-0">
-              Link ABHA
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <CopyChip label="Mobile" value={patient.mobile} onCopy={copy} />
+            <CopyChip label="Address" value={patient.address} onCopy={copy} wide />
+            {/* ABHA: linked — its ID, copyable; not linked — link an existing one, or create one. */}
+            {patient.abhaId ? (
+              <CopyChip label="ABHA linked" value={patient.abhaId} onCopy={copy} />
+            ) : linking ? null : (
+              // Two clear choices: the patient already has an ABHA ID → Link it;
+              // they don't → Create one on the ABDM site.
+              <>
+                <button
+                  type="button"
+                  onClick={() => setLinking(true)}
+                  title="The patient already has an ABHA ID — enter it to link"
+                  className="focus-ring inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-3 text-xs font-semibold text-primary-text transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-500/35"
+                >
+                  <Link2 className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+                  Link ABHA
+                </button>
+                <span aria-hidden="true" className="text-xs text-ink-subtle">or</span>
+                <CreateAbhaLink choice />
+              </>
+            )}
+            <Button size="sm" variant="ghost" onClick={startEditing} aria-label="Edit details" className="ml-auto">
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+              Edit
             </Button>
           </div>
-          <FieldError message={abhaTouched ? abhaProblem : null} />
-        </form>
-      ) : null}
+
+          {/* Link ABHA: the patient has an ABHA — enter its address or number. */}
+          {!patient.abhaId && linking ? (
+            <form onSubmit={link} noValidate className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  value={abha}
+                  onChange={(event) => {
+                    setAbha(event.target.value)
+                    setError(null)
+                  }}
+                  onBlur={() => setAbhaTouched(true)}
+                  autoFocus
+                  placeholder="ABHA address or number"
+                  aria-label="ABHA address or number"
+                  aria-invalid={Boolean(abhaTouched && abhaProblem)}
+                  title={connectivity.abha === 'unavailable' ? 'ABHA lookup is unavailable — record an existing ABHA by hand. Care is never blocked on it.' : undefined}
+                  className={cn(inputClass, 'h-9 w-full sm:w-80', abhaTouched && abhaProblem && errorClass)}
+                />
+                <Button type="submit" size="sm" disabled={!abha.trim()} className="shrink-0">
+                  Link
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setLinking(false)
+                    setAbha('')
+                    setAbhaTouched(false)
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+              <FieldError message={abhaTouched ? abhaProblem : null} />
+            </form>
+          ) : null}
+        </div>
+      )}
     </div>
   )
 }

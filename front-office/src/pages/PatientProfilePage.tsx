@@ -71,12 +71,13 @@ export function PatientProfilePage() {
         }}
       />
 
-      <div className="mt-4 flex min-w-0 flex-col gap-6 sm:mt-5">
-        {header.admission ? <CurrentAdmissionCard admission={header.admission} now={now} /> : null}
-        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      {/* Left: the admission (when there is one) over the timeline. Right: the payment history, beside both. */}
+      <div className="mt-4 grid grid-cols-1 items-start gap-6 sm:mt-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+        <div className="flex min-w-0 flex-col gap-6">
+          {header.admission ? <CurrentAdmissionCard admission={header.admission} now={now} /> : null}
           <PatientTimeline timeline={timeline} today={today} onChangeBooking={setChangingBooking} />
-          <PatientBillingCard patientId={patient.patientId} due={header.payment.due} />
         </div>
+        <PatientBillingCard patientId={patient.patientId} due={header.payment.due} />
       </div>
 
       {changingBooking ? (

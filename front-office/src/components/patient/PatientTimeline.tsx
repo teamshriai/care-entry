@@ -56,7 +56,7 @@ export function PatientTimeline({
 }) {
   return (
     <Card accentTone="info" className="min-w-0">
-      <CardHeader icon={CalendarClock} iconTone="info" title="Timeline" subtitle="Encounters, bills and admissions — newest first" />
+      <CardHeader icon={CalendarClock} iconTone="info" title="Timeline" subtitle="Visits and admissions — newest first" />
 
       <section aria-label="Today and upcoming" className="border-t border-border-soft">
         <h3 className="px-5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Today &amp; upcoming</h3>
@@ -84,8 +84,8 @@ export function PatientTimeline({
                 status === undefined ? null : event.kind === 'bill' ? (
                   <Badge tone={BILL_STATUS_TONE[status as BillDisplayStatus]}>{BILL_STATUS_LABEL[status as BillDisplayStatus]}</Badge>
                 ) : (
-                  <Badge tone={event.kind === 'mlc' && status === 'Open' ? 'critical' : undefined} status={status}>
-                    {status}
+                  <Badge tone={event.kind === 'mlc' && status === 'Open' ? 'critical' : status === 'Incomplete' ? 'warning' : undefined} status={status}>
+                    {event.statusLabel ?? status}
                   </Badge>
                 )
               return (
@@ -143,12 +143,12 @@ function UpcomingRow({
           </p>
           <p className="truncate text-xs text-ink-muted">Walk-in today · {item.provider?.room ?? item.provider?.department ?? ''}</p>
         </div>
-        <Badge status={item.token.status}>{item.token.status === 'In consultation' ? 'In room' : item.token.status}</Badge>
+        <Badge status={item.token.status}>{item.token.status}</Badge>
       </li>
     )
   }
 
-  const { appointment, bill } = item
+  const { appointment, bill, token } = item
   const isToday = appointment.date === today
   const unpaid = (appointment.status === 'Payment Pending' || appointment.status === 'Scheduled') && bill && bill.balance > 0
   const tele = appointment.mode === 'Teleconsult'
@@ -166,16 +166,18 @@ function UpcomingRow({
           {relativeDayLabel(appointment.date, today)} · {formatTime(appointment.slot)} · {appointment.provider?.name ?? 'Doctor'}
         </p>
         <p className="truncate text-xs text-ink-muted">
-          {tele ? 'Teleconsult' : 'Outpatient encounter'} · {appointment.department}
+          {tele ? 'Teleconsult' : 'Doctor visit'} · {appointment.department}
           {!tele && appointment.provider?.room ? ` · ${appointment.provider.room}` : ''}
         </p>
       </div>
-      <Badge status={appointment.status}>{appointmentStatusLabel(appointment.status)}</Badge>
-      {unpaid && bill ? (
-        <Link to={`/payments/${bill.paymentId}`} className="focus-ring tap-reach rounded text-xs font-semibold text-primary-text hover:underline">
-          View bill
-        </Link>
-      ) : isToday ? (
+      {/* Checked in: where the patient is in the queue — Waiting, Called, In consultation. */}
+      {appointment.status === 'Checked-in' && token ? (
+        <Badge status={token.status}>{token.status}</Badge>
+      ) : (
+        <Badge status={appointment.status}>{appointmentStatusLabel(appointment.status)}</Badge>
+      )}
+      {/* An unpaid booking can't be checked in yet; its bill is printed from Payment History. */}
+      {unpaid ? null : isToday ? (
         <CheckInToggle appointment={appointment} />
       ) : null}
       {appointment.status === 'Confirmed' ? (

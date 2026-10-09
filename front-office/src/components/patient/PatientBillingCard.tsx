@@ -1,16 +1,13 @@
-import { useNavigate } from 'react-router-dom'
-import { IndianRupee, Receipt } from 'lucide-react'
+import { IndianRupee, Printer, Receipt } from 'lucide-react'
 import { Card, CardHeader } from '../ui/Card'
-import { Button } from '../ui/Button'
 import { EmptyState } from '../ui/EmptyState'
-import { ResponsiveTable } from '../ui/ResponsiveTable'
-import type { Column } from '../ui/ResponsiveTable'
 import { BillStatusBadge } from '../payment/BillStatusBadge'
 import { useStoreValue } from '../../hooks/useStore'
 import { getBillsForPatient } from '../../domain/selectors'
 import { todayKey } from '../../domain/time'
-import { billNumberFor, billServicesSummary, formatRupees, isBillDue } from '../../utils/billing'
+import { billNumberFor, billServicesSummary, formatRupees } from '../../utils/billing'
 import { formatDateKey } from '../../utils/dates'
+import { printBill } from '../../utils/printBill'
 import { formatClock } from '../../utils/format'
 import { cn } from '../../utils/cn'
 import type { Payment } from '../../types/payment'
@@ -19,70 +16,21 @@ import type { Payment } from '../../types/payment'
  * The patient's bills, with the amount still to be paid at the top. The
  * amount is the profile header's own figure — it also counts a current stay's
  * bed charges not yet billed — so the two never disagree. Care Entry takes no
- * money: a bill opens its detail, where it is sent to the billing counter.
+ * money: the printed bill is what the patient takes to the billing counter.
  */
 export function PatientBillingCard({ patientId, due }: { patientId: string; due: number }) {
-  const navigate = useNavigate()
-  const bills = useStoreValue(getBillsForPatient, patientId)
+  const all = useStoreValue(getBillsForPatient, patientId)
+  // Bills still to pay come first; the rest stay newest first.
+  const bills = [...all.filter(isPending), ...all.filter((bill) => !isPending(bill))]
   const paid = bills.reduce((sum, bill) => sum + (bill.status === 'Refunded' ? 0 : bill.paidAmount), 0)
-
-  const columns: Column<Payment>[] = [
-    {
-      key: 'bill',
-      header: 'Bill no.',
-      className: 'whitespace-nowrap font-medium text-primary-text',
-      mobile: 'subtitle',
-      cell: (bill) => billNumberFor(bill),
-    },
-    {
-      key: 'services',
-      header: 'Services',
-      mobile: 'title',
-      cell: (bill) => (
-        <span className="block tbl:max-w-64 tbl:truncate" title={billServicesSummary(bill)}>
-          {billServicesSummary(bill)}
-        </span>
-      ),
-    },
-    {
-      key: 'date',
-      header: 'Date',
-      className: 'whitespace-nowrap text-ink-muted',
-      mobile: 'meta',
-      cell: (bill) => `${formatDateKey(todayKey(new Date(bill.createdAt)))} · ${formatClock(bill.createdAt)}`,
-    },
-    { key: 'total', header: 'Total', className: 'whitespace-nowrap text-right tabular-nums', mobile: 'meta', cell: (bill) => formatRupees(bill.totalAmount) },
-    { key: 'paid', header: 'Paid', className: 'whitespace-nowrap text-right tabular-nums text-ink-muted', mobile: 'meta', cell: (bill) => formatRupees(bill.paidAmount) },
-    {
-      key: 'balance',
-      header: 'Pending',
-      className: 'whitespace-nowrap text-right tabular-nums font-semibold',
-      mobile: 'meta',
-      cell: (bill) => <span className={cn(bill.balance > 0 && bill.status !== 'Cancelled' && bill.status !== 'Refunded' ? 'text-critical' : 'text-ink-muted')}>{formatRupees(bill.status === 'Cancelled' || bill.status === 'Refunded' ? 0 : bill.balance)}</span>,
-    },
-    { key: 'status', header: 'Status', className: 'whitespace-nowrap', mobile: 'aside', cell: (bill) => <BillStatusBadge payment={bill} /> },
-    {
-      key: 'actions',
-      header: <span className="sr-only">Actions</span>,
-      className: 'whitespace-nowrap text-right',
-      mobile: 'actions',
-      // Only a pending bill leads anywhere; a paid one is just a record.
-      cell: (bill) =>
-        isBillDue(bill) ? (
-          <Button size="sm" variant="secondary" onClick={() => navigate(`/payments/${bill.paymentId}`)}>
-            Bill details
-          </Button>
-        ) : null,
-    },
-  ]
 
   return (
     <Card accentTone="stable">
-      <CardHeader icon={IndianRupee} iconTone="stable" title="Payment Status" subtitle={bills.length ? `${bills.length} ${bills.length === 1 ? 'bill' : 'bills'}` : 'No bills yet'} />
+      <CardHeader icon={IndianRupee} iconTone="stable" title="Payment History" subtitle={bills.length ? `${bills.length} ${bills.length === 1 ? 'bill' : 'bills'}` : 'No bills yet'} />
       <div className="grid grid-cols-1 gap-3 border-b border-border-soft px-4 py-4 sm:grid-cols-3 sm:px-5">
-        <div className={cn('rounded-xl border px-4 py-3', due > 0 ? 'border-critical-border bg-critical-bg' : 'border-stable-border bg-stable-bg')}>
+        <div className={cn('rounded-xl border px-4 py-3', due > 0 ? 'border-critical-fg/30 bg-critical-bg' : 'border-success-fg/30 bg-success-bg')}>
           <p className="text-xs font-medium text-ink-muted">Pending amount</p>
-          <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', due > 0 ? 'text-critical' : 'text-stable')}>{formatRupees(due)}</p>
+          <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', due > 0 ? 'text-critical-fg' : 'text-success-fg')}>{formatRupees(due)}</p>
           <p className="text-xs text-ink-muted">{due > 0 ? 'Pending — the patient pays at the bill counter' : 'Nothing is pending'}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
@@ -93,19 +41,74 @@ export function PatientBillingCard({ patientId, due }: { patientId: string; due:
         <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
           <p className="text-xs font-medium text-ink-muted">Bills</p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums text-ink">{bills.length}</p>
-          <p className="text-xs text-ink-muted">{bills.filter((bill) => bill.balance > 0 && bill.status !== 'Cancelled' && bill.status !== 'Refunded').length} pending</p>
+          <p className="text-xs text-ink-muted">{bills.filter(isPending).length} pending</p>
         </div>
       </div>
       {bills.length === 0 ? (
         <EmptyState icon={Receipt} title="No bills" description="Bills for this patient's visits and stays appear here." />
       ) : (
-        <ResponsiveTable
-          rows={bills}
-          rowKey={(bill) => bill.paymentId}
-          caption="Bills"
-          columns={columns}
-        />
+        <ul className="divide-y divide-border-soft" aria-label="Bills">
+          {bills.map((bill) => (
+            <BillRow key={bill.paymentId} bill={bill} />
+          ))}
+        </ul>
       )}
     </Card>
+  )
+}
+
+/** A bill with money still owed on it — the one the desk acts on. */
+function isPending(bill: Payment): boolean {
+  return bill.balance > 0 && bill.status !== 'Cancelled' && bill.status !== 'Refunded'
+}
+
+/**
+ * One bill on one line: what it was for, its number and date, the amount and
+ * its status, and printing. A pending bill stands out — tinted, its amount due
+ * in red, and a solid print icon (the printed bill is what the patient takes
+ * to the billing counter). A settled bill stays quiet, with a light print icon
+ * to reprint it.
+ */
+function BillRow({ bill }: { bill: Payment }) {
+  const pending = isPending(bill)
+  const number = billNumberFor(bill)
+  return (
+    <li
+      className={cn(
+        'flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5',
+        pending && 'bg-[color-mix(in_oklab,var(--color-hue-amber)_9%,var(--color-surface-1))] shadow-[inset_3px_0_0_var(--color-hue-amber)]',
+      )}
+    >
+      <div className="min-w-0 flex-1 basis-56">
+        <p className="truncate text-sm font-semibold text-ink" title={billServicesSummary(bill)}>
+          {billServicesSummary(bill)}
+        </p>
+        <p className="truncate text-xs tabular-nums text-ink-muted">
+          {number} · {formatDateKey(todayKey(new Date(bill.createdAt)))} · {formatClock(bill.createdAt)}
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3">
+        <div className="text-right">
+          <p className="text-sm font-semibold tabular-nums text-ink">{formatRupees(bill.totalAmount)}</p>
+          {pending ? <p className="text-xs font-semibold tabular-nums text-critical-fg">{formatRupees(bill.balance)} due</p> : null}
+        </div>
+        <BillStatusBadge payment={bill} />
+        {/* Print: solid blue for a bill still to pay, light for one already settled. */}
+        <button
+          type="button"
+          onClick={() => printBill(bill.paymentId)}
+          aria-label={`Print bill ${number}`}
+          title="Print bill"
+          className={cn(
+            'focus-ring flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+            pending
+              ? 'bg-primary-600 text-on-primary shadow-card-sm hover:bg-primary-700'
+              : 'bg-[color-mix(in_oklab,var(--color-hue-blue)_14%,var(--color-surface-1))] text-[var(--color-hue-blue)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-hue-blue)_30%,transparent)] hover:bg-[var(--color-hue-blue)] hover:text-white',
+          )}
+        >
+          <Printer className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      </div>
+    </li>
   )
 }
