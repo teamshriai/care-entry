@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { UserPlus, UserRoundCheck } from 'lucide-react'
@@ -13,19 +13,41 @@ import { AgeConfirm, FieldError } from '../components/patient/AgeConfirm'
 import { CreateAbhaLink } from '../components/patient/CreateAbhaLink'
 import { useStoreValue } from '../hooks/useStore'
 import { useToast } from '../hooks/useToast'
-import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity } from '../domain/selectors'
+import { findAbhaHolder, findPossibleDuplicatesFor, getConnectivity, getPatientById } from '../domain/selectors'
+import { getState } from '../domain/store'
 import { registerPatient } from '../domain/actions'
 import { initialsOf } from '../utils/format'
 import { cn } from '../utils/cn'
 import { nationalMobile } from '../utils/phone'
-import { abhaError, ageError, ageNeedsConfirmation, mobileError, nameError, nextAgeInput, nextNameInput, sexError } from '../utils/validation'
+import { abhaError, addressError, ageError, ageNeedsConfirmation, mobileEarlyError, mobileError, nameError, nextAgeInput, nextNameInput, sexError } from '../utils/validation'
 import type { Patient, Sex } from '../types/patient'
 import { errorClass, inputClass } from '../utils/formClasses'
+import { revealFirstInvalid } from '../utils/revealInvalid'
+import { ABHA_REGISTERED_EVENT, ABHA_SCAN_EVENT } from '../utils/abhaQr'
+import type { AbhaScan } from '../utils/abhaQr'
 
 const SEXES: Sex[] = ['Male', 'Female', 'Other']
 
 interface RegisterPatientLocationState {
   prefillName?: string
+  /** An ABHA card scanned elsewhere that could not register on its own — the form, filled from it. */
+  abhaScan?: AbhaScan
+  /** A patient just registered from a scanned ABHA card — shown as the acknowledgement. */
+  registeredId?: string
+}
+
+/** The form filled from a scanned ABHA card — the fields the card does not carry stay as they were. */
+function fillFromScan(form: PatientFormState, scan: AbhaScan): PatientFormState {
+  return {
+    ...form,
+    name: scan.name ? nextNameInput(scan.name).trim() : form.name,
+    age: scan.age != null ? String(scan.age) : form.age,
+    sex: scan.sex ?? form.sex,
+    mobile: scan.mobile ?? form.mobile,
+    abhaId: scan.abhaAddress ?? scan.abhaNumber ?? form.abhaId,
+    address: scan.address ? scan.address.slice(0, 200) : form.address,
+    ageConfirmed: scan.age != null ? false : form.ageConfirmed,
+  }
 }
 
 /** What the desk typed into the search box before pressing Register Patient. */
@@ -43,12 +65,12 @@ interface PatientFormState {
   sex: Sex | ''
   mobile: string
   abhaId: string
+  address: string
   ageConfirmed: boolean
 }
 
-type FieldKey = 'name' | 'age' | 'sex' | 'mobile' | 'abhaId'
+type FieldKey = 'name' | 'age' | 'sex' | 'mobile' | 'abhaId' | 'address'
 
-const FIELD_LABEL: Record<FieldKey, string> = { name: 'name', age: 'age', sex: 'sex', mobile: 'mobile', abhaId: 'ABHA' }
 
 export function RegisterPatientPage() {
   const location = useLocation()
@@ -56,14 +78,41 @@ export function RegisterPatientPage() {
   const { notify } = useToast()
   const connectivity = useStoreValue(getConnectivity)
   const [form, setForm] = useState<PatientFormState>(() => {
-    const prefill = prefillFrom(location.search, location.state as RegisterPatientLocationState | null)
-    return { name: prefill.name, age: '', sex: '', mobile: prefill.mobile, abhaId: '', ageConfirmed: false }
+    const state = location.state as RegisterPatientLocationState | null
+    const prefill = prefillFrom(location.search, state)
+    const blank: PatientFormState = { name: prefill.name, age: '', sex: '', mobile: prefill.mobile, abhaId: '', address: '', ageConfirmed: false }
+    return state?.abhaScan ? fillFromScan(blank, state.abhaScan) : blank
   })
+
   // A field shows its message once it has been left (or a submit was tried) —
   // never while the desk is still typing its first character.
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({})
   const [error, setError] = useState<string | null>(null)
-  const [registered, setRegistered] = useState<Patient | null>(null)
+  const [registered, setRegistered] = useState<Patient | null>(() => {
+    const id = (location.state as RegisterPatientLocationState | null)?.registeredId
+    return id ? getPatientById(getState(), id) : null
+  })
+
+  // An ABHA card scanned on this page fills the form; Register Patient is still the desk's click.
+  useEffect(() => {
+    function onScan(event: Event) {
+      const scan = (event as CustomEvent<AbhaScan>).detail
+      setForm((current) => fillFromScan(current, scan))
+      // Anything the card left wrong or empty shows at once.
+      setTouched({ name: true, age: true, sex: true, mobile: true, abhaId: true, address: true })
+      setError(null)
+    }
+    // A card scanned here registered its holder: the acknowledgement, then the profile.
+    function onRegistered(event: Event) {
+      setRegistered((event as CustomEvent<Patient>).detail)
+    }
+    window.addEventListener(ABHA_SCAN_EVENT, onScan)
+    window.addEventListener(ABHA_REGISTERED_EVENT, onRegistered)
+    return () => {
+      window.removeEventListener(ABHA_SCAN_EVENT, onScan)
+      window.removeEventListener(ABHA_REGISTERED_EVENT, onRegistered)
+    }
+  }, [])
 
   const duplicateQuery = useMemo(() => ({ name: form.name, mobile: form.mobile, abhaId: form.abhaId }), [form.name, form.mobile, form.abhaId])
   const duplicates = useStoreValue(findPossibleDuplicatesFor, duplicateQuery)
@@ -75,11 +124,13 @@ export function RegisterPatientPage() {
     sex: sexError(form.sex),
     mobile: mobileError(form.mobile),
     abhaId: abhaError(form.abhaId) ?? (abhaHolder ? `Already linked to ${abhaHolder.name} (${abhaHolder.uhid}).` : null),
+    address: addressError(form.address),
   }
   const needsAgeConfirm = ageNeedsConfirmation(form.age)
   const invalid = (Object.keys(errors) as FieldKey[]).filter((key) => errors[key])
   const ready = invalid.length === 0 && (!needsAgeConfirm || form.ageConfirmed)
-  const shown = (key: FieldKey) => (touched[key] ? errors[key] : null)
+  // A mobile starting 0–5 is wrong already, so it is flagged while still being typed.
+  const shown = (key: FieldKey) => (touched[key] ? errors[key] : key === 'mobile' ? mobileEarlyError(form.mobile) : null)
   // A typed ABHA already on another record is flagged at once, not on blur.
   const abhaShown = form.abhaId.trim() ? (shown('abhaId') ?? (abhaHolder ? errors.abhaId : null)) : null
 
@@ -97,8 +148,12 @@ export function RegisterPatientPage() {
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
-    setTouched({ name: true, age: true, sex: true, mobile: true, abhaId: true })
-    if (!ready) return
+    setTouched({ name: true, age: true, sex: true, mobile: true, abhaId: true, address: true })
+    if (!ready) {
+      // Register stays clickable: it marks every missing or wrong field and goes to the first.
+      revealFirstInvalid()
+      return
+    }
     try {
       // Registering is free — it only creates the record and its UHID.
       setRegistered(registerPatient(form))
@@ -120,7 +175,7 @@ export function RegisterPatientPage() {
       <div className="flex min-h-[60dvh] items-center justify-center py-6">
         <Card accentTone="teal" className="w-full max-w-md">
           <AckCard
-            title="Patient Created"
+            title="Registering Patient"
             icon={UserRoundCheck}
             durationMs={7000}
             onDone={() => navigate(`/patients/${registered.uhid}`, { replace: true })}
@@ -139,7 +194,7 @@ export function RegisterPatientPage() {
 
   return (
     <div>
-      <PageHeader title="Register Patient" subtitle="Welcome a new patient — create their record and UHID." />
+      <PageHeader title="Register Patient" />
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,640px)_minmax(0,1fr)] mt-4 sm:mt-5">
         <Card accentTone="teal" className="min-w-0">
@@ -148,7 +203,7 @@ export function RegisterPatientPage() {
             <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
               {error ? <Alert tone="critical">{error}</Alert> : null}
 
-              <Field label="Full name" required htmlFor="reg-name" hint="Letters only — no numbers" error={shown('name')}>
+              <Field label="Full name" required htmlFor="reg-name" error={shown('name')}>
                 <input
                   id="reg-name"
                   value={form.name}
@@ -172,7 +227,7 @@ export function RegisterPatientPage() {
                     inputMode="numeric"
                     maxLength={3}
                     placeholder="0–130"
-                    aria-invalid={Boolean(shown('age'))}
+                    aria-invalid={Boolean(shown('age')) || (needsAgeConfirm && !form.ageConfirmed)}
                     className={cn(inputClass, (shown('age') || needsAgeConfirm) && errorClass, needsAgeConfirm && 'font-semibold text-critical-fg')}
                   />
                 </Field>
@@ -184,6 +239,7 @@ export function RegisterPatientPage() {
                         type="button"
                         role="radio"
                         aria-checked={form.sex === option}
+                        aria-invalid={option === SEXES[0] && Boolean(shown('sex'))}
                         onClick={() => {
                           update('sex', option)
                           touch('sex')()
@@ -208,7 +264,7 @@ export function RegisterPatientPage() {
                 <AgeConfirm age={form.age} confirmed={form.ageConfirmed} onConfirm={(next) => setForm((current) => ({ ...current, ageConfirmed: next }))} />
               ) : null}
 
-              <Field label="Mobile number" required htmlFor="reg-mobile" hint="10 digits, starting with 6, 7, 8 or 9 — used to find existing records" error={shown('mobile')}>
+              <Field label="Mobile number" required htmlFor="reg-mobile" error={shown('mobile')}>
                 <MobileInput
                   id="reg-mobile"
                   value={form.mobile}
@@ -220,24 +276,25 @@ export function RegisterPatientPage() {
                 />
               </Field>
 
+              <Field label="Address" htmlFor="reg-address" error={shown('address')}>
+                <input
+                  id="reg-address"
+                  value={form.address}
+                  onChange={(event) => update('address', event.target.value)}
+                  onBlur={touch('address')}
+                  placeholder="Optional"
+                  maxLength={200}
+                  autoComplete="off"
+                  aria-invalid={Boolean(shown('address'))}
+                  className={cn(inputClass, shown('address') && errorClass)}
+                />
+              </Field>
+
               <Field
                 label="ABHA address or number"
                 htmlFor="reg-abha"
                 error={abhaShown}
-                hint={
-                  <>
-                    {/* Matches abhaError: a 14-digit number, or an address of 8–18 characters @abdm. Made-up values — never a real patient’s. */}
-                    <span className="block">
-                      e.g. <span className="font-medium text-ink-muted tabular-nums">12-3456-7890-1234</span> or{' '}
-                      <span className="font-medium text-ink-muted">priya.kumar@abdm</span>
-                    </span>
-                    <span className="mt-0.5 block">
-                      {connectivity.abha === 'unavailable'
-                        ? 'Optional. ABHA lookup is unavailable — type it in or link it later. The patient is never held up.'
-                        : 'Optional — links the patient’s health records from other hospitals.'}
-                    </span>
-                  </>
-                }
+                hint={connectivity.abha === 'unavailable' ? 'ABHA lookup is unavailable' : undefined}
               >
                 {/* Kept short, so the Create ABHA popup has room to open on its right. */}
                 <div className="flex max-w-md gap-2">
@@ -249,7 +306,7 @@ export function RegisterPatientPage() {
                     placeholder="name@abdm or 14-digit number"
                     autoComplete="off"
                     aria-invalid={Boolean(abhaShown)}
-                    aria-describedby={abhaShown ? 'reg-abha-error' : 'reg-abha-hint'}
+                    aria-describedby={abhaShown ? 'reg-abha-error' : connectivity.abha === 'unavailable' ? 'reg-abha-hint' : undefined}
                     className={cn(inputClass, abhaShown && errorClass)}
                   />
                   {/* No ABHA yet? The patient can create one with ABDM. */}
@@ -258,14 +315,7 @@ export function RegisterPatientPage() {
               </Field>
 
               <div className="flex flex-col items-stretch gap-2 border-t border-border-soft pt-4 sm:flex-row sm:items-center sm:justify-end">
-                {!ready ? (
-                  <p className="text-xs text-ink-muted sm:mr-auto">
-                    {invalid.length
-                      ? `To create the patient: check the ${invalid.map((key) => FIELD_LABEL[key]).join(', ')}.`
-                      : 'To create the patient: confirm the age with the patient.'}
-                  </p>
-                ) : null}
-                <Button type="submit" disabled={!ready}>
+                <Button type="submit">
                   <UserPlus className="h-4 w-4" strokeWidth={1.75} />
                   Register Patient
                 </Button>
@@ -277,10 +327,7 @@ export function RegisterPatientPage() {
         <div className="flex min-w-0 flex-col gap-6">
           {duplicates.length > 0 ? (
             <Card accentTone="warning" className="border-warning-fg/25 bg-warning-bg/40">
-              <CardHeader
-                title="Possible existing patient found"
-                subtitle="Matched on mobile number, name or ABHA. Check with the patient before creating a second record."
-              />
+              <CardHeader title="Possible existing patient found" />
               <div className="divide-y divide-border-soft">
                 {duplicates.map((candidate) => (
                   <div key={candidate.patientId} className="flex items-center justify-between gap-3 px-5 py-3">
@@ -303,17 +350,7 @@ export function RegisterPatientPage() {
                 ))}
               </div>
             </Card>
-          ) : (
-            <Card accentTone="teal">
-              <CardBody>
-                <p className="text-sm font-medium text-ink">Duplicate check</p>
-                <p className="mt-1 text-sm text-ink-muted">
-                  As you type the patient’s name, mobile number or ABHA, any record that may already be theirs appears here — so
-                  each patient keeps one record and one complete history.
-                </p>
-              </CardBody>
-            </Card>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

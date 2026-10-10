@@ -141,7 +141,7 @@ export function RegisterDoctorPage() {
     const bookable = created.status === 'Active'
     return (
       <div>
-        <PageHeader title="Register Doctor" subtitle="Profile created — the doctor is now in the directory." />
+        <PageHeader title="Register Doctor" />
         <div className="mt-5 sm:mt-6">
           <Card accentTone="indigo" className="max-w-2xl">
             <CardBody className="flex flex-col gap-4">
@@ -158,11 +158,6 @@ export function RegisterDoctorPage() {
                     {created.department} · {created.specialty} · {created.employeeId} · consults{' '}
                     {formatTimeRange(created.schedule.startTime, created.schedule.endTime)} in {created.schedule.slotMinutes}-minute
                     slots
-                  </p>
-                  <p className="mt-1 text-xs text-ink-subtle">
-                    {bookable
-                      ? 'Now visible in the Doctor Directory, in availability, and selectable when booking appointments.'
-                      : 'Saved as Inactive — activate the account from the profile before appointments can be booked.'}
                   </p>
                 </div>
               </div>
@@ -197,7 +192,6 @@ export function RegisterDoctorPage() {
     <div>
       <PageHeader
         title="Register Doctor"
-        subtitle="Creates the doctor's hospital profile and schedule. This does not grant access to any clinical record."
         illustration={<DoctorIllustration className="h-8 w-8" />}
         illustrationTone="indigo"
       />
@@ -270,7 +264,7 @@ export function RegisterDoctorPage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Specialty" required>
+                <Field label="Speciality" required>
                   <input
                     value={form.specialty}
                     onChange={(e) => update('specialty', e.target.value)}
@@ -309,7 +303,7 @@ export function RegisterDoctorPage() {
             <Card accentTone="indigo">
               <CardHeader icon={Building2} iconTone="indigo" title="Hospital information" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Doctor / employee ID" hint="Left blank, one is allocated automatically">
+                <Field label="Doctor / employee ID">
                   <input
                     value={form.employeeId}
                     onChange={(e) => update('employeeId', e.target.value)}
@@ -349,12 +343,7 @@ export function RegisterDoctorPage() {
             </Card>
 
             <Card accentTone="stable">
-              <CardHeader
-                icon={CalendarCheck}
-                iconTone="stable"
-                title="Schedule"
-                subtitle="Drives bookable slots — availability is computed from this, never entered by hand"
-              />
+              <CardHeader icon={CalendarCheck} iconTone="stable" title="Schedule" />
               <CardBody className="flex flex-col gap-4">
                 <Field label="Working days" required>
                   <div className="flex flex-wrap gap-1.5">
@@ -400,16 +389,13 @@ export function RegisterDoctorPage() {
                     </select>
                   </Field>
                 </div>
-                <p className="text-xs text-ink-subtle">
-                  Leave and one-off unavailability are recorded on the doctor&apos;s profile after registration.
-                </p>
               </CardBody>
             </Card>
 
             <Card accentTone="stable">
               <CardHeader icon={ShieldCheck} iconTone="stable" title="Account" />
               <CardBody className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="Login email / username" hint="Defaults to the contact email">
+                <Field label="Login email / username">
                   <input
                     value={form.loginEmail}
                     onChange={(e) => update('loginEmail', e.target.value)}
@@ -428,7 +414,7 @@ export function RegisterDoctorPage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Account status" hint="Only Active doctors can be booked">
+                <Field label="Account status">
                   <div className="flex gap-1.5">
                     {(['Active', 'Inactive'] as ProviderStatus[]).map((option) => (
                       <Choice key={option} active={form.status === option} onClick={() => update('status', option)}>
@@ -450,22 +436,18 @@ export function RegisterDoctorPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-ink">{form.name || 'New doctor'}</p>
                     <p className="truncate text-xs text-ink-muted">
-                      {form.department || 'Department'} · {form.specialty || 'Specialty'}
+                      {form.department || 'Department'} · {form.specialty || 'Speciality'}
                     </p>
                   </div>
                 </div>
 
                 <dl className="space-y-2 border-t border-border-soft pt-3 text-sm">
-                  <Row label="Working days" value={form.workingDays.length ? `${form.workingDays.length} days/week` : '—'} />
+                  <Row label="Working days" value={form.workingDays.length ? `${form.workingDays.length} ${form.workingDays.length === 1 ? 'day' : 'days'}/week` : '—'} />
                   <Row label="Session" value={form.startTime && form.endTime ? formatTimeRange(form.startTime, form.endTime) : '—'} />
                   <Row label="Slot length" value={`${form.slotMinutes} min`} />
                   <Row label="Fee" value={form.consultationFee ? `₹${form.consultationFee}` : '—'} />
                   <Row label="Status" value={form.status} />
                 </dl>
-
-                <p className="text-xs text-ink-subtle">
-                  Registering creates a hospital profile only. Clinical functionality lives in the Clinician Portal.
-                </p>
 
                 <div className="flex flex-col gap-2 border-t border-border-soft pt-4">
                   <Button type="submit">Register doctor</Button>
@@ -485,13 +467,11 @@ export function RegisterDoctorPage() {
 function Field({
   label,
   required,
-  hint,
   children,
   className,
 }: {
   label: string
   required?: boolean
-  hint?: ReactNode
   children: ReactNode
   className?: string
 }) {
@@ -501,7 +481,6 @@ function Field({
         {label} {required ? <span className="text-critical-fg">*</span> : null}
       </label>
       <div className="mt-1.5">{children}</div>
-      {hint ? <p className="mt-1 text-xs text-ink-subtle">{hint}</p> : null}
     </div>
   )
 }

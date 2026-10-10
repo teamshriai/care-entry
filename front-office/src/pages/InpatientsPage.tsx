@@ -70,7 +70,6 @@ export function InpatientsPage() {
   const activeWard = wards.find((w) => w.ward === wardChoice) ?? wards[0] ?? null
 
   const bedsFree = wards.reduce((sum, w) => sum + w.available, 0)
-  const bedsTotal = wards.reduce((sum, w) => sum + w.total, 0)
 
   function selectFilter(next: InpatientFilter) {
     const query = new URLSearchParams(location.search)
@@ -86,19 +85,17 @@ export function InpatientsPage() {
       key: 'admitted',
       label: 'Inpatients',
       value: rows.length,
-      context: `${rows.filter((r) => isCritical(r.admission.wardLabel)).length} in ICU / Emergency`,
       tone: 'purple',
       icon: BedDouble,
     },
-    { key: 'beds', label: 'Beds free', value: bedsFree, context: `of ${bedsTotal} beds`, tone: 'stable', icon: BedSingle },
-    { key: 'discharged', label: 'Discharged today', value: discharged.length, context: 'Beds released', tone: 'teal', icon: LogOut },
+    { key: 'beds', label: 'Beds available', value: bedsFree, tone: 'stable', icon: BedSingle },
+    { key: 'discharged', label: 'Discharged today', value: discharged.length, tone: 'teal', icon: LogOut },
   ]
 
   return (
     <div>
       <PageHeader
         title="Patients"
-        subtitle="Inpatients — who is in a bed, who is waiting for one, which beds are free, and who went home today."
         illustration={<AdmissionIllustration className="h-8 w-8" />}
         illustrationTone="purple"
         tabs={<PatientsTabs />}
@@ -110,7 +107,7 @@ export function InpatientsPage() {
         {filter === 'admitted' ? (
           <Card accentTone="purple">
             {rows.length === 0 ? (
-              <EmptyState icon={BedDouble} title="Nobody is admitted" description="Patients appear here the moment they are admitted." />
+              <EmptyState icon={BedDouble} title="Nobody is admitted" />
             ) : (
               <ResponsiveTable
                 rows={rows}
@@ -182,7 +179,7 @@ export function InpatientsPage() {
                     <WardIcon ward={w.ward} className={cn('h-4 w-4', isCritical(w.ward) && 'text-critical-fg')} />
                     {w.ward}
                     <span className={cn('text-xs tabular-nums', w.available > 0 ? 'text-success-fg' : 'text-critical-fg')}>
-                      {w.available}/{w.total} free
+                      {w.available}/{w.total} available
                     </span>
                   </button>
                 )
@@ -206,7 +203,7 @@ export function InpatientsPage() {
         {filter === 'discharged' ? (
           <Card accentTone="purple">
             {discharged.length === 0 ? (
-              <EmptyState icon={LogOut} title="No discharges yet today" description="Patients appear here as they are discharged." />
+              <EmptyState icon={LogOut} title="No discharges yet today" />
             ) : (
               <ResponsiveTable
                 rows={discharged}
@@ -219,7 +216,7 @@ export function InpatientsPage() {
                   { key: 'type', header: 'Type', className: 'whitespace-nowrap text-ink-muted', cell: ({ admission: a }) => a.dischargeType ?? 'Normal Discharge' },
                   {
                     key: 'bill',
-                    header: 'Final bill',
+                    header: 'Bill',
                     className: 'whitespace-nowrap',
                     mobile: 'aside',
                     cell: ({ bill }) =>
@@ -285,9 +282,7 @@ function BedTile({ bed, occupant, onOpen }: { bed: Bed; occupant: Admission | nu
     <>
       <span className="min-w-0">
         <span className="block truncate text-sm font-semibold text-ink">{bed.bedNumber}</span>
-        <span className="block truncate text-xs text-ink-subtle">
-          {occupant ? occupant.patientName : free ? 'Free' : bed.status}
-        </span>
+        {occupant ? <span className="block truncate text-xs text-ink-subtle">{occupant.patientName}</span> : null}
       </span>
       <Badge tone={free ? 'stable' : bed.status === 'Occupied' ? 'info' : 'neutral'} className="text-2xs">
         {bed.status}

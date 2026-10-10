@@ -85,7 +85,7 @@ export function DoctorChoiceList({
                   </span>
                 ) : null}
                 <span className={cn('mt-1.5 inline-flex rounded-md px-1.5 py-0.5 text-xs font-semibold', choosable ? 'bg-info-bg text-info-fg' : 'bg-surface-2 text-ink-subtle')}>
-                  {choosable && next ? `Next free · ${relativeDayLabel(next.date, today)}, ${formatTime(next.slot)}` : s.reason}
+                  {choosable && next ? `Earliest slot · ${relativeDayLabel(next.date, today)}, ${formatTime(next.slot)}` : s.reason}
                 </span>
                 {note?.(s)}
               </span>

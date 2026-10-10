@@ -51,8 +51,7 @@ export function PaymentReceiptPage() {
             <CardBody>
               <EmptyState
                 title="No such receipt"
-                description="Every bill is listed under Payment Status."
-                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Payment Status</Button>}
+                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Payments</Button>}
               />
             </CardBody>
           </Card>
@@ -111,7 +110,7 @@ export function PaymentReceiptPage() {
             </div>
             {payment.balance > 0 ? (
               <div className="flex items-center justify-between text-sm text-warning-fg">
-                <span>Balance due</span>
+                <span>Balance Due</span>
                 <span className="tabular-nums">{formatRupees(payment.balance)}</span>
               </div>
             ) : null}
@@ -131,9 +130,6 @@ export function PaymentReceiptPage() {
               </div>
             ) : null}
 
-            <p className="border-t border-border-soft pt-3 text-center text-2xs text-ink-subtle">
-              Simulated receipt — no real payment gateway is connected in this build.
-            </p>
           </CardBody>
         </Card>
       </div>

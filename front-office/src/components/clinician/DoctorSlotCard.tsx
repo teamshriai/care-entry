@@ -35,6 +35,9 @@ export function DoctorSlotCard({
   onPick,
   onOpen,
   wide = false,
+  sharedDay,
+  sharedRange,
+  currentAppointmentId,
   children,
 }: {
   suggestion: DoctorSuggestion
@@ -52,6 +55,12 @@ export function DoctorSlotCard({
   /** A long row where there is room: the doctor on the left, their days
    *  and times on the right (stacked again when the row is narrow). */
   wide?: boolean
+  /** The booking page: one date and one time axis for every doctor, shown
+   *  above the list — the card then has no day tabs or hours of its own. */
+  sharedDay?: string
+  sharedRange?: [number, number]
+  /** Rescheduling: the booking being moved, marked on its doctor's chart. */
+  currentAppointmentId?: string
   /** Extra controls under the doctor, for the chosen one (how they're seen). */
   children?: ReactNode
 }) {
@@ -61,7 +70,7 @@ export function DoctorSlotCard({
   const strip = useStoreValue(getDoctorDateStrip, provider.providerId, now)
   const firstOpen = strip.find((d) => d.state === 'open')?.date ?? null
   const [ownDay, setOwnDay] = useState<string | null>(null)
-  const shownDay = ownDay ?? (chosen ? selectedDate : null) ?? firstOpen ?? today
+  const shownDay = sharedDay ?? ownDay ?? (chosen ? selectedDate : null) ?? firstOpen ?? today
   const modes = modesFor(provider)
   const tomorrow = addDaysToKey(today, 1)
 
@@ -108,6 +117,11 @@ export function DoctorSlotCard({
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center gap-1.5">
                 <span className="text-sm font-semibold text-ink">{provider.name}</span>
+                {currentAppointmentId ? (
+                  <Badge tone="info" size="xs">
+                    Current
+                  </Badge>
+                ) : null}
                 {soonest && bookable ? (
                   <span className="inline-flex items-center gap-0.5 rounded-full bg-success-bg px-1.5 py-0.5 text-2xs font-semibold text-success-fg">
                     <Sparkles size={11} aria-hidden="true" />
@@ -139,33 +153,27 @@ export function DoctorSlotCard({
                   <Check size={14} strokeWidth={3} />
                 </span>
               ) : null}
-              <span
-                className={cn(
-                  'hidden rounded-md px-1.5 py-0.5 text-right text-xs font-semibold @md:inline-block',
-                  wide && '@3xl:hidden',
-                  bookable ? 'bg-info-bg text-info-fg' : 'bg-surface-2 text-ink-subtle',
-                )}
-              >
-                {bookable && next ? `Next free · ${relativeDayLabel(next.date, today)}, ${formatTime(next.slot)}` : reason}
-              </span>
+              {/* Why a doctor can't be booked (on leave, not scheduled …) — the chart shows the free times. */}
+              {bookable ? null : (
+                <span className={cn('hidden rounded-md bg-surface-2 px-1.5 py-0.5 text-right text-xs font-semibold text-ink-subtle @md:inline-block', wide && '@3xl:hidden')}>
+                  {reason}
+                </span>
+              )}
             </span>
           </button>
-          {/* Phones: the next free time on its own line. */}
-          <p
-            className={cn(
-              'mx-3.5 -mt-1.5 mb-3 self-start rounded-md px-1.5 py-0.5 text-xs font-semibold @md:hidden',
-              wide && '@3xl:ml-[4.25rem] @3xl:block sm:mx-4',
-              bookable ? 'bg-info-bg text-info-fg' : 'bg-surface-2 text-ink-subtle',
-            )}
-          >
-            {bookable && next ? `Next free · ${relativeDayLabel(next.date, today)}, ${formatTime(next.slot)}` : reason}
-          </p>
+          {/* Phones (and the wide row): why the doctor can't be booked, on its own line. */}
+          {bookable ? null : (
+            <p className={cn('mx-3.5 -mt-1.5 mb-3 self-start rounded-md bg-surface-2 px-1.5 py-0.5 text-xs font-semibold text-ink-subtle @md:hidden', wide && '@3xl:ml-[4.25rem] @3xl:block sm:mx-4')}>
+              {reason}
+            </p>
+          )}
         </div>
 
         {bookable ? (
           <div className={cn('flex min-w-0 flex-col gap-3 border-t border-border-soft px-3.5 pb-3.5 pt-3 sm:px-4', wide && '@3xl:flex-1 @3xl:border-t-0 @3xl:pt-3.5')}>
             {children}
             {/* The doctor's days. Every day can be shown: the chart says why one can't be booked. */}
+            {sharedDay ? null : (
             <div className="scrollbar-hide scroll-fade-x -mx-1 -my-0.5 flex gap-1.5 overflow-x-auto overflow-y-hidden px-1 py-1" role="group" aria-label={`${provider.name} — day`}>
               {strip.map((d) => {
                 const open = d.state === 'open'
@@ -178,7 +186,7 @@ export function DoctorSlotCard({
                     key={d.date}
                     type="button"
                     aria-pressed={active}
-                    aria-label={`${label === 'Tmrw' ? 'Tomorrow' : label}, ${open ? `${d.open} free` : d.state === 'full' ? 'fully booked' : d.state === 'leave' ? 'on leave' : 'not working'}`}
+                    aria-label={`${label === 'Tmrw' ? 'Tomorrow' : label}, ${open ? `${d.open} available` : d.state === 'full' ? 'fully booked' : d.state === 'leave' ? 'on leave' : 'not working'}`}
                     onClick={() => setOwnDay(d.date)}
                     className={cn(
                       'focus-ring tap-reach inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold transition-colors',
@@ -202,12 +210,15 @@ export function DoctorSlotCard({
                 )
               })}
             </div>
+            )}
 
             {/* That day as the clinicians' Dashboard chart: tap free time to book it. */}
             <DoctorDayChart
               providerId={provider.providerId}
               date={shownDay}
               now={now}
+              sharedRange={sharedRange}
+              currentAppointmentId={currentAppointmentId}
               onPick={(date, slot) => {
                 setOwnDay(date)
                 onPick(provider.providerId, date, slot)

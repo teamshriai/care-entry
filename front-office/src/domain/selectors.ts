@@ -39,8 +39,17 @@ export function getProviderById(state: AppState, providerId: string): Provider |
   return state.providers.find((p) => p.providerId === providerId) ?? null
 }
 
+/** Departments the desk reaches for first, in this order; the rest follow alphabetically. */
+const DEPARTMENT_ORDER = ['General Medicine', 'Emergency']
+
+/** General Medicine first, Emergency second, then the rest A–Z — for any list of departments. */
+export function compareDepartments(a: string, b: string): number {
+  const rank = (d: string) => (DEPARTMENT_ORDER.includes(d) ? DEPARTMENT_ORDER.indexOf(d) : DEPARTMENT_ORDER.length)
+  return rank(a) - rank(b) || a.localeCompare(b)
+}
+
 export function getDepartments(state: AppState): string[] {
-  return [...new Set(state.providers.map((p) => p.department))].sort()
+  return [...new Set(state.providers.map((p) => p.department))].sort(compareDepartments)
 }
 
 export function getSpecialties(state: AppState): string[] {
@@ -290,7 +299,7 @@ export function getDoctorSuggestions(state: AppState, department: string, now: n
         status,
         nextSlots,
         bookable,
-        reason: bookable ? null : `No open slots in the next ${SUGGESTION_HORIZON_DAYS} days`,
+        reason: bookable ? null : `No open slots in the coming ${SUGGESTION_HORIZON_DAYS} days`,
       }
     })
     .sort((a, b) => Number(b.bookable) - Number(a.bookable) || firstSlotAt(a) - firstSlotAt(b))
@@ -612,7 +621,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         id: `na-failed-${bill.paymentId}`,
         tone: 'critical',
         title: 'Payment failed',
-        detail: `${bill.patientName} · ${billNumberFor(bill)} · ${formatRupees(bill.balance)} still due — the last attempt failed.`,
+        detail: `${bill.patientName} · ${billNumberFor(bill)} · ${formatRupees(bill.balance)} still due.`,
         action: { kind: 'bill', patientId: bill.patientId, paymentId: bill.paymentId },
       })
     }
@@ -634,7 +643,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
       id: `na-dup-${group[0].patientId}`,
       tone: 'warning',
       title: 'Possible duplicate patient',
-      detail: `${group.map((p) => p.uhid).join(' and ')} share a mobile number (${group[0].name})`,
+      detail: `${group.map((p) => p.uhid).join(' and ')} share a mobile number (${group[0].name}).`,
       action: { kind: 'open', label: 'Review', to: '/patients?filter=duplicates' },
     })
   }
@@ -645,7 +654,7 @@ export function getNeedsAttention(state: AppState, now: number = Date.now()): Ne
         id: `na-wait-${token.tokenId}`,
         tone: 'warning',
         title: 'Patient awaiting doctor',
-        detail: `${token.patient?.name ?? 'A patient'} has been awaiting the doctor for ${token.waitingMinutes} minutes (${token.tokenNumber}).`,
+        detail: `${token.patient?.name ?? 'A patient'} has waited ${token.waitingMinutes} minutes (${token.tokenNumber}).`,
         action: { kind: 'open', label: 'Outpatients', to: '/patients/outpatients?filter=waiting' },
       })
     }

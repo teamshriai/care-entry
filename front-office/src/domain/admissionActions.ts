@@ -60,10 +60,8 @@ export function admitPatient(input: CreateAdmissionInput): { admission: Admissio
   if (!doctor || doctor.status !== 'Active') throw new DomainError('VALIDATION', 'Select an admitting doctor.')
 
   if (!input.reason?.trim()) throw new DomainError('VALIDATION', 'A reason for admission is required.')
-  if (!input.attendant.name?.trim() || !input.attendant.phone?.trim()) {
-    throw new DomainError('VALIDATION', 'Attendant name and phone are required.')
-  }
-  if (!isValidMobile(input.attendant.phone.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
+  // The attendant is optional; a mobile, when given, must be a valid one.
+  if (input.attendant.phone?.trim() && !isValidMobile(input.attendant.phone.trim())) throw new DomainError('VALIDATION', MOBILE_ERROR)
 
   const bed = requireBed(state, input.bedId)
   if (bed.status !== 'Available') {
@@ -216,7 +214,7 @@ export function dischargeAdmission(admissionId: string, details: DischargeDetail
   const state = getState()
   const admission = requireAdmission(state, admissionId)
   if (admission.status !== 'Admitted') {
-    throw new DomainError('INVALID_TRANSITION', `Cannot discharge an admission that is ${admission.status}.`)
+    throw new DomainError('INVALID_TRANSITION', `This admission is ${admission.status.toLowerCase()} — it can't be discharged.`)
   }
   if (!DISCHARGE_TYPES.includes(details.dischargeType)) {
     throw new DomainError('VALIDATION', 'Choose how the patient is leaving.')
@@ -225,7 +223,7 @@ export function dischargeAdmission(admissionId: string, details: DischargeDetail
   const now = Date.now()
   const preview = previewDischargeBill(state, admissionId, now)
   if (preview && preview.balance > 0) {
-    throw new DomainError('BALANCE_DUE', `${formatRupees(preview.balance)} on the final bill is still to be paid at the billing counter.`)
+    throw new DomainError('BALANCE_DUE', `${formatRupees(preview.balance)} on the bill is still to be paid at the billing counter.`)
   }
   // The stored bill becomes the final bill.
   repriceAdmissionBill(admissionId, now)

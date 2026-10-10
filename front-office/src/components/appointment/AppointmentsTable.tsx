@@ -48,7 +48,6 @@ export function AppointmentsTable({
       <EmptyState
         illustration={<AppointmentIllustration className="h-11 w-11" />}
         title="No appointments today"
-        description="Schedule an appointment to get started."
         action={emptyAction}
       />
     )

@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ElementType } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight, ExternalLink, FileHeart, HeartPulse, Hospital, ScanLine, ShieldCheck, Smartphone, Stethoscope } from 'lucide-react'
+import { ExternalLink, FileHeart, HeartPulse, Hospital, ScanLine, ShieldCheck, Smartphone, Stethoscope } from 'lucide-react'
 import { cn } from '../../utils/cn'
 import type { IconTone } from '../../utils/toneHex'
 import { SoftIconTile } from '../ui/IconTile'
@@ -11,7 +11,7 @@ const ABHA_REGISTER_URL = 'https://abha.abdm.gov.in/abha/v3/register'
 
 /** What ABHA does for a patient — shown to explain why it is worth creating. */
 const ABHA_BENEFITS: { text: string; icon: ElementType; hue: IconTone }[] = [
-  { text: 'One patient. One complete health history.', icon: FileHeart, hue: 'teal' },
+  { text: 'One patient, one complete health history', icon: FileHeart, hue: 'teal' },
   { text: 'Skip repeat MRIs & tests unless needed', icon: ScanLine, hue: 'orange' },
   { text: 'Access all records digitally, anytime', icon: Smartphone, hue: 'blue' },
   { text: 'Move between hospitals seamlessly', icon: Hospital, hue: 'violet' },
@@ -190,9 +190,6 @@ export function CreateAbhaLink({ compact = false, choice = false }: { compact?: 
                     <span className="block text-base font-bold leading-tight">Your Health, One Place</span>
                   </span>
                 </span>
-                <span className="relative mt-1.5 block text-xs font-medium leading-snug text-white/90">
-                  No more repeating your story. No more carrying files.
-                </span>
               </div>
 
               <ul className="grid grid-cols-1 gap-1.5 p-3 min-[360px]:grid-cols-2">
@@ -203,14 +200,6 @@ export function CreateAbhaLink({ compact = false, choice = false }: { compact?: 
                   </li>
                 ))}
               </ul>
-
-              <div className="flex items-center justify-between gap-3 rounded-b-2xl border-t border-border-soft px-4 py-2.5">
-                <span className="text-2xs text-ink-subtle">Free, from the Ayushman Bharat Digital Mission (ABDM)</span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-primary-text">
-                  Click to create
-                  <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.25} aria-hidden="true" />
-                </span>
-              </div>
             </div>,
             document.body,
           )

@@ -14,8 +14,8 @@ const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'O
 
 /**
  * An appointment, read back in full before it is booked: when (date, time
- * range, length, place), who (patient, doctor), the visit, the bill line by
- * line, and what happens next for the patient.
+ * range, length, place), who (patient, doctor), the visit, and the bill line by
+ * line.
  */
 export function AppointmentSummary({
   patient,
@@ -36,7 +36,6 @@ export function AppointmentSummary({
   items: PaymentItem[]
   today: string
 }) {
-  const teleconsult = mode === 'Teleconsult'
   const total = items.reduce((sum, item) => sum + item.amount, 0)
 
   return (
@@ -66,21 +65,6 @@ export function AppointmentSummary({
         </p>
       </div>
 
-      {/* What happens next, for the patient. */}
-      <div className="rounded-xl border border-[color-mix(in_oklab,var(--color-hue-teal)_22%,var(--color-border-soft))] bg-[linear-gradient(135deg,color-mix(in_oklab,var(--color-hue-teal)_10%,var(--color-surface-1)),color-mix(in_oklab,var(--color-hue-teal)_3%,var(--color-surface-1)))] px-3.5 py-3">
-        <p className="text-2xs font-semibold uppercase tracking-[0.08em] text-ink-subtle">What happens next</p>
-        <ol className="mt-1.5 flex flex-col gap-1 text-xs text-ink-muted">
-          <Next n={1}>
-            {patient.name} pays <span className="font-semibold text-ink">{formatRupees(total)}</span> at the billing counter.
-          </Next>
-          <Next n={2}>The appointment is confirmed as soon as the payment is recorded.</Next>
-          <Next n={3}>
-            {teleconsult
-              ? `${patient.name} joins by video at ${formatTime(slot)}.`
-              : `${patient.name} arrives 10 minutes before ${formatTime(slot)}${provider.room ? ` at ${provider.room}` : ''}.`}
-          </Next>
-        </ol>
-      </div>
     </div>
   )
 }
@@ -175,16 +159,5 @@ function Person({ label, name, children }: { label: string; name: string; childr
         <div className="text-xs text-ink-muted">{children}</div>
       </div>
     </div>
-  )
-}
-
-function Next({ n, children }: { n: number; children: ReactNode }) {
-  return (
-    <li className="flex gap-2">
-      <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-1 text-2xs font-bold text-ink-muted shadow-card-sm" aria-hidden="true">
-        {n}
-      </span>
-      <span>{children}</span>
-    </li>
   )
 }

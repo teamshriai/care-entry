@@ -21,7 +21,7 @@ import { usePatientCareStatus } from '../../hooks/useCareStatus'
 export function PaymentsTable({
   payments,
   emptyTitle = 'No payments to show',
-  emptyDescription = 'Bills appear here as they are raised; their status updates once the patient pays at the bill counter.',
+  emptyDescription,
   renderActions,
   showBalance = false,
 }: {
@@ -94,8 +94,22 @@ export function PaymentsTable({
       header: 'Visit / service',
       className: 'text-ink-muted',
       cell: (payment) => (
-        <span className="block tbl:max-w-[10rem] tbl:truncate 2xl:max-w-[16rem]" title={payment.items.map((i) => i.description).join(', ')}>
-          {payment.items.map((item) => item.description).join(', ')}
+        <span className="flex min-w-0 items-center gap-2">
+          {/* OPD or IPD at a glance: a stay's bill, or a visit's. */}
+          {payment.admissionId || payment.appointmentId ? (
+            <span
+              className={cn(
+                'shrink-0 rounded px-1.5 py-0.5 text-2xs font-bold tracking-wide',
+                payment.admissionId ? 'bg-therapy-bg text-therapy-fg' : 'bg-info-bg text-info-fg',
+              )}
+              title={payment.admissionId ? 'Inpatient (IPD)' : 'Outpatient (OPD)'}
+            >
+              {payment.admissionId ? 'IPD' : 'OPD'}
+            </span>
+          ) : null}
+          <span className="block min-w-0 tbl:max-w-[10rem] tbl:truncate 2xl:max-w-[16rem]" title={payment.items.map((i) => i.description).join(', ')}>
+            {payment.items.map((item) => item.description).join(', ')}
+          </span>
         </span>
       ),
     },
@@ -130,7 +144,7 @@ export function PaymentsTable({
     },
     {
       key: 'actions',
-      header: <span className="sr-only">Actions</span>,
+      header: 'Actions',
       className: 'whitespace-nowrap text-right',
       mobile: 'actions',
       cell: (payment) =>

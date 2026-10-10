@@ -68,7 +68,7 @@ const DEPARTMENT_PREFIX: Record<string, string> = {
   'General Medicine': 'MED',
   Orthopedics: 'ORT',
   Neurosurgery: 'NSG',
-  'Emergency Medicine': 'EMG',
+  'Emergency': 'EMG',
 }
 
 interface ActivityInput {
@@ -178,7 +178,7 @@ export function registerPatient(input: RegisterPatientInput): Patient {
     sex: sex as Sex,
     mobile: formatMobile(mobile),
     email: null,
-    address: null,
+    address: input.address?.trim() || null,
     abhaId,
     registrationStatus: 'Registered',
     createdAt: Date.now(),
@@ -227,7 +227,7 @@ function applyBooking(
 ): Step<Appointment> {
   const targetDate = date ?? todayKey(new Date(now))
   if (!getAvailableSlots(state, providerId, now, targetDate).includes(slot)) {
-    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken (or has passed). Please choose another one.')
+    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken or has passed. Choose another time.')
   }
   const clash = patientOverlap(state, patientId, providerId, targetDate, slot)
   if (clash) {
@@ -376,7 +376,7 @@ export function releaseUnpaidBookings(now: number = Date.now()): Appointment[] {
   let next = state
   const released: Appointment[] = []
   for (const appointment of expired) {
-    const step = applyCancelBooking(next, appointment.appointmentId, 'Patient', 'Payment not received within 5 minutes — time released', now)
+    const step = applyCancelBooking(next, appointment.appointmentId, 'Patient', 'Payment not received within 5 minutes — slot released', now)
     next = step.state
     released.push(step.value)
   }
@@ -414,7 +414,7 @@ export function markNoShow(appointmentId: string): Appointment {
     throw new DomainError('INVALID_TRANSITION', `This booking is ${appointmentStatusLabel(appointment.status).toLowerCase()}.`)
   }
   if (now < slotToTimestamp(appointment.date, appointment.slot) + NO_SHOW_GRACE_MINUTES * 60000) {
-    throw new DomainError('INVALID_TRANSITION', `A no-show can be marked ${NO_SHOW_GRACE_MINUTES} minutes after the booked time.`)
+    throw new DomainError('INVALID_TRANSITION', `A no-show can only be marked once ${NO_SHOW_GRACE_MINUTES} minutes have passed since the booked time.`)
   }
   const updated: Appointment = { ...appointment, status: 'No-show' }
   setState(
@@ -449,9 +449,6 @@ export function rescheduleAppointment({ appointmentId, providerId, date, slot, m
   }
   const provider = state.providers.find((p) => p.providerId === providerId)
   if (!provider || provider.status !== 'Active') throw new DomainError('VALIDATION', 'That doctor is not taking bookings.')
-  if (provider.department !== appointment.department) {
-    throw new DomainError('VALIDATION', `Choose a doctor in ${appointment.department} — a move stays in the same department.`)
-  }
   if (!modesFor(provider).includes(mode)) {
     throw new DomainError('VALIDATION', `${provider.name} does not offer ${mode === 'Teleconsult' ? 'teleconsults' : 'in-person visits'}.`)
   }
@@ -459,7 +456,7 @@ export function rescheduleAppointment({ appointmentId, providerId, date, slot, m
     throw new DomainError('VALIDATION', 'That is the time it is already booked for — choose another.')
   }
   if (!getAvailableSlots(state, providerId, now, date).includes(slot)) {
-    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken (or has passed). Please choose another one.')
+    throw new DomainError('SLOT_ALREADY_BOOKED', 'That slot was just taken or has passed. Choose another time.')
   }
 
   const difference = provider.consultationFee - consultationFeePaid(state, appointmentId)
@@ -485,6 +482,8 @@ export function rescheduleAppointment({ appointmentId, providerId, date, slot, m
     ...appointment,
     status: differenceBill ? 'Payment Pending' : appointment.status,
     providerId,
+    // A move may go to another department; the booking follows its new doctor.
+    department: provider.department,
     date,
     slot,
     mode,
@@ -538,7 +537,10 @@ export function checkInAppointment(appointmentId: string): CheckInResult {
     throw new DomainError('INVALID_TRANSITION', 'Payment is pending at the billing counter — check in once it is received.')
   }
   if (appointment.status !== 'Confirmed') {
-    throw new DomainError('INVALID_TRANSITION', `Cannot queue an appointment that is ${appointment.status}.`)
+    throw new DomainError(
+      'INVALID_TRANSITION',
+      `This booking is ${appointmentStatusLabel(appointment.status).toLowerCase()} — it can't be checked in.`,
+    )
   }
   const today = todayKey()
   if (appointment.date !== today) {
@@ -653,7 +655,7 @@ export function callToken(tokenId: string): void {
   const state = getState()
   const token = requireToken(state, tokenId)
   if (token.status !== 'Waiting') {
-    throw new DomainError('INVALID_TRANSITION', `Only a waiting token can be called (this one is ${token.status}).`)
+    throw new DomainError('INVALID_TRANSITION', `Only a waiting token can be called (this one is ${token.status.toLowerCase()}).`)
   }
 
   setState((current) => {
@@ -675,7 +677,7 @@ export function startConsultation(tokenId: string): void {
   const state = getState()
   const token = requireToken(state, tokenId)
   if (token.status !== 'Called') {
-    throw new DomainError('INVALID_TRANSITION', `A consultation can only start from a called token (this one is ${token.status}).`)
+    throw new DomainError('INVALID_TRANSITION', `A consultation can only start from a called token (this one is ${token.status.toLowerCase()}).`)
   }
 
   setState((current) => {
@@ -699,7 +701,7 @@ export function completeConsultation(tokenId: string): void {
   const state = getState()
   const token = requireToken(state, tokenId)
   if (token.status !== 'In consultation' && token.status !== 'Called') {
-    throw new DomainError('INVALID_TRANSITION', `Cannot complete a token that is ${token.status}.`)
+    throw new DomainError('INVALID_TRANSITION', `This token is ${token.status.toLowerCase()} — it can't be completed.`)
   }
   const visit = state.visits.find((v) => v.visitId === token.visitId) ?? null
   const now = Date.now()
@@ -739,7 +741,7 @@ export function recallToken(tokenId: string): void {
   setState((current) => {
     const { activityLog, activitySeq } = withActivity(current, [
       {
-        text: willMarkNoShow ? 'Patient marked no-show' : 'Patient recalled',
+        text: willMarkNoShow ? 'Patient marked as no-show' : 'Patient recalled',
         meta: `${token.tokenNumber} · ${patientName(current, token.patientId)}`,
       },
     ])
@@ -872,7 +874,8 @@ export function setDoctorStatus(providerId: string, status: ProviderStatus): voi
     if (openCount > 0) {
       throw new DomainError(
         'HAS_OPEN_APPOINTMENTS',
-        `${provider.name} still has ${openCount} open appointment(s). Cancel or reassign them before deactivating.`,
+        `${provider.name} still has ${openCount} open ${openCount === 1 ? 'appointment' : 'appointments'}. ` +
+          'Cancel or reassign them before deactivating.',
       )
     }
   }
@@ -912,7 +915,7 @@ export function addDoctorLeave(providerId: string, date: string, reason: string 
   if (affected.length > 0) {
     throw new DomainError(
       'HAS_OPEN_APPOINTMENTS',
-      `${affected.length} appointment(s) are booked on that date. Cancel or reschedule them first.`,
+      `${affected.length} ${affected.length === 1 ? 'appointment is' : 'appointments are'} booked on that date. Cancel or reschedule them first.`,
     )
   }
 
@@ -1390,7 +1393,7 @@ function applyNewBill(
 function applyCollection(state: AppState, { paymentId, amount, method }: CollectPaymentInput, now: number): Step<Payment> {
   const payment = requirePayment(state, paymentId)
   if (payment.status === 'Cancelled' || payment.status === 'Refunded') {
-    throw new DomainError('INVALID_TRANSITION', `Cannot collect against a payment that is ${payment.status}.`)
+    throw new DomainError('INVALID_TRANSITION', `This bill is ${payment.status.toLowerCase()} — no payment can be collected on it.`)
   }
   if (!(amount > 0)) throw new DomainError('VALIDATION', 'Enter an amount greater than zero.')
   if (amount > payment.balance) {
@@ -1483,7 +1486,7 @@ function applyBillCancel(state: AppState, paymentId: string, reason: string, now
     throw new DomainError('INVALID_TRANSITION', 'Money has already been collected against this bill — refund it instead of cancelling.')
   }
   if (payment.status !== 'Pending') {
-    throw new DomainError('INVALID_TRANSITION', `Cannot cancel a payment that is ${payment.status}.`)
+    throw new DomainError('INVALID_TRANSITION', `This bill is ${payment.status.toLowerCase()} — it can't be cancelled.`)
   }
   if (!reason.trim()) throw new DomainError('VALIDATION', 'A cancellation reason is required.')
   const updated: Payment = { ...payment, status: 'Cancelled', cancelledAt: now, cancelReason: reason.trim(), updatedAt: now }
@@ -1512,7 +1515,7 @@ export function recordFailedPayment({ paymentId, amount, method, reason }: Recor
   const state = getState()
   const payment = requirePayment(state, paymentId)
   if (payment.status === 'Cancelled' || payment.status === 'Refunded') {
-    throw new DomainError('INVALID_TRANSITION', `This bill is ${payment.status.toLowerCase()}.`)
+    throw new DomainError('INVALID_TRANSITION', `This bill is ${payment.status.toLowerCase()} — no payment can be recorded on it.`)
   }
   if (!(payment.balance > 0)) throw new DomainError('INVALID_TRANSITION', 'Nothing is due on this bill.')
   if (!(amount > 0) || amount > payment.balance) {

@@ -123,7 +123,7 @@ export function BookingDialog({
                 ? 'Nothing was paid on this booking.'
                 : by === 'Doctor'
                   ? `The billing counter refunds the ${formatRupees(paid)} paid by ${methods} in full (${billNumbers}).`
-                  : `The patient cancelled — the ${formatRupees(paid)} fee is kept. Refunds are made only when the doctor is unavailable.`}
+                  : `The patient cancelled — the ${formatRupees(paid)} fee is kept.`}
             </p>
           ) : null}
           <div className="flex flex-wrap justify-end gap-2">

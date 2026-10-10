@@ -24,6 +24,30 @@ const SpeechRecognitionCtor: RecognitionCtor | undefined =
     : ((window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor }).SpeechRecognition ??
       (window as unknown as { webkitSpeechRecognition?: RecognitionCtor }).webkitSpeechRecognition)
 
+/** Why voice can't work here before even trying, or null. */
+function voiceProblem(): { title: string; detail: string } | null {
+  if (!SpeechRecognitionCtor) return { title: 'Voice input isn’t available in this browser', detail: 'Use Chrome or Edge for voice, or tap + to type the task.' }
+  // Brave ships the API but blocks the speech service behind it, so it never hears anything.
+  if ((navigator as Navigator & { brave?: unknown }).brave) {
+    return { title: 'Voice input doesn’t work in Brave', detail: 'Brave blocks the speech service voice typing needs. Use Chrome or Edge for voice, or tap + to type the task.' }
+  }
+  // The microphone is only offered on https or localhost — not on a LAN address like 192.168.x.x.
+  if (!window.isSecureContext) {
+    return { title: 'Voice input needs a secure address', detail: 'Open the portal at http://localhost:5173 (or over https) to use the microphone, or tap + to type the task.' }
+  }
+  return null
+}
+
+/** What each speech-recognition error means for the desk. */
+const VOICE_ERROR: Record<string, { title: string; detail: string }> = {
+  'not-allowed': { title: 'Microphone access was blocked', detail: 'Allow the microphone for this site (the icon at the left of the address bar), then try again.' },
+  'service-not-allowed': { title: 'Voice input is turned off in this browser', detail: 'Use Chrome or Edge for voice, or tap + to type the task.' },
+  'audio-capture': { title: 'No microphone found', detail: 'Connect a microphone, or tap + to type the task.' },
+  'no-speech': { title: 'Didn’t hear anything', detail: 'Tap the microphone and speak straight away.' },
+  network: { title: 'Voice input couldn’t reach the speech service', detail: 'It needs an internet connection, and doesn’t work in Brave. Use Chrome or Edge, or tap + to type.' },
+  'language-not-supported': { title: 'Voice input doesn’t support this language here', detail: 'Tap + to type the task instead.' },
+}
+
 const savedTime = (at: number) => new Date(at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
 /**
@@ -49,15 +73,16 @@ export function TodoCard() {
   }
 
   function startVoice() {
-    if (!SpeechRecognitionCtor) {
-      notify('Voice input isn’t available in this browser', { tone: 'error', detail: 'Use + to type the task instead.' })
-      return
-    }
     if (listening) {
       recognition.current?.stop()
       return
     }
-    const rec = new SpeechRecognitionCtor()
+    const problem = voiceProblem()
+    if (problem) {
+      notify(problem.title, { tone: 'error', detail: problem.detail })
+      return
+    }
+    const rec = new SpeechRecognitionCtor!()
     rec.lang = 'en-IN'
     rec.interimResults = true
     rec.continuous = false
@@ -69,36 +94,46 @@ export function TodoCard() {
       setDraft(heard)
     }
     rec.onerror = (event) => {
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') notify('Microphone access was blocked', { tone: 'error', detail: 'Allow the microphone for this site, or type the task.' })
+      const message = VOICE_ERROR[event.error]
+      if (message) notify(message.title, { tone: 'error', detail: message.detail })
     }
     rec.onend = () => {
       setListening(false)
       recognition.current = null
-      if (heard.trim()) {
-        add(heard)
-        setDraft(null)
-      }
+      // Nothing heard (or it failed): close the empty row again.
+      if (heard.trim()) add(heard)
+      setDraft(null)
     }
     recognition.current = rec
     setDraft('')
     setListening(true)
-    rec.start()
+    try {
+      rec.start()
+    } catch {
+      setListening(false)
+      setDraft(null)
+      notify('Voice input couldn’t start', { tone: 'error', detail: 'Try again, or tap + to type the task.' })
+    }
   }
 
+  // Empty: just the heading row with its buttons — no empty box under it.
+  const empty = todos.length === 0 && draft === null
   return (
     <Card className="flex flex-col">
-      <div className="flex items-center gap-2 px-4 pb-2 pt-4 sm:px-5">
+      <div className={cn('flex items-center gap-2 px-4 pt-4 sm:px-5', empty ? 'pb-4' : 'pb-2')}>
         <h2 className="text-lg font-semibold tracking-tight text-ink">To-do</h2>
+        {pending > 0 ? (
         <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-surface-2 px-1.5 text-xs font-bold tabular-nums text-ink" aria-label={`${pending} to do`}>
           {pending}
         </span>
+        ) : null}
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             onClick={startVoice}
             aria-pressed={listening}
             aria-label={listening ? 'Stop listening' : 'Add a to-do by voice'}
-            title={SpeechRecognitionCtor ? (listening ? 'Listening… tap to stop' : 'Add by voice') : 'Voice input isn’t available in this browser'}
+            title={listening ? 'Listening… tap to stop' : 'Add by voice'}
             className={cn(
               'focus-ring flex h-10 w-10 items-center justify-center rounded-full transition-colors',
               listening
@@ -120,6 +155,7 @@ export function TodoCard() {
         </div>
       </div>
 
+      {empty ? null : (
       <ul className="flex max-h-[22rem] flex-col gap-2 overflow-y-auto px-4 pb-4 pt-1 sm:px-5">
         {draft !== null ? (
           <li className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5 ring-2 ring-primary-600/30">
@@ -133,7 +169,7 @@ export function TodoCard() {
                 if (e.key === 'Escape') setDraft(null)
               }}
               onBlur={() => !listening && commitDraft()}
-              placeholder={listening ? 'Listening…' : 'What needs doing? Press Enter to save'}
+              placeholder={listening ? 'Listening…' : 'What needs doing?'}
               aria-label="New to-do"
               maxLength={160}
               className="min-w-0 flex-1 bg-transparent text-sm font-medium text-ink outline-none placeholder:text-ink-subtle"
@@ -143,8 +179,8 @@ export function TodoCard() {
         {shown.map((todo) => (
           <TodoItem key={`${todo.id}-${todo.savedAt}`} todo={todo} onToggle={() => toggle(todo.id)} onEdit={(text) => edit(todo.id, text)} onDelete={() => remove(todo.id)} />
         ))}
-        {todos.length === 0 && draft === null ? <li className="py-6 text-center text-sm text-ink-subtle">Nothing to do yet — tap + or the microphone to add one.</li> : null}
       </ul>
+      )}
     </Card>
   )
 }

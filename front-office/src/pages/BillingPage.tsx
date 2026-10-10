@@ -20,11 +20,11 @@ function readFilter(search: string): BillFilter {
   return FILTERS.includes(value as BillFilter) ? (value as BillFilter) : 'due'
 }
 
-const EMPTY: Record<BillFilter, { title: string; description: string }> = {
-  due: { title: 'No payment pending', description: 'Every bill has been paid at the billing counter.' },
-  failed: { title: 'No failed payments', description: 'Every payment at the billing counter has gone through.' },
-  'collected-today': { title: 'Nothing received yet today', description: 'Payments recorded by the billing counter appear here.' },
-  all: { title: 'No bills yet', description: 'Bills appear here as they are raised.' },
+const EMPTY_TITLE: Record<BillFilter, string> = {
+  due: 'No payment pending',
+  failed: 'No failed payments',
+  'collected-today': 'Nothing received yet today',
+  all: 'No payments yet',
 }
 
 /** Payment Status, to view only: Care Entry raises and prints bills, the
@@ -46,37 +46,34 @@ export function BillingPage() {
   }
 
   const items: StatFilterItem<BillFilter>[] = [
-    { key: 'due', label: 'Pending', value: formatRupees(overview.dueAmount), context: `${overview.dueCount} bills`, tone: 'warning', icon: HandCoins },
-    { key: 'failed', label: 'Payment failed', value: overview.failedCount, context: 'Not completed at the counter', tone: 'critical', icon: AlertCircle },
+    { key: 'due', label: 'Payment pending', value: formatRupees(overview.dueAmount), tone: 'warning', icon: HandCoins },
+    { key: 'failed', label: 'Payment failed', value: overview.failedCount, tone: 'critical', icon: AlertCircle },
     {
       key: 'collected-today',
       label: 'Payment received today',
       value: formatRupees(overview.collectedToday),
-      context: `${overview.collectedTodayCount} bills`,
       tone: 'stable',
       icon: IndianRupee,
     },
-    { key: 'all', label: 'All bills', value: overview.allCount, context: 'Every bill raised', tone: 'info', icon: ReceiptText },
+    { key: 'all', label: 'Total payments', value: overview.allCount, tone: 'info', icon: ReceiptText },
   ]
 
   return (
     <div>
       <PageHeader
-        title="Payment Status"
-        subtitle="Each patient’s bills and whether they are pending or paid — payment is taken at the bill counter, not here."
+        title="Payments"
         illustration={<PaymentIllustration className="h-8 w-8" />}
         illustrationTone="stable"
       />
 
       <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
-        <StatFilter label="Show bills" items={items} selected={filter} onSelect={selectFilter} />
+        <StatFilter label="Show payments" items={items} selected={filter} onSelect={selectFilter} />
 
         <Card accentTone="stable">
           <PaymentsTable
             payments={bills}
             showBalance
-            emptyTitle={EMPTY[filter].title}
-            emptyDescription={EMPTY[filter].description}
+            emptyTitle={EMPTY_TITLE[filter]}
             renderActions={(payment) => (
               <>
                 {isBillDue(payment) ? (

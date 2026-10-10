@@ -42,8 +42,7 @@ export function PaymentDetailPage() {
               <EmptyState
                 icon={ReceiptIcon}
                 title="No such bill"
-                description="It may have been removed. Every bill is listed under Payment Status."
-                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Payment Status</Button>}
+                action={<Button size="sm" onClick={() => navigate('/billing?filter=all')}>Payments</Button>}
               />
             </CardBody>
           </Card>
@@ -58,7 +57,7 @@ export function PaymentDetailPage() {
     if (!payment) return
     printBill(payment.paymentId)
     setPrinted(true)
-    notify(`Bill printed — ${payment.patientName} pays at the billing counter`, { detail: `${billNumberFor(payment)} · ${formatRupees(payment.balance)}` })
+    notify(`Bill printed for ${payment.patientName}`, { detail: `${billNumberFor(payment)} · ${formatRupees(payment.balance)}` })
   }
 
   const linkedTo = payment.admissionId
@@ -110,9 +109,9 @@ export function PaymentDetailPage() {
               </div>
             </div>
 
-            <CardHeader title="Payments at the billing counter" subtitle="Every payment and attempt recorded against this bill" />
+            <CardHeader title="Payments at the billing counter" />
             {payment.transactions.length === 0 && payment.failedAttempts.length === 0 ? (
-              <EmptyState title="No payment recorded yet" description="Payments taken at the billing counter appear here." />
+              <EmptyState title="No payment recorded yet" />
             ) : (
               <div className="divide-y divide-border-soft">
                 {[
@@ -180,19 +179,12 @@ export function PaymentDetailPage() {
                 </dl>
                 <div className="flex flex-col gap-2 border-t border-border-soft pt-3">
                   {due ? (
-                    <>
-                      <p className="text-sm text-ink-muted">
-                        {printed
-                          ? `Bill printed — ${payment.patientName} pays at the billing counter. The status updates here once it is paid.`
-                          : `${payment.patientName} pays ${formatRupees(payment.balance)} at the billing counter — print the bill for them to take there.`}
-                      </p>
-                      <Button variant={printed ? 'outline' : 'secondary'} onClick={print}>
-                        <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        {printed ? 'Print again' : 'Print bill'}
-                      </Button>
-                    </>
+                    <Button variant={printed ? 'outline' : 'secondary'} onClick={print}>
+                      <Printer className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      {printed ? 'Print again' : 'Print bill'}
+                    </Button>
                   ) : payment.status === 'Paid' || payment.status === 'Partially Paid' ? (
-                    <p className="text-sm font-medium text-success-fg">Payment received at the billing counter.</p>
+                    <p className="text-sm font-medium text-success-fg">Payment received</p>
                   ) : (
                     <p className="text-xs text-ink-subtle">This bill is {payment.status.toLowerCase()}.</p>
                   )}

@@ -23,7 +23,7 @@ export function PaymentHoldSweeper() {
         const doctor = getProviderById(state, released.providerId)
         notify('Booking released — payment not received', {
           tone: 'info',
-          detail: `${patient?.name ?? 'Patient'} · ${doctor?.name ?? 'Doctor'} · ${formatTime(released.slot)} is free again`,
+          detail: `${patient?.name ?? 'Patient'} · ${doctor?.name ?? 'Doctor'} · ${formatTime(released.slot)} slot is available again`,
         })
       }
     }, CHECK_EVERY_MS)

@@ -1,22 +1,21 @@
 import { useState } from 'react'
-import { ArrowRight, Building2, CalendarPlus, Check, ClipboardCheck, Pencil, Sparkles, Video, XCircle } from 'lucide-react'
+import { ArrowRight, Building2, CalendarPlus, Pencil, Video } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { DoctorSlotCard } from '../../components/clinician/DoctorSlotCard'
-import { AppointmentPeople, AppointmentWhen } from '../../components/appointment/AppointmentSummary'
-import { BillStatusBadge } from '../../components/payment/BillStatusBadge'
-import { Button } from '../../components/ui/Button'
+import { DepartmentChips } from '../../components/clinician/DepartmentChips'
+import { SharedDayHeader } from '../../components/clinician/SharedDayHeader'
+import { AppointmentWhen } from '../../components/appointment/AppointmentSummary'
 import { Alert } from '../../components/ui/Alert'
-import { useToast } from '../../hooks/useToast'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useStoreValue } from '../../hooks/useStore'
 import { useNow } from '../../hooks/useNow'
-import { getState } from '../../domain/store'
+import { getState, setState } from '../../domain/store'
 import {
   getAvailableSlots,
   getConsultationBillItems,
   getDepartmentSummaries,
   getDoctorSuggestions,
-  getPaymentById,
   getPatientById,
   getProviderById,
   getToday,
@@ -26,28 +25,15 @@ import { formatRupees, sumItems } from '../../utils/billing'
 import { dayWithDate, relativeDayLabel } from '../../utils/dates'
 import { modesFor } from '../../utils/appointment'
 import { cn } from '../../utils/cn'
-import { Quadrant, StepRail, Waiting } from '../../components/flow/Quadrant'
-import { SoftIconTile } from '../../components/ui/IconTile'
-import { departmentIcon, departmentTone } from '../../utils/departments'
+import { Quadrant, StepRail } from '../../components/flow/Quadrant'
 import type { FlowProps } from '../registry'
 import type { Patient } from '../../types/patient'
 import type { ConsultMode } from '../../types/appointment'
-import type { AppState } from '../../types/store'
-import type { Payment } from '../../types/payment'
 import type { Provider } from '../../types/doctor'
+import type { AppState } from '../../types/store'
 import { inputClass } from '../../utils/formClasses'
-import { formatTime } from '../../domain/time'
-
-/** The booking as it was made — what the confirmation reads back. */
-interface Done {
-  patient: Patient
-  provider: Provider
-  appointmentId: string
-  date: string
-  slot: string
-  mode: ConsultMode
-  bill: Payment
-}
+import { dayStartTimestamp, formatTime } from '../../domain/time'
+import { getDepartmentDateStrip, getDepartmentDayRange } from '../../domain/doctorDaySelectors'
 
 /** A doctor and a time, chosen together. */
 interface Pick {
@@ -91,11 +77,37 @@ interface Start {
  *  the doctor, and a slot is kept only when the page named one and it is
  *  still free. With the patient known, whatever is still open is filled in
  *  as a smart choice. */
+/** Every booking opens in General Medicine — the first stop — with its doctors' times open. */
+const DEFAULT_DEPARTMENT = 'General Medicine'
+function defaultDepartment(state: AppState, patientId: string): string | null {
+  return patientId && state.patients.some((p) => p.patientId === patientId) ? DEFAULT_DEPARTMENT : null
+}
+
+/** The doctor a returning patient was last with — their latest visit or booking (a cancelled one aside),
+ *  while that doctor still takes bookings. */
+function lastVisitedDoctor(state: AppState, patientId: string): Provider | null {
+  const seen = [
+    ...state.visits.filter((v) => v.patientId === patientId).map((v) => ({ at: v.arrivalTime, providerId: v.providerId })),
+    ...state.appointments
+      .filter((a) => a.patientId === patientId && a.status !== 'Cancelled')
+      .map((a) => ({ at: Math.max(a.createdAt, slotTimestampOf(a.date, a.slot)), providerId: a.providerId })),
+  ].sort((x, y) => y.at - x.at)
+  const doctor = seen[0] ? getProviderById(state, seen[0].providerId) : null
+  return doctor && doctor.status === 'Active' ? doctor : null
+}
+
+/** A booking's time as a timestamp, to order it among visits. */
+function slotTimestampOf(date: string, slot: string): number {
+  const [h, m] = slot.split(':').map(Number)
+  return dayStartTimestamp(date) + (h * 60 + m) * 60000
+}
+
 function startFrom(params: FlowProps['params'], now: number): Start {
   const state = getState()
-  const doctor = params.doctor ? getProviderById(state, params.doctor) : null
+  // A doctor named by the page; else, for a returning patient, the doctor they saw last.
+  const doctor = params.doctor ? getProviderById(state, params.doctor) : params.uhid ? lastVisitedDoctor(state, params.uhid) : null
   const usable = doctor && doctor.status === 'Active' ? doctor : null
-  const department = usable?.department ?? params.dept ?? null
+  const department = usable?.department ?? params.dept ?? (params.uhid ? defaultDepartment(state, params.uhid) : null)
   const named = Boolean(usable && params.date && params.slot && getAvailableSlots(state, usable.providerId, now, params.date).includes(params.slot))
   if (usable && named) {
     return { department, providerId: usable.providerId, date: params.date!, slot: params.slot!, mode: modesFor(usable)[0], smart: false }
@@ -127,18 +139,22 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   const [reason, setReason] = useState('')
   const [showReason, setShowReason] = useState(false)
   const [changingPatient, setChangingPatient] = useState(false)
-  const [done, setDone] = useState<Done | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Tapping a free time books it at once and shows the appointment; Cancel
-  // there cancels it straight away, and Confirm closes the flow.
+  // Opened on a time already chosen on a doctor's chart: only the patient is left to choose.
+  const [patientOnly, setPatientOnly] = useState(() => Boolean(params.doctor && !params.uhid && start.providerId && start.slot && !start.smart))
+  // The day every doctor's row shows — one date for the whole list.
+  const [dayChoice, setDayChoice] = useState<string | null>(null)
   // The smart choice on show — cleared the moment the desk picks another.
   const [smart, setSmart] = useState<Pick | null>(() => (start.smart && start.providerId && start.date && start.slot ? { providerId: start.providerId, date: start.date, slot: start.slot } : null))
-  const { notify } = useToast()
-  const doneBill = useStoreValue(getPaymentById, done?.bill.paymentId ?? '')
+  const navigate = useNavigate()
+  const location = useLocation()
 
   const departments = useStoreValue(getDepartmentSummaries, now)
   const provider = useStoreValue(getProviderById, providerId ?? '')
   const suggestions = useStoreValue(getDoctorSuggestions, department ?? '', now)
+  const departmentDays = useStoreValue(getDepartmentDateStrip, department ?? '', now)
+  const listDay = dayChoice ?? date ?? departmentDays.find((d) => d.open > 0)?.date ?? today
+  const listRange = useStoreValue(getDepartmentDayRange, department ?? '', now, listDay)
   const billItems = useStoreValue(getConsultationBillItems, patientId, providerId ?? '')
   const total = sumItems(billItems)
   const modes = provider ? modesFor(provider) : (['In person'] as ConsultMode[])
@@ -170,6 +186,17 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   function choosePatient(next: Patient) {
     setPatientId(next.patientId)
     setChangingPatient(false)
+    // Nothing chosen yet: General Medicine, its doctors' times open.
+    // Nothing chosen yet: the doctor they saw last (and that doctor's department), else General Medicine.
+    if (!department) {
+      const last = lastVisitedDoctor(getState(), next.patientId)
+      const usual = last?.department ?? defaultDepartment(getState(), next.patientId)
+      if (usual) {
+        setDepartment(usual)
+        pickSoonest(usual, last?.providerId)
+        return
+      }
+    }
     // A time the desk already chose on the doctor's page is booked for this patient.
     if (providerId && date && slot && !smart) {
       bookPick(next, { providerId, date, slot })
@@ -195,6 +222,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   function chooseDepartment(next: string) {
     setError(null)
     if (next !== department) {
+      setDayChoice(null)
       setDepartment(next)
       setProviderId(null)
       setDate(null)
@@ -219,16 +247,20 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
   }
 
   // Booking holds the time and raises the bill. The bill is printed from the
-  // patient's Payment History and paid at the billing counter — Care Entry takes
+  // patient's timeline and paid at the billing counter — Care Entry takes
   // no money — and the booking is only confirmed once that payment is recorded.
   // Unpaid after five minutes, the time is released (see PaymentHoldSweeper).
   function bookPick(who: Patient, pick: Pick) {
     const doctor = getProviderById(getState(), pick.providerId)
     if (!doctor) return
     setError(null)
+    // Rescheduling an unpaid booking from the timeline: it gives way to the new time, and comes
+    // back untouched if the new one can't be booked.
+    const before = getState()
     try {
+      if (params.appointment) cancelAppointment({ appointmentId: params.appointment, by: 'Patient', note: 'Moved to another time before payment' })
       const mode = pick.providerId === providerId ? consultMode : (modesFor(doctor)[0] ?? 'In person')
-      const result = bookAppointment({
+      bookAppointment({
         patientId: who.patientId,
         providerId: doctor.providerId,
         date: pick.date,
@@ -236,16 +268,12 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
         mode,
         reason: reason.trim() || undefined,
       })
-      setDone({
-        patient: who,
-        provider: doctor,
-        appointmentId: result.appointment.appointmentId,
-        date: pick.date,
-        slot: pick.slot,
-        mode,
-        bill: result.bill,
-      })
+      // Booked: straight to the patient's profile, where the timeline shows the booking and prints its bill.
+      const profile = `/patients/${who.uhid}`
+      if (location.pathname === profile) onClose()
+      else navigate(profile, { replace: true })
     } catch (err) {
+      if (params.appointment) setState(before)
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
       // A slot taken a moment ago: reopen the times so another can be picked.
@@ -253,85 +281,14 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
     }
   }
 
-  // Cancelling straight after booking: the booking is withdrawn and, while
-  // still unpaid, so is its bill. A fee already paid at the counter is kept
-  // (a consultation fee is refunded only when the doctor is unavailable).
-  function cancelBooking() {
-    if (!done) return
-    try {
-      cancelAppointment({ appointmentId: done.appointmentId, by: 'Patient', note: 'Cancelled at the desk after booking' })
-      notify('Appointment cancelled', { detail: `${done.provider.name} · ${dayWithDate(done.date, today)}, ${formatTime(done.slot)}` })
-      onClose()
-    } catch (err) {
-      notify(err instanceof Error ? err.message : String(err), { tone: 'error' })
-    }
-  }
-
-  const subtitle = patient
-    ? `${patient.name} · ${patient.uhid}${patient.age ? ` · ${patient.age} ${patient.sex.charAt(0)}` : ''}`
-    : 'Choose the patient'
-
-  // ------------------------------------------------------------ acknowledgement
-  // A short, calm confirmation for the patient: who, with whom, when. It
-  // closes by itself after ten seconds (a bar shows the time running out —
-  // no countdown), or at once with Done; Cancel undoes the booking. The
-  // timer waits while the cancel question is open.
-  if (done) {
-    const fee = doneBill ?? done.bill
-    return (
-      <FlowSheet title="Schedule Appointment" subtitle={subtitle} icon={CalendarPlus} onClose={onClose} size="full">
-        <div className="flex min-h-full items-center justify-center py-4 sm:py-8">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border-soft bg-surface-1 shadow-modal">
-            {/* The details to confirm with the patient before the booking goes ahead. */}
-            <div
-              className="px-5 pb-3 pt-5 text-center sm:px-6 sm:pb-4 sm:pt-6"
-              style={{ backgroundImage: 'radial-gradient(120% 100% at 50% 0%, color-mix(in oklab, var(--color-primary-500) 12%, transparent) 0%, transparent 70%)' }}
-            >
-              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-text ring-[6px] ring-primary-50/60" aria-hidden="true">
-                <ClipboardCheck className="h-6 w-6" strokeWidth={2} />
-              </span>
-              <h3 className="mt-3.5 text-lg font-bold tracking-tight text-ink">Confirm appointment details</h3>
-              <p className="mt-0.5 text-sm text-ink-muted">
-                Please check these details with <span className="font-semibold text-ink">{done.patient.name}</span> before confirming.
-              </p>
-            </div>
-
-            {/* When, who, and the fee — the essentials, read back. */}
-            <div className="flex flex-col gap-2.5 px-4 pb-4 sm:px-6 sm:pb-5">
-              <AppointmentWhen provider={done.provider} date={done.date} slot={done.slot} mode={done.mode} today={today} />
-              <AppointmentPeople patient={done.patient} provider={done.provider} />
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-border-soft px-3.5 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink">Consultation fee</p>
-                  <p className="text-xs text-ink-muted">Paid at the billing counter — the time is held for 5 minutes</p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="text-base font-bold tabular-nums text-ink">{formatRupees(fee.totalAmount)}</span>
-                  <BillStatusBadge payment={fee} />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 border-t border-border-soft bg-surface-2/40 px-5 py-3.5 sm:flex sm:px-6">
-              <Button variant="danger" onClick={cancelBooking} className="sm:flex-none">
-                <XCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
-                Cancel
-              </Button>
-              <Button onClick={onClose} className="order-first col-span-2 sm:order-none sm:ml-auto sm:min-w-28 sm:flex-none">
-                <Check className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                Confirm
-              </Button>
-            </div>
-          </div>
-        </div>
-      </FlowSheet>
-    )
-  }
+  // The patient is named once, on the page itself — the title says what is left to do.
+  const subtitle = patient ? 'Choose a doctor and a time' : 'Choose the patient'
+  // Patient and department both chosen: they shrink to one strip, and the doctors get the screen.
+  const compact = Boolean(patient && department && !changingPatient)
 
   // ---------------------------------------------------------------- one page
   const timeSummary =
     provider && date && slot ? `${provider.name} · ${relativeDayLabel(date, today)} ${formatTime(slot)}${consultMode === 'Teleconsult' ? ' · Teleconsult' : ''}` : undefined
-  const smartShown = Boolean(smart && smart.providerId === providerId && smart.date === date && smart.slot === slot)
   const soonestId = suggestions.find((s) => s.bookable)?.provider.providerId ?? null
   const showPatientSearch = !patient || changingPatient
 
@@ -365,7 +322,7 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
                 <ArrowRight size={14} aria-hidden="true" />
               </span>
               <span>
-                <span className="font-semibold text-ink">Next: {steps[currentIndex]?.next ?? 'confirm'}</span>
+                <span className="font-semibold text-ink">{(steps[currentIndex]?.next ?? 'confirm').replace(/^./, (c) => c.toUpperCase())}</span>
                 <span className="hidden sm:inline"> — {steps.filter((step) => step.done).length} of 3 chosen</span>
               </span>
             </p>
@@ -403,13 +360,32 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           </div>
         </div>
       </div>
-      <p className="hidden text-xs text-ink-subtle sm:block">
-        {ready
-          ? `${patient?.name ?? 'The patient'} pays at the billing counter within 5 minutes — print the bill from Payment History. The appointment is confirmed once it is paid.`
-          : 'Tap a free time to book it for the patient. Every choice stays editable — tap any section to change it.'}
-      </p>
     </div>
   )
+
+  // The doctor and the time were chosen on the Doctors page: just the patient, then it is booked.
+  if (patientOnly && provider && date && slot && !patient) {
+    return (
+      <FlowSheet title="Schedule Appointment" subtitle="Choose the patient" icon={CalendarPlus} onClose={onClose} size="full">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 py-2 sm:py-6">
+          <AppointmentWhen provider={provider} date={date} slot={slot} mode={consultMode} today={today} />
+          <div className="flex items-center justify-between gap-3 px-1 text-sm">
+            <span className="min-w-0 truncate text-ink">
+              <span className="font-semibold">{provider.name}</span> · {provider.department} · {formatRupees(total)}
+            </span>
+            <button type="button" onClick={() => setPatientOnly(false)} className="focus-ring shrink-0 rounded text-xs font-semibold text-primary-text hover:underline">
+              Change doctor or time
+            </button>
+          </div>
+          <section aria-label="Patient" className="flex flex-col gap-2 rounded-2xl border border-border-soft bg-surface-1 p-4 shadow-card-sm">
+            <h3 className="text-sm font-semibold text-ink">Patient</h3>
+            <PatientSearch mode="pick" inline onPick={choosePatient} autoFocus placeholder="Search for the patient by name, mobile, UHID or ABHA" />
+          </section>
+          {error ? <Alert tone="critical" live>{error}</Alert> : null}
+        </div>
+      </FlowSheet>
+    )
+  }
 
   return (
     <FlowSheet title="Schedule Appointment" subtitle={subtitle} icon={CalendarPlus} onClose={onClose} size="full" footer={confirmBar}>
@@ -420,12 +396,45 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           own — the sheet itself never does). Narrower: one column, same order. */}
       <div className="flex flex-col xl:h-full">
       <StepRail steps={rail} />
-      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.75fr)] lg:grid-rows-[auto_minmax(0,1fr)] xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)] lg:grid-rows-[auto_minmax(0,1fr)] xl:min-h-0 xl:flex-1">
+        {compact && patient ? (
+          // One strip across the top: who, and which department — each changeable in place.
+          <section
+            aria-label="Patient and department"
+            className="surface-raised flex flex-col gap-2.5 rounded-xl border border-border-soft bg-surface-1 px-3.5 py-2.5 sm:px-4 lg:col-span-2 lg:row-start-1 xl:flex-row xl:items-center xl:gap-4"
+          >
+            <div className="flex min-w-0 items-center gap-2.5 xl:shrink-0">
+              <span className="text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Patient</span>
+              <span className="min-w-0 truncate text-sm text-ink" title={patient.name}>
+                <span className="font-semibold">{patient.name}</span>
+                <span className="text-ink-muted">
+                  {' '}
+                  · <span className="tabular-nums">{patient.uhid}</span>
+                  {patient.age ? ` · ${patient.age} ${patient.sex.charAt(0)}` : ''}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setChangingPatient(true)}
+                className="focus-ring inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50 px-4 text-sm font-semibold text-primary-text shadow-card-sm transition-all hover:-translate-y-0.5 hover:bg-primary-100 hover:shadow-card-md dark:border-primary-500/35"
+              >
+                <Pencil size={14} aria-hidden="true" />
+                Change
+              </button>
+            </div>
+            <span aria-hidden="true" className="hidden h-6 w-px bg-border-soft xl:block" />
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <span className="text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Department</span>
+              <DepartmentChips departments={departments.map((d) => d.department)} selected={department} onChoose={chooseDepartment} />
+            </div>
+          </section>
+        ) : (
+          <>
         {/* Top-left · Patient */}
-        <Quadrant id="book-patient" step={1} title="Patient" done={Boolean(patient)} current={currentIndex === 0} scrollFrom="xl" className="lg:col-start-1 lg:row-start-1">
+        <Quadrant id="book-patient" step={1} title="Patient" done={Boolean(patient)} current={currentIndex === 0} scrollFrom="xl" className="lg:col-span-2 lg:row-start-1">
           {showPatientSearch ? (
             <div className="flex flex-col gap-2">
-              <PatientSearch mode="pick" inline onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile, UHID or ABHA" />
+              <PatientSearch mode="pick" inline onPick={choosePatient} autoFocus placeholder="Search for the patient by name, mobile, UHID or ABHA" />
               {patient ? (
                 <button type="button" onClick={() => setChangingPatient(false)} className="self-start text-xs font-semibold text-primary-text hover:underline">
                   Keep {patient.name}
@@ -463,42 +472,9 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           ) : null}
         </Quadrant>
 
-        {/* Top-right · Department */}
-        <Quadrant id="book-department" step={2} title="Department" done={Boolean(department)} current={currentIndex === 1} scrollFrom="xl" className="lg:col-start-1 lg:row-start-2 lg:self-start xl:self-stretch">
-          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-1" role="group" aria-label="Departments">
-            {departments.map(({ department: dep, doctors, bookable, next }) => {
-              const selected = dep === department
-              return (
-                <button
-                  key={dep}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => chooseDepartment(dep)}
-                  className={cn(
-                    'focus-ring relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all duration-200',
-                    selected
-                      ? 'border-primary-600 bg-primary-50 shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-primary-500)_16%,transparent)]'
-                      : 'border-border-soft bg-surface-1 shadow-card-sm hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-md',
-                  )}
-                >
-                  <SoftIconTile icon={departmentIcon(dep)} tone={departmentTone(dep)} size="md" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-ink">{dep}</span>
-                    <span className="block truncate text-xs text-ink-muted">
-                      {doctors} {doctors === 1 ? 'doctor' : 'doctors'}
-                      {next ? ` · next ${relativeDayLabel(next.date, today) === 'Today' ? formatTime(next.slot) : `${relativeDayLabel(next.date, today)} ${formatTime(next.slot)}`}` : bookable === 0 ? ' · no free time' : ''}
-                    </span>
-                  </span>
-                  {selected ? (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[image:var(--gradient-primary)] text-on-primary" aria-hidden="true">
-                      <Check size={12} strokeWidth={3} />
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-        </Quadrant>
+
+          </>
+        )}
 
         {/* Right · Doctor Availability — each doctor with their own times. */}
         <Quadrant
@@ -509,26 +485,13 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
           current={currentIndex === 2}
           summary={timeSummary}
           scrollFrom="xl"
-          className="lg:col-start-2 lg:row-span-2 lg:row-start-1"
+          className="lg:col-span-2 lg:row-start-2"
         >
-          {!department ? (
-            <Waiting>Choose a department to see its doctors and their open times.</Waiting>
-          ) : (
+          {!department ? null : (
             <div className="flex flex-col gap-3">
-              {smartShown && provider && date && slot ? (
-                <div
-                  role="status"
-                  className="flex items-start gap-2.5 rounded-xl border border-success-fg/25 bg-success-bg px-3 py-2.5 text-sm"
-                >
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" strokeWidth={2} aria-hidden="true" />
-                  <p className="min-w-0 text-ink">
-                    <span className="font-semibold text-success-fg">Smart choice</span> · {provider.name},{' '}
-                    <span className="whitespace-nowrap font-semibold">
-                      {relativeDayLabel(date, today)} {formatTime(slot)}
-                    </span>{' '}
-                    <span className="text-ink-muted">— the soonest open time in {department}. Tap any other time to change it.</span>
-                  </p>
-                </div>
+              {/* One date and one time axis for every doctor, pinned while the doctors scroll under it. */}
+              {suggestions.length > 0 ? (
+                <SharedDayHeader days={departmentDays} day={listDay} onDay={setDayChoice} range={listRange} today={today} now={now} />
               ) : null}
               {suggestions.length === 0 ? (
                 <p className="text-sm text-ink-muted">No doctors in this department.</p>
@@ -546,6 +509,9 @@ function AppointmentFlow({ params, onClose }: FlowProps) {
                           selectedDate={chosen ? date : null}
                           selectedSlot={chosen ? slot : null}
                           onPick={pickTime}
+                          sharedDay={listDay}
+                          sharedRange={listRange}
+                          wide
                         >
                           {chosen && modes.length > 1 ? (
                             <div className="flex flex-wrap items-center gap-2">

@@ -9,12 +9,7 @@ export function NotFoundPage() {
     <EmptyState
       icon={Compass}
       title="This page doesn't exist"
-      description={
-        <>
-          Nothing lives at <span className="break-all font-medium text-ink">{pathname}</span>. It may be an old or mistyped link — use the menu, or go back
-          to the dashboard.
-        </>
-      }
+      description={<span className="break-all font-medium text-ink">{pathname}</span>}
       action={
         <Link
           to="/"

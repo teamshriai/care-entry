@@ -51,6 +51,7 @@ export function DoctorDayChart({
   now,
   onPick,
   currentAppointmentId,
+  sharedRange,
 }: {
   providerId: string
   date: string
@@ -60,6 +61,8 @@ export function DoctorDayChart({
   onPick: (date: string, slot: string) => void
   /** Reschedule: the booking being moved, drawn as "Current: …"; tapping it does nothing. */
   currentAppointmentId?: string
+  /** Draw these hours on a plain scale with no axis of its own, under a shared DayTimelineAxis. */
+  sharedRange?: [number, number]
 }) {
   const navigate = useNavigate()
   const today = useStoreValue(getToday)
@@ -71,15 +74,15 @@ export function DoctorDayChart({
 
   const model = useMemo(() => {
     const bookings = day.input.bookings?.map((b) => (b.id === currentAppointmentId ? { ...b, title: `Current: ${b.title}` } : b))
-    const drawn = dayModel({ ...day.input, bookings })
+    const drawn = dayModel({ ...day.input, bookings, range: sharedRange })
     // "Next free" names the first slot that can be booked, as the day tabs and
     // the doctor's card do, not the first free minute (which can fall inside a
     // slot that has already started).
     const first = day.board.find((e) => e.status === 'available')
     const nextFree = first ? minutesFrom(first.slot) : null
-    const summary = drawn.summary.replace(/, next free [^,]*$/, '') + (nextFree !== null ? `, next free ${clock12(nextFree)}` : '')
+    const summary = drawn.summary.replace(/, earliest available [^,]*$/, '') + (nextFree !== null ? `, earliest available ${clock12(nextFree)}` : '')
     return { ...drawn, nextFree, summary }
-  }, [day, currentAppointmentId])
+  }, [day, currentAppointmentId, sharedRange])
 
   const nextFreeFrom = (minute: number) => getNextFreeSlotFrom(getState(), providerId, now, date, minute)
 
@@ -94,7 +97,7 @@ export function DoctorDayChart({
     setNotice({
       title: started ? 'This slot has started' : 'No slot at this time',
       text: started
-        ? `The ${formatTime(under.slot)} slot with ${name} has already started, so it can no longer be booked.`
+        ? `The ${formatTime(under.slot)} slot with ${name} has already started.`
         : `${name} has no slot that starts at ${time12(at)}.`,
       book: nextFreeFrom(at),
       profile: false,
@@ -138,6 +141,8 @@ export function DoctorDayChart({
     <div className="min-w-0">
       <DayTimeline
         model={model}
+        fit={Boolean(sharedRange)}
+        hideAxis={Boolean(sharedRange)}
         nextPatient={nextPatient ?? undefined}
         onSchedule={schedule}
         onBlocked={blocked}
@@ -182,7 +187,7 @@ export function DoctorDayChart({
       >
         <p className="text-sm text-ink">{notice?.text}</p>
         {notice && !notice.profile && !notice.book ? (
-          <p className="mt-2 text-sm text-ink-muted">{name} has no free time in the next two weeks.</p>
+          <p className="mt-2 text-sm text-ink-muted">{name} has no available slots in the coming two weeks.</p>
         ) : null}
       </Modal>
     </div>

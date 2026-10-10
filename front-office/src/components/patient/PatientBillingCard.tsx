@@ -1,4 +1,4 @@
-import { IndianRupee, Printer, Receipt } from 'lucide-react'
+import { IndianRupee, Printer, Receipt, X } from 'lucide-react'
 import { Card, CardHeader } from '../ui/Card'
 import { EmptyState } from '../ui/EmptyState'
 import { BillStatusBadge } from '../payment/BillStatusBadge'
@@ -18,7 +18,7 @@ import type { Payment } from '../../types/payment'
  * bed charges not yet billed — so the two never disagree. Care Entry takes no
  * money: the printed bill is what the patient takes to the billing counter.
  */
-export function PatientBillingCard({ patientId, due }: { patientId: string; due: number }) {
+export function PatientBillingCard({ patientId, due, onClose }: { patientId: string; due: number; onClose?: () => void }) {
   const all = useStoreValue(getBillsForPatient, patientId)
   // Bills still to pay come first; the rest stay newest first.
   const bills = [...all.filter(isPending), ...all.filter((bill) => !isPending(bill))]
@@ -26,17 +26,26 @@ export function PatientBillingCard({ patientId, due }: { patientId: string; due:
 
   return (
     <Card accentTone="stable">
-      <CardHeader icon={IndianRupee} iconTone="stable" title="Payment History" subtitle={bills.length ? `${bills.length} ${bills.length === 1 ? 'bill' : 'bills'}` : 'No bills yet'} />
+      <CardHeader
+        icon={IndianRupee}
+        iconTone="stable"
+        title="Payment History"
+        action={
+          onClose ? (
+            <button type="button" onClick={onClose} aria-label="Close payment history" title="Close" className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-ink-subtle hover:bg-surface-2 hover:text-ink">
+              <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+            </button>
+          ) : undefined
+        }
+      />
       <div className="grid grid-cols-1 gap-3 border-b border-border-soft px-4 py-4 sm:grid-cols-3 sm:px-5">
         <div className={cn('rounded-xl border px-4 py-3', due > 0 ? 'border-critical-fg/30 bg-critical-bg' : 'border-success-fg/30 bg-success-bg')}>
           <p className="text-xs font-medium text-ink-muted">Pending amount</p>
           <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', due > 0 ? 'text-critical-fg' : 'text-success-fg')}>{formatRupees(due)}</p>
-          <p className="text-xs text-ink-muted">{due > 0 ? 'Pending — the patient pays at the bill counter' : 'Nothing is pending'}</p>
         </div>
         <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
           <p className="text-xs font-medium text-ink-muted">Payment received</p>
           <p className="mt-0.5 text-2xl font-bold tabular-nums text-ink">{formatRupees(paid)}</p>
-          <p className="text-xs text-ink-muted">Across all bills</p>
         </div>
         <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
           <p className="text-xs font-medium text-ink-muted">Bills</p>
@@ -45,7 +54,7 @@ export function PatientBillingCard({ patientId, due }: { patientId: string; due:
         </div>
       </div>
       {bills.length === 0 ? (
-        <EmptyState icon={Receipt} title="No bills" description="Bills for this patient's visits and stays appear here." />
+        <EmptyState icon={Receipt} title="No bills" />
       ) : (
         <ul className="divide-y divide-border-soft" aria-label="Bills">
           {bills.map((bill) => (

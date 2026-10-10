@@ -73,15 +73,23 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
             />
           ) : null}
           <Fact label="Reason" value={admission.reason} />
-          <div className="min-w-0">
-            <dt className="text-xs text-ink-muted">Attendant</dt>
-            <dd className="truncate font-medium text-ink">
-              {admission.attendant.name} ({admission.attendant.relationship}) ·{' '}
-              <a href={`tel:${admission.attendant.phone.replace(/[^0-9+]/g, '')}`} className="focus-ring tap-reach rounded text-primary-text hover:underline">
-                {admission.attendant.phone}
-              </a>
-            </dd>
-          </div>
+          {/* The attendant is optional at admission: shown only with a name or a mobile. */}
+          {admission.attendant.name.trim() || admission.attendant.phone.trim() ? (
+            <div className="min-w-0">
+              <dt className="text-xs text-ink-muted">Attendant</dt>
+              <dd className="truncate font-medium text-ink">
+                {admission.attendant.name.trim() ? `${admission.attendant.name} (${admission.attendant.relationship})` : admission.attendant.relationship}
+                {admission.attendant.phone.trim() ? (
+                  <>
+                    {' · '}
+                    <a href={`tel:${admission.attendant.phone.replace(/[^0-9+]/g, '')}`} className="focus-ring tap-reach rounded text-primary-text hover:underline">
+                      {admission.attendant.phone}
+                    </a>
+                  </>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
         </dl>
         <div className="-mb-1 flex justify-end">
           <Button size="xs" variant="ghost" onClick={() => setCancelling(true)}>
@@ -95,7 +103,7 @@ export function CurrentAdmissionCard({ admission, now }: { admission: Admission;
         open={cancelling}
         onClose={() => setCancelling(false)}
         title="Cancel this admission"
-        description={admitted ? 'The bed is freed. A paid deposit stays on the bill for a refund.' : 'The request is withdrawn.'}
+        description={admitted ? 'The bed becomes available. A paid deposit stays on the bill for a refund.' : 'The request is withdrawn.'}
       >
         <form onSubmit={handleCancel} className="flex flex-col gap-3">
           {error ? <Alert tone="critical">{error}</Alert> : null}

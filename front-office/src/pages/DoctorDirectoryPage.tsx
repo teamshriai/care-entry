@@ -10,7 +10,10 @@ import { DoctorSlotCard } from '../components/clinician/DoctorSlotCard'
 import { useStoreValue } from '../hooks/useStore'
 import { useNow } from '../hooks/useNow'
 import { useFlow } from '../flows/useFlow'
-import { getDirectorySuggestions, getDoctorRows, getToday } from '../domain/selectors'
+import { addDaysToKey, compareDepartments, getDirectorySuggestions, getDoctorRows, getToday } from '../domain/selectors'
+import { getDoctorsDateStrip, getDoctorsDayRange } from '../domain/doctorDaySelectors'
+import { DayTimelineAxis } from '../components/dayTimeline/DayTimeline'
+import { dayStartTimestamp } from '../domain/time'
 import type { DoctorSuggestion } from '../domain/selectors'
 import { departmentIcon, departmentTone } from '../utils/departments'
 import { TONE_HEX } from '../utils/toneHex'
@@ -22,6 +25,14 @@ const AVAILABILITY_FILTERS = ['All', 'Bookable now', 'Available', 'Fully booked'
 type AvailabilityFilter = (typeof AVAILABILITY_FILTERS)[number]
 
 const ALL = 'All specialities'
+
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+/** Minutes after midnight, for the shared axis's Now label. */
+function minutesOfDay(timestamp: number): number {
+  const d = new Date(timestamp)
+  return d.getHours() * 60 + d.getMinutes()
+}
 
 function matchesAvailability(row: DoctorRow | undefined, filter: AvailabilityFilter): boolean {
   if (filter === 'All') return true
@@ -74,13 +85,20 @@ export function DoctorDirectoryPage() {
       list.push(doctor)
       map.set(doctor.provider.department, list)
     }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    return [...map.entries()].sort((a, b) => compareDepartments(a[0], b[0]))
   }, [matching])
 
-  const departments = useMemo(() => [...new Set(doctors.map((d) => d.provider.department))].sort(), [doctors])
+  const departments = useMemo(() => [...new Set(doctors.map((d) => d.provider.department))].sort(compareDepartments), [doctors])
   const shown = speciality === ALL ? groups : groups.filter(([department]) => department === speciality)
   const shownCount = shown.reduce((sum, [, list]) => sum + list.length, 0)
   const countOf = (department: string) => groups.find(([d]) => d === department)?.[1].length ?? 0
+
+  // One day and one time axis for every doctor shown, pinned while the doctors scroll under it.
+  const shownIds = useMemo(() => shown.flatMap(([, list]) => list.map((d) => d.provider.providerId)), [shown])
+  const [dayChoice, setDayChoice] = useState<string | null>(null)
+  const days = useStoreValue(getDoctorsDateStrip, shownIds, now)
+  const day = dayChoice ?? days.find((d) => d.open > 0)?.date ?? today
+  const range = useStoreValue(getDoctorsDayRange, shownIds, now, day)
 
   function book(providerId: string, date: string, slot: string) {
     openFlow('schedule', { doctor: providerId, date, slot })
@@ -90,7 +108,6 @@ export function DoctorDirectoryPage() {
     <div>
       <PageHeader
         title="Doctors"
-        subtitle="Every doctor's day, by speciality. Tap free time on a doctor's chart to book it for a patient."
         illustration={<DoctorIllustration className="h-8 w-8" />}
         illustrationTone="indigo"
         actions={
@@ -158,11 +175,57 @@ export function DoctorDirectoryPage() {
         {shownCount} of {doctors.length} doctors{speciality === ALL ? '' : ` · ${speciality}`}
       </p>
 
+      {/* The date and the time axis stay put; only the doctors' rows scroll under them. */}
+      {shownIds.length > 0 ? (
+        <div className="sticky top-0 z-20 mt-2 flex flex-col gap-1 rounded-xl border border-border-soft bg-surface-1 pb-1 pt-2 shadow-card-sm">
+          <div className="scrollbar-hide scroll-fade-x flex gap-1.5 overflow-x-auto overflow-y-hidden px-3.5 py-1 sm:px-4" role="group" aria-label="Day">
+            {days.map((d) => {
+              const active = d.date === day
+              const dt = new Date(dayStartTimestamp(d.date))
+              const label = d.date === today ? 'Today' : d.date === addDaysToKey(today, 1) ? 'Tmrw' : `${WEEKDAY_SHORT[dt.getDay()]} ${dt.getDate()}`
+              return (
+                <button
+                  key={d.date}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={`${label === 'Tmrw' ? 'Tomorrow' : label}, ${d.open} open times`}
+                  onClick={() => setDayChoice(d.date)}
+                  className={cn(
+                    'focus-ring tap-reach inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-semibold transition-colors',
+                    active
+                      ? 'border-ink bg-ink text-surface-1'
+                      : d.open > 0
+                        ? 'border-border-soft bg-surface-1 text-ink hover:border-border-strong'
+                        : 'border-transparent bg-surface-2 text-ink-subtle hover:border-border-soft',
+                  )}
+                >
+                  {label}
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 text-2xs font-semibold tabular-nums',
+                      active ? 'bg-surface-1/20' : d.open > 0 ? 'bg-[color-mix(in_oklab,var(--color-hue-blue)_14%,var(--color-surface-1))] text-[color-mix(in_oklab,var(--color-hue-blue)_var(--tone-ink-amount),var(--tone-ink-mix))]' : '',
+                    )}
+                  >
+                    {d.open > 0 ? d.open : 'Full'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          {/* Lined up with the charts inside the cards: this bar's border stands in for theirs. */}
+          <div className="@container">
+            <div className="px-3.5 sm:px-4 @3xl:pl-[calc(18rem+1rem)]">
+              <DayTimelineAxis range={range} now={day === today ? minutesOfDay(now) : null} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* One section per speciality. */}
-      <div className="mt-2 flex flex-col gap-6">
+      <div className="mt-3 flex flex-col gap-6">
         {shown.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border-soft px-4 py-10 text-center text-sm text-ink-subtle">
-            No doctors match — try another search or filter.
+            No doctors match
           </p>
         ) : (
           shown.map(([department, list]) => {
@@ -192,6 +255,8 @@ export function DoctorDirectoryPage() {
                         selectedSlot={null}
                         onPick={book}
                         onOpen={(providerId) => navigate(`/doctors/${providerId}`)}
+                        sharedDay={day}
+                        sharedRange={range}
                         wide
                       />
                     </li>

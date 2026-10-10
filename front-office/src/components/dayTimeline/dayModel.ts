@@ -94,6 +94,8 @@ export interface DayInput {
   openings?: Span[]
   /** Working hours. Defaults to WORK, or none on a Sunday; pass [] for a day on leave. */
   work?: Span[]
+  /** The hours to draw, fixed — so several doctors' rows share one time axis. */
+  range?: Span
 }
 
 export interface TimelineItem {
@@ -190,7 +192,7 @@ export function dayModel(day: DayInput): DayModel {
   const edges = [...sessions.map((o) => o.span), ...[...outside.map((o) => o.span), ...openings, ...(day.work ?? []), ...partBlocks].filter(([, b]) => b > over)]
   const from = hull ? Math.floor(hull[0] / 30) * 30 : START
   const to = hull ? Math.ceil(hull[1] / 30) * 30 : END
-  const range: Span = [
+  const range: Span = day.range ?? [
     Math.max(0, Math.min(from, ...edges.map(([a]) => Math.floor(a / 30) * 30))),
     Math.min(24 * 60, Math.max(to, ...edges.map(([, b]) => Math.ceil(b / 30) * 30))),
   ]
@@ -272,11 +274,11 @@ export function dayModel(day: DayInput): DayModel {
   const nextFree = open[0]?.start ?? null
   const booked = bookings.length
   const summary = [
-    `${date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}: busy ${durationSpoken(busyMin)}, free ${durationSpoken(freeMin)}`,
+    `${date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}: busy ${durationSpoken(busyMin)}, available ${durationSpoken(freeMin)}`,
     breakMin ? `break ${durationSpoken(breakMin)}` : '',
     blockedMin ? `blocked ${durationSpoken(blockedMin)}` : '',
     booked ? `${booked} patient${booked === 1 ? '' : 's'} booked` : '',
-    nextFree !== null ? `next free ${clock12(nextFree)}` : '',
+    nextFree !== null ? `earliest available ${clock12(nextFree)}` : '',
   ]
     .filter(Boolean)
     .join(', ')
@@ -291,7 +293,7 @@ export function hourLine(c: HourCell) {
     c.busyMin === whole ? 'busy' : c.busyMin && `${c.busyMin} min busy`,
     c.blockedMin === whole ? 'blocked' : c.blockedMin && `${c.blockedMin} min blocked`,
     c.breakMin === whole ? 'break' : c.breakMin && `${c.breakMin} min break`,
-    c.freeMin === whole ? 'free' : c.freeMin && `${c.freeMin} min free`,
+    c.freeMin === whole ? 'available' : c.freeMin && `${c.freeMin} min available`,
   ].filter(Boolean)
   const who = c.bookings ? ` · ${c.bookings} patient${c.bookings === 1 ? '' : 's'}` : ''
   return `${span12(c.start, c.end)} · ${parts.join(', ')}${c.titles.length ? ` · ${c.titles.join(', ')}` : ''}${who}`

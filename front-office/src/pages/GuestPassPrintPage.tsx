@@ -54,7 +54,7 @@ export function GuestPassPrintPage() {
       <Card accentTone="brand" className="w-full max-w-md">
         {!pass ? (
           <CardBody>
-            <EmptyState icon={IdCard} title="No such pass" description="Every pass is listed on the Guest Pass page." />
+            <EmptyState icon={IdCard} title="No such pass" />
           </CardBody>
         ) : (
           <CardBody className="flex flex-col gap-4">

@@ -8,6 +8,7 @@ import { useStoreValue } from '../../hooks/useStore'
 import { findAbhaHolder, getConnectivity } from '../../domain/selectors'
 import { linkAbha, updatePatientDemographics } from '../../domain/actions'
 import { toEditableMobile } from '../../utils/phone'
+import { revealFirstInvalid } from '../../utils/revealInvalid'
 import { abhaError, addressError, ageError, ageNeedsConfirmation, emailError, mobileError, nameError, nextAgeInput, nextNameInput } from '../../utils/validation'
 import { cn } from '../../utils/cn'
 import { AgeConfirm, FieldError } from './AgeConfirm'
@@ -72,7 +73,12 @@ export function PatientDetailsStrip({ patient }: { patient: Patient }) {
 
   function save(event: React.FormEvent) {
     event.preventDefault()
-    if (!draft || !draftReady) return
+    if (!draft) return
+    // Save stays clickable: with something wrong it goes to the first marked field.
+    if (!draftReady) {
+      revealFirstInvalid()
+      return
+    }
     try {
       updatePatientDemographics(patient.patientId, draft)
       notify('Details updated', { detail: patient.uhid })
@@ -128,7 +134,7 @@ export function PatientDetailsStrip({ patient }: { patient: Patient }) {
                 className={cn(inputClass, (draftErrors.age || needsAgeConfirm) && errorClass)}
                 placeholder="Age 0–130"
                 aria-label="Age in years, 0 to 130"
-                aria-invalid={Boolean(draftErrors.age)}
+                aria-invalid={Boolean(draftErrors.age) || (needsAgeConfirm && !draft.ageConfirmed)}
                 inputMode="numeric"
                 maxLength={3}
               />
@@ -158,7 +164,7 @@ export function PatientDetailsStrip({ patient }: { patient: Patient }) {
             <FieldError message={draftErrors.address} />
           </div>
           <div className="flex gap-2 sm:col-span-2">
-            <Button type="submit" size="sm" disabled={!draftReady}>
+            <Button type="submit" size="sm">
               Save
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setDraft(null)}>
