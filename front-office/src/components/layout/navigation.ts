@@ -6,7 +6,6 @@ import {
   IndianRupee,
   LayoutGrid,
   Receipt,
-  Stethoscope,
   Users,
 } from 'lucide-react'
 import type { IconTone } from '../../utils/toneHex'
@@ -41,8 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
       // One place for patients — everyone, outpatients and inpatients are its
       // tabs, and a patient's profile lives under it too.
       { label: 'Patients', path: '/patients', icon: Users, hue: 'teal', description: 'Everyone, outpatients and inpatients' },
-      { label: 'Payment Status', path: '/billing', icon: IndianRupee, hue: 'amber', description: 'Whether each patient’s bill is pending or paid at the bill counter' },
-      { label: 'Doctors', path: '/doctors', icon: Stethoscope, hue: 'green', description: 'Directory, schedules and leave' },
+      { label: 'Payments', path: '/billing', icon: IndianRupee, hue: 'amber', description: 'Whether each patient’s bill is pending or paid at the billing counter' },
       { label: 'Activity & Analytics', path: '/activity-analytics', icon: ChartNoAxesCombined, hue: 'violet', description: 'Desk activity, trends and performance' },
     ],
   },
@@ -74,7 +72,7 @@ const ROUTE_TITLES: [string, string][] = [
   ['/doctors/register', 'Register Doctor'],
   ['/doctors/', 'Doctor profile'],
   ['/doctors', 'Doctors'],
-  ['/billing', 'Payment Status'],
+  ['/billing', 'Payments'],
   ['/payments/', 'Bill'],
   ['/activity-analytics', 'Activity & Analytics'],
   ['/services/guest-pass/print', 'Print Guest Pass'],

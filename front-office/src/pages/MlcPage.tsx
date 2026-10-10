@@ -16,7 +16,9 @@ import { todayKey } from '../domain/time'
 import { formatRelativeTime, formatClock } from '../utils/format'
 import { cn } from '../utils/cn'
 import type { MlcCategory } from '../types/frontDesk'
-import { inputClass } from '../utils/formClasses'
+import { errorClass, errorWithinClass, inputClass } from '../utils/formClasses'
+import { revealFirstInvalid } from '../utils/revealInvalid'
+import { FieldError } from '../components/patient/AgeConfirm'
 
 const CATEGORIES: MlcCategory[] = ['Road traffic accident', 'Assault', 'Poisoning', 'Burns', 'Suicide attempt', 'Other']
 const BROUGHT_BY = ['Police', 'Relative', 'Bystander', 'Ambulance']
@@ -34,14 +36,24 @@ export function MlcPage() {
   const [policeStation, setPoliceStation] = useState('')
   const [incidentAt, setIncidentAt] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // The submit stays clickable: tried with something missing, it marks each such field.
+  const [attempted, setAttempted] = useState(false)
+  const problem = {
+    patient: patient ? null : 'Choose the patient.',
+    category: category ? null : 'Choose the MLC category.',
+    policeStation: policeStation.trim() ? null : 'Enter the police station.',
+  }
+  const shown = (key: keyof typeof problem) => (attempted ? problem[key] : null)
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+    if (!patient || !category || !policeStation.trim()) {
+      setAttempted(true)
+      revealFirstInvalid()
+      return
+    }
     try {
-      // The submit button is disabled without a patient/category, so both
-      // fallbacks below only satisfy the type and fail the same validation
-      // an empty value would at runtime.
       const record = registerMlc({
         patientId: patient?.patientId ?? '',
         category: category || 'Other',
@@ -54,6 +66,7 @@ export function MlcPage() {
       setCategory('')
       setPoliceStation('')
       setIncidentAt('')
+      setAttempted(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       setError(message)
@@ -72,10 +85,7 @@ export function MlcPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Medico-Legal Case Registration"
-        subtitle="An MLC is always recorded against a patient. Police intimation is captured and acknowledged — never assumed."
-      />
+      <PageHeader title="Medico-Legal Case Registration" />
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[380px_minmax(0,1fr)] mt-4 sm:mt-5">
         <Card accentTone="warning" className="min-w-0">
@@ -88,23 +98,21 @@ export function MlcPage() {
                 <p className="mb-1.5 text-xs font-medium text-ink-muted">
                   Patient <span className="text-critical-fg">*</span>
                 </p>
-                <PatientPickField
-                  patient={patient}
-                  onChange={(next) => setPatientId(next.patientId)}
-                  placeholder="Search the patient — register them first if new"
-                />
-                {!patient ? (
-                  <p className="mt-1.5 text-xs text-ink-muted">
-                    An MLC is always bound to a patient record — identity may still be pending.
-                  </p>
-                ) : null}
+                <div data-invalid={shown('patient') ? 'true' : undefined} className={cn(shown('patient') && errorWithinClass)}>
+                  <PatientPickField
+                    patient={patient}
+                    onChange={(next) => setPatientId(next.patientId)}
+                    placeholder="Search for the patient"
+                  />
+                </div>
+                <FieldError message={shown('patient')} />
               </div>
 
               <div>
                 <label className="text-xs font-medium text-ink-muted">
                   MLC category <span className="text-critical-fg">*</span>
                 </label>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <div data-invalid={shown('category') ? 'true' : undefined} className="mt-1.5 flex flex-wrap gap-1.5">
                   {CATEGORIES.map((option) => (
                     <button
                       key={option}
@@ -114,13 +122,16 @@ export function MlcPage() {
                         'focus-ring min-h-11 rounded-full border px-3.5 text-sm font-medium transition-colors',
                         category === option
                           ? 'border-primary-600 bg-primary-600 text-on-primary'
-                          : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
+                          : shown('category')
+                            ? 'border-critical-fg/50 bg-surface-1 text-ink hover:bg-surface-2'
+                            : 'border-border bg-surface-1 text-ink hover:bg-surface-2',
                       )}
                     >
                       {option}
                     </button>
                   ))}
                 </div>
+                <FieldError message={shown('category')} />
               </div>
 
               <div>
@@ -153,9 +164,11 @@ export function MlcPage() {
                 <input
                   value={policeStation}
                   onChange={(event) => setPoliceStation(event.target.value)}
-                  placeholder="Jurisdiction station"
-                  className={cn(inputClass, 'mt-1.5')}
+                  placeholder="Station with jurisdiction"
+                  aria-invalid={Boolean(shown('policeStation'))}
+                  className={cn(inputClass, 'mt-1.5', shown('policeStation') && errorClass)}
                 />
+                <FieldError message={shown('policeStation')} />
               </div>
 
               <div>
@@ -168,12 +181,9 @@ export function MlcPage() {
                 />
               </div>
 
-              <Button type="submit" disabled={!patient || !category || !policeStation.trim()}>
+              <Button type="submit">
                 Allocate MLC number
               </Button>
-              <p className="text-xs text-ink-subtle">
-                Records are retained for 10 years, which overrides erasure requests.
-              </p>
             </form>
           </CardBody>
         </Card>
@@ -181,15 +191,10 @@ export function MlcPage() {
         <Card accentTone="warning" className="min-w-0">
           <CardHeader
             title="MLC register"
-            subtitle="Every case and its police intimation status, newest first"
             action={<span className="text-xs tabular-nums text-ink-subtle">{records.length}</span>}
           />
           {records.length === 0 ? (
-            <EmptyState
-              icon={FileWarning}
-              title="No MLC records"
-              description="Registered medico-legal cases appear here with their police intimation status."
-            />
+            <EmptyState icon={FileWarning} title="No MLC records" />
           ) : (
             <div className="divide-y divide-border-soft">
               {records.map((record) => (

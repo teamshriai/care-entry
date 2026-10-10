@@ -34,9 +34,9 @@ export function DateStrip({
         const isSelected = day.date === selected
         const date = new Date(dayStartTimestamp(day.date))
         const top = day.date === today ? 'Today' : day.date === tomorrow ? 'Tmrw' : WEEKDAY[date.getDay()]
-        const bottom = day.state === 'open' ? `${day.open} free` : day.state === 'full' ? 'Full' : day.state === 'leave' ? 'Leave' : 'Off'
+        const bottom = day.state === 'open' ? `${day.open} open` : day.state === 'full' ? 'Full' : day.state === 'leave' ? 'Leave' : 'Off'
         const spoken = `${day.date === today ? 'Today, ' : day.date === tomorrow ? 'Tomorrow, ' : ''}${WEEKDAY[date.getDay()]} ${date.getDate()} ${MONTH[date.getMonth()]} — ${
-          day.state === 'open' ? `${day.open} free ${day.open === 1 ? 'time' : 'times'}` : day.state === 'full' ? 'fully booked' : day.state === 'leave' ? 'doctor on leave' : 'not working'
+          day.state === 'open' ? `${day.open} available ${day.open === 1 ? 'slot' : 'slots'}` : day.state === 'full' ? 'fully booked' : day.state === 'leave' ? 'doctor on leave' : 'not working'
         }`
         return (
           <button

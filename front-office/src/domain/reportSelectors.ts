@@ -34,8 +34,8 @@ export const ACTIVITY_TYPES: ActivityTypeInfo[] = [
   { type: 'APPOINTMENT_SCHEDULED', label: 'Appointment Scheduled', event: 'Appointment Scheduled', hue: 'blue' },
   { type: 'PATIENT_CHECKED_IN', label: 'Patient Checked In', event: 'Patient Checked In', hue: 'orange' },
   { type: 'GUEST_PASS_ISSUED', label: 'Guest Pass Issued', event: 'Guest Pass Issued', hue: 'indigo' },
-  { type: 'PATIENT_ADMITTED', label: 'Admission', event: 'Admission', hue: 'violet' },
-  { type: 'PATIENT_DISCHARGED', label: 'Discharge', event: 'Discharge', hue: 'pink' },
+  { type: 'PATIENT_ADMITTED', label: 'Admission', event: 'Patient Admitted', hue: 'violet' },
+  { type: 'PATIENT_DISCHARGED', label: 'Discharge', event: 'Patient Discharged', hue: 'pink' },
   { type: 'PAYMENT_COMPLETED', label: 'Payment Received', event: 'Payment Received', hue: 'green' },
 ]
 

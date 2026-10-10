@@ -22,7 +22,6 @@ import {
   getActivityEvents,
   rangeFor,
   summarize,
-  trendInsight,
   trendScaleFor,
 } from '../domain/reportSelectors'
 import type { ActivityEvent, ActivityType, ReportPeriod, ReportRange } from '../domain/reportSelectors'
@@ -85,9 +84,6 @@ export function ActivityAnalyticsPage() {
   const scale = trendScaleFor(period, range)
   const trend = activityTrend(filtered, range, scale, now, period === 'week')
   const perUnit = scale === 'hour' ? 'per hour' : 'per day'
-  const insight = trendInsight(trend, scale === 'hour' && range.to === today)
-  const unitWord = scale === 'hour' ? 'hour' : 'day'
-  const list = (labels: string[]) => (labels.length > 3 ? `${labels.slice(0, 3).join(', ')} and ${labels.length - 3} more` : labels.join(' and '))
 
   const multiDay = range.from !== range.to
   const rows = filtered.slice(0, RECENT_ROWS)
@@ -110,7 +106,7 @@ export function ActivityAnalyticsPage() {
 
   return (
     <div>
-      <PageHeader title="Activity & Analytics" subtitle="View Front Office activity, operational trends, and performance insights." />
+      <PageHeader title="Activity & Analytics" />
 
       <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         {/* Filters */}
@@ -189,7 +185,7 @@ export function ActivityAnalyticsPage() {
           <StatCard
             selected={selected === 'PATIENT_REGISTERED'}
             onSelect={() => setSelected('PATIENT_REGISTERED')}
-            trend={sparkOf('PATIENT_REGISTERED')} hue="teal" icon={UserPlus} value={counts.PATIENT_REGISTERED} label="Patients Registered" hint="New UHIDs created" />
+            trend={sparkOf('PATIENT_REGISTERED')} hue="teal" icon={UserPlus} value={counts.PATIENT_REGISTERED} label="Patients Registered" />
           <StatCard
             selected={selected === 'APPOINTMENT_SCHEDULED'}
             onSelect={() => setSelected('APPOINTMENT_SCHEDULED')}
@@ -198,24 +194,24 @@ export function ActivityAnalyticsPage() {
             icon={CalendarPlus}
             value={counts.APPOINTMENT_SCHEDULED}
             label="Appointments Scheduled"
-            hint={cancelledBookings ? `${cancelledBookings} later cancelled` : 'Bookings made'}
+            hint={cancelledBookings ? `${cancelledBookings} later cancelled` : undefined}
           />
           <StatCard
             selected={selected === 'PATIENT_CHECKED_IN'}
             onSelect={() => setSelected('PATIENT_CHECKED_IN')}
-            trend={sparkOf('PATIENT_CHECKED_IN')} hue="orange" icon={UserCheck} value={counts.PATIENT_CHECKED_IN} label="Patients Checked In" hint="Arrivals at the desk" />
+            trend={sparkOf('PATIENT_CHECKED_IN')} hue="orange" icon={UserCheck} value={counts.PATIENT_CHECKED_IN} label="Patients Checked In" />
           <StatCard
             selected={selected === 'GUEST_PASS_ISSUED'}
             onSelect={() => setSelected('GUEST_PASS_ISSUED')}
-            trend={sparkOf('GUEST_PASS_ISSUED')} hue="indigo" icon={IdCard} value={counts.GUEST_PASS_ISSUED} label="Guest Passes Issued" hint="Visitors, doctors, staff" />
+            trend={sparkOf('GUEST_PASS_ISSUED')} hue="indigo" icon={IdCard} value={counts.GUEST_PASS_ISSUED} label="Guest Passes Issued" />
           <StatCard
             selected={selected === 'PATIENT_ADMITTED'}
             onSelect={() => setSelected('PATIENT_ADMITTED')}
-            trend={sparkOf('PATIENT_ADMITTED')} hue="violet" icon={BedDouble} value={counts.PATIENT_ADMITTED} label="Admissions" hint="Patients admitted" />
+            trend={sparkOf('PATIENT_ADMITTED')} hue="violet" icon={BedDouble} value={counts.PATIENT_ADMITTED} label="Admissions" />
           <StatCard
             selected={selected === 'PATIENT_DISCHARGED'}
             onSelect={() => setSelected('PATIENT_DISCHARGED')}
-            trend={sparkOf('PATIENT_DISCHARGED')} hue="pink" icon={LogOut} value={counts.PATIENT_DISCHARGED} label="Discharges" hint="Patients discharged" />
+            trend={sparkOf('PATIENT_DISCHARGED')} hue="pink" icon={LogOut} value={counts.PATIENT_DISCHARGED} label="Discharges" />
           <StatCard
             selected={selected === 'PAYMENT_STATUS'}
             onSelect={() => setSelected('PAYMENT_STATUS')}
@@ -235,20 +231,16 @@ export function ActivityAnalyticsPage() {
         {/* The records behind the chosen card */}
         {selected === 'PAYMENT_STATUS' ? (
           <Card accentTone="stable">
-            <CardHeader icon={IndianRupee} iconTone="stable" title="Payment Status" subtitle="All bills to date — totals only; which patient owes what is on the Payment Status page" />
+            <CardHeader icon={IndianRupee} iconTone="stable" title="Payment Status" />
             <div className="flex flex-col gap-3 p-4 sm:p-5">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                <StatCard hue="blue" icon={ReceiptText} value={payments.totalBills} label="Total Bills" hint="Bills raised so far" />
-                <StatCard hue="indigo" icon={IndianRupee} value={formatRupees(payments.billedAmount)} label="Total Billed" hint="Value of all bills" />
-                <StatCard hue="green" icon={IndianRupee} value={formatRupees(payments.receivedAmount)} label="Payment Received" hint="Paid at the bill counter" />
-                <StatCard hue="orange" icon={IndianRupee} value={formatRupees(payments.pendingAmount)} label="Pending Amount" hint="Total − received" />
-                <StatCard hue="teal" icon={ReceiptText} value={payments.paidBills} label="Paid Bills" hint="Nothing left to pay" />
-                <StatCard hue="red" icon={ReceiptText} value={payments.pendingBills} label="Pending Bills" hint="Some amount still unpaid" />
+                <StatCard hue="blue" icon={ReceiptText} value={payments.totalBills} label="Total Bills" />
+                <StatCard hue="indigo" icon={IndianRupee} value={formatRupees(payments.billedAmount)} label="Total Billed" />
+                <StatCard hue="green" icon={IndianRupee} value={formatRupees(payments.receivedAmount)} label="Payment Received" />
+                <StatCard hue="orange" icon={IndianRupee} value={formatRupees(payments.pendingAmount)} label="Pending Amount" />
+                <StatCard hue="teal" icon={ReceiptText} value={payments.paidBills} label="Paid Bills" />
+                <StatCard hue="red" icon={ReceiptText} value={payments.pendingBills} label="Pending Bills" />
               </div>
-              <p className="text-xs text-ink-muted">
-                <span className="font-semibold text-ink">Paid</span> = nothing left to pay · <span className="font-semibold text-ink">Pending</span> = some amount still unpaid (a part-paid bill is
-                pending) · Total Billed = Payment Received + Pending Amount, and Paid Bills + Pending Bills = Total Bills.
-              </p>
             </div>
           </Card>
         ) : (
@@ -268,33 +260,19 @@ export function ActivityAnalyticsPage() {
               {filtered.length === 0 ? (
                 <NoActivity />
               ) : (
-                <>
-                  <TrendLineChart
-                    points={trend}
-                    color={trendColor}
-                    ariaLabel={`${typeLabel} ${perUnit}, ${rangeLabel(range)}`}
-                    xTitle={scale === 'hour' ? 'Hour of the day' : period === 'week' ? 'Day' : 'Date'}
-                    yTitle={activityType === 'ALL' ? 'Number of activities' : `Number of ${typeLabel.toLowerCase()}`}
-                  />
-                  <div className="mt-3 flex flex-col gap-1.5 rounded-xl border border-[color-mix(in_oklab,var(--color-hue-violet)_20%,var(--color-border-soft))] bg-[linear-gradient(135deg,color-mix(in_oklab,var(--color-hue-violet)_9%,var(--color-surface-1)),color-mix(in_oklab,var(--color-hue-blue)_5%,var(--color-surface-1)))] px-4 py-3 text-sm text-ink-muted">
-                    <p>
-                      <span className="font-semibold text-ink">How to read this:</span> each dot is how many {typeLabel === 'All activities' ? 'activities (registrations, bookings, check-ins, passes, admissions, discharges together)' : typeLabel.toLowerCase()} were recorded in that {unitWord}. The higher the dot, the busier the desk.
-                    </p>
-                    <p>
-                      <span className="font-semibold text-ink">Busiest {unitWord}:</span> {list(insight.busiest)} with {insight.busiestValue}
-                      {' · '}
-                      <span className="font-semibold text-ink">Quietest:</span> {list(insight.quietest)} with {insight.quietestValue}
-                      {' · '}
-                      <span className="font-semibold text-ink">Average:</span> {insight.average} per {unitWord}
-                    </p>
-                  </div>
-                </>
+                <TrendLineChart
+                  points={trend}
+                  color={trendColor}
+                  ariaLabel={`${typeLabel} ${perUnit}, ${rangeLabel(range)}`}
+                  xTitle={scale === 'hour' ? 'Hour of the day' : period === 'week' ? 'Day' : 'Date'}
+                  yTitle={activityType === 'ALL' ? 'Number of activities' : `Number of ${typeLabel.toLowerCase()}`}
+                />
               )}
             </div>
           </Card>
 
           <Card className="min-w-0" accentTone="brand">
-            <CardHeader icon={ListChecks} iconTone="brand" title="Activity Breakdown" subtitle="What the front office did most in this period" />
+            <CardHeader icon={ListChecks} iconTone="brand" title="Activity Breakdown" />
             <div className="px-4 pb-5 pt-4 sm:px-5">
               {summary.total === 0 ? (
                 <NoActivity />
@@ -335,7 +313,7 @@ export function ActivityAnalyticsPage() {
               />
               {filtered.length > rows.length ? (
                 <p className="border-t border-border-soft px-5 py-3 text-xs text-ink-muted">
-                  Showing the latest {rows.length} of {filtered.length} — choose a shorter period or one activity to narrow it down.
+                  Showing the latest {rows.length} of {filtered.length}
                 </p>
               ) : null}
             </>
@@ -386,5 +364,5 @@ function activityColumns(withDate: boolean): Column<ActivityEvent>[] {
 }
 
 function NoActivity() {
-  return <EmptyState icon={Activity} title="No activity found" description="There are no recorded activities for the selected period." />
+  return <EmptyState icon={Activity} title="No activity found" />
 }

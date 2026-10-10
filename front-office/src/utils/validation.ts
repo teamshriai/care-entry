@@ -67,6 +67,12 @@ export function mobileError(value: string | null | undefined): string | null {
   return isValidMobile(value) ? null : MOBILE_ERROR
 }
 
+/** A mobile that is already wrong while it is still being typed — it starts
+ *  with 0–5 — so the field can say so at once instead of waiting for blur. */
+export function mobileEarlyError(value: string | null | undefined): string | null {
+  return /^[0-5]/.test((value ?? '').replace(/\D/g, '')) ? MOBILE_ERROR : null
+}
+
 /** ABHA is optional; when given it is an address or a 14-digit number. */
 export function abhaError(value: string | null | undefined): string | null {
   const text = (value ?? '').trim()

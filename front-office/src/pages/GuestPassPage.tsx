@@ -15,11 +15,13 @@ import { getDepartments, getPatientById, getProviders } from '../domain/selector
 import { getCurrentAdmissionForPatient } from '../domain/patientSelectors'
 import { issueGuestPass } from '../domain/actions'
 import { isValidMobile } from '../utils/phone'
-import { nameError, nextNameInput } from '../utils/validation'
+import { mobileEarlyError, mobileError, nameError, nextNameInput } from '../utils/validation'
+import { revealFirstInvalid } from '../utils/revealInvalid'
+import { FieldError } from '../components/patient/AgeConfirm'
 import { cn } from '../utils/cn'
 import { GUEST_PASS_TYPES } from '../types/frontDesk'
 import type { GuestPassType } from '../types/frontDesk'
-import { inputClass } from '../utils/formClasses'
+import { errorClass, errorWithinClass, inputClass } from '../utils/formClasses'
 
 const RELATIONSHIPS = ['Spouse', 'Son', 'Daughter', 'Parent', 'Sibling', 'Other relative', 'Friend']
 const STAFF_ROLES = ['Staff without ID card', 'Trainee', 'Vendor', 'Contractor']
@@ -30,12 +32,6 @@ const TYPE_ICON: Record<GuestPassType, typeof Users> = {
   'Patient visitor': Users,
   'Visiting doctor': Stethoscope,
   'Staff / service': Wrench,
-}
-
-const TYPE_HINT: Record<GuestPassType, string> = {
-  'Patient visitor': 'For an admitted patient’s visitor — confirmed with the patient or their attendant.',
-  'Visiting doctor': 'For a doctor from outside — confirmed with the hospital doctor they are here to see.',
-  'Staff / service': 'For staff without an ID card, vendors and contractors — confirmed with whoever authorised them.',
 }
 
 
@@ -68,6 +64,8 @@ export function GuestPassPage() {
   const [verifiedWith, setVerifiedWith] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Print stays clickable: tried with something missing or wrong, it marks each such field.
+  const [attempted, setAttempted] = useState(false)
 
   const host = providers.find((p) => p.providerId === hostProviderId) ?? null
 
@@ -87,6 +85,24 @@ export function GuestPassPage() {
         ? Boolean(host && purpose.trim())
         : Boolean(area && relationship && purpose.trim() && verifiedWith.trim()))
 
+  const visitor = type === 'Patient visitor'
+  const doctorVisit = type === 'Visiting doctor'
+  const problem = {
+    patient: visitor && !(patient && stay?.status === 'Admitted') ? (patient ? 'This patient is not admitted — choose an admitted patient.' : 'Choose the admitted patient being visited.') : null,
+    relationship: !doctorVisit && !relationship ? (visitor ? 'Choose the relationship to the patient.' : 'Choose the role.') : null,
+    host: doctorVisit && !host ? 'Choose the hospital doctor they are visiting.' : null,
+    area: !visitor && !doctorVisit && !area ? 'Choose the department or area.' : null,
+    purpose: !visitor && !purpose.trim() ? 'Enter the purpose of the visit.' : null,
+    name: holderName.trim() ? nameError(holderName) : type === 'Visiting doctor' ? 'Enter the visiting doctor’s name.' : 'Enter the pass holder’s name.',
+    mobile: mobileError(holderMobile),
+    id: !idType ? 'Choose the kind of ID seen.' : !/^[A-Za-z0-9]{4}$/.test(idLast4) ? 'Enter the last 4 characters of the ID.' : null,
+    verifiedWith: !doctorVisit && !verifiedWith.trim() ? (visitor ? 'Enter who confirmed the visit.' : 'Enter who authorised the visit.') : null,
+    confirmed: confirmed ? null : 'Tick to confirm you have seen the ID and confirmed the visit.',
+  }
+  const shown = (key: keyof typeof problem) => (attempted ? problem[key] : null)
+  // A mobile starting 0–5 is wrong already, so it is flagged while still being typed.
+  const mobileShown = shown('mobile') ?? mobileEarlyError(holderMobile)
+
   function reset(nextType: GuestPassType) {
     setType(nextType)
     setPatientId('')
@@ -97,11 +113,17 @@ export function GuestPassPage() {
     setVerifiedWith('')
     setConfirmed(false)
     setError(null)
+    setAttempted(false)
   }
 
   function handlePrint(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    if (!ready) {
+      setAttempted(true)
+      revealFirstInvalid()
+      return
+    }
     try {
       const pass = issueGuestPass({
         type,
@@ -134,14 +156,11 @@ export function GuestPassPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Guest Pass"
-        subtitle="Nobody moves about the hospital without a hospital ID or a pass — printed only after the ID is seen and the visit confirmed."
-      />
+      <PageHeader title="Guest Pass" />
 
       <div className="mt-5 sm:mt-6">
         <Card accentTone="brand" className="min-w-0 max-w-2xl">
-          <CardHeader icon={IdCard} iconTone="brand" title="Print a pass" subtitle={TYPE_HINT[type]} />
+          <CardHeader icon={IdCard} iconTone="brand" title="Print a pass" />
           <CardBody>
             <form onSubmit={handlePrint} className="flex flex-col gap-4" noValidate>
               {error ? <Alert tone="critical">{error}</Alert> : null}
@@ -171,7 +190,7 @@ export function GuestPassPage() {
               {/* Who or what the visit is for */}
               {type === 'Patient visitor' ? (
                 <>
-                  <Field label="Visiting the inpatient" required>
+                  <Field label="Visiting the inpatient" required error={shown('patient')}>
                     <PatientPickField
                       patient={patient}
                       onChange={(next) => {
@@ -179,17 +198,17 @@ export function GuestPassPage() {
                         setError(null)
                       }}
                       scope="inpatients"
-                      placeholder="Search an admitted patient by name, mobile, UHID or ABHA"
+                      placeholder="Search for an admitted patient by name, mobile, UHID or ABHA"
                       detail={stay?.wardLabel ? `${stay.wardLabel} · ${stay.bedNumber}` : undefined}
                     />
                   </Field>
-                  <Field label="Relationship to the patient" required>
+                  <Field label="Relationship to the patient" required error={shown('relationship')}>
                     <Chips options={RELATIONSHIPS} value={relationship} onChange={setRelationship} />
                   </Field>
                 </>
               ) : type === 'Visiting doctor' ? (
                 <>
-                  <Field label="Visiting doctor of" required>
+                  <Field label="Hospital doctor they are visiting" required error={shown('host')}>
                     <select value={hostProviderId} onChange={(e) => setHostProviderId(e.target.value)} className={inputClass} aria-label="Hospital doctor they are visiting">
                       <option value="">Choose the hospital doctor</option>
                       {providers
@@ -201,13 +220,13 @@ export function GuestPassPage() {
                         ))}
                     </select>
                   </Field>
-                  <Field label="Purpose of the visit" required>
+                  <Field label="Purpose of the visit" required error={shown('purpose')}>
                     <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} placeholder="e.g. Joint review of a patient" className={inputClass} aria-label="Purpose of the visit" />
                   </Field>
                 </>
               ) : (
                 <>
-                  <Field label="Department or area" required>
+                  <Field label="Department or area" required error={shown('area')}>
                     <select value={area} onChange={(e) => setArea(e.target.value)} className={inputClass} aria-label="Department or area">
                       <option value="">Choose where they need to go</option>
                       {[...departments, ...SERVICE_AREAS].map((option) => (
@@ -217,23 +236,23 @@ export function GuestPassPage() {
                       ))}
                     </select>
                   </Field>
-                  <Field label="Role" required>
+                  <Field label="Role" required error={shown('relationship')}>
                     <Chips options={STAFF_ROLES} value={relationship} onChange={setRelationship} />
                   </Field>
-                  <Field label="Purpose of the visit" required>
+                  <Field label="Purpose of the visit" required error={shown('purpose')}>
                     <input value={purpose} onChange={(e) => setPurpose(e.target.value)} maxLength={80} placeholder="e.g. Service the MRI chiller" className={inputClass} aria-label="Purpose of the visit" />
                   </Field>
                 </>
               )}
 
               {/* The holder and their ID */}
-              <Field label={type === 'Visiting doctor' ? 'Visiting doctor’s name' : 'Pass holder’s name'} required>
+              <Field label={type === 'Visiting doctor' ? 'Visiting doctor’s name' : 'Pass holder’s name'} required error={shown('name')}>
                 <input value={holderName} onChange={(e) => setHolderName(nextNameInput(e.target.value))} maxLength={60} placeholder="As on their ID" className={inputClass} aria-label="Pass holder's name" />
               </Field>
-              <Field label="Mobile" required>
+              <Field label="Mobile" required error={mobileShown}>
                 <MobileInput value={holderMobile} onValueChange={setHolderMobile} placeholder="10-digit mobile" className={inputClass} aria-label="Pass holder's mobile" />
               </Field>
-              <Field label="ID proof seen" required>
+              <Field label="ID proof seen" required error={shown('id')}>
                 <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
                   <select value={idType} onChange={(e) => setIdType(e.target.value)} className={inputClass} aria-label="Kind of ID proof">
                     <option value="">Kind of ID</option>
@@ -261,24 +280,27 @@ export function GuestPassPage() {
                 </p>
                 {type === 'Visiting doctor' ? null : (
                   <input
+                    aria-invalid={Boolean(shown('verifiedWith'))}
                     value={verifiedWith}
                     onChange={(e) => setVerifiedWith(e.target.value)}
                     maxLength={60}
                     placeholder={type === 'Patient visitor' ? 'Confirmed with — the patient or attendant’s name' : 'Authorised by — staff name and role'}
-                    className={inputClass}
+                    className={cn(inputClass, shown('verifiedWith') && errorClass)}
                     aria-label={type === 'Patient visitor' ? 'Confirmed with the patient or attendant' : 'Authorised by'}
                   />
                 )}
+                {type === 'Visiting doctor' ? null : <FieldError message={shown('verifiedWith')} />}
                 <label className="flex items-start gap-2 text-xs text-ink">
-                  <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-primary-600)]" />
+                  <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} aria-invalid={Boolean(shown('confirmed'))} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--color-primary-600)]" />
                   <span>
                     I have seen the ID and confirmed this visit with <strong>{confirmer}</strong>
-                    {type === 'Patient visitor' ? ' — they know and want this visitor.' : ' — they expect this person.'}
+                    {type === 'Patient visitor' ? ' — they know about this visitor and agree to the visit.' : ' — they expect this person.'}
                   </span>
                 </label>
+                <FieldError message={shown('confirmed')} />
               </div>
 
-              <Button type="submit" disabled={!ready}>
+              <Button type="submit">
                 <Printer className="h-4 w-4" strokeWidth={1.75} />
                 Print pass
               </Button>
@@ -290,13 +312,17 @@ export function GuestPassPage() {
   )
 }
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
+function Field({ label, required, error = null, children }: { label: string; required?: boolean; error?: string | null; children: ReactNode }) {
   return (
     <div>
       <p className="mb-1.5 text-xs font-medium text-ink-muted">
         {label} {required ? <span className="text-critical-fg">*</span> : null}
       </p>
-      {children}
+      {/* Marked: its controls take the error edge, and a submit's reveal lands here. */}
+      <div data-invalid={error ? 'true' : undefined} className={cn(error && errorWithinClass)}>
+        {children}
+      </div>
+      <FieldError message={error} />
     </div>
   )
 }

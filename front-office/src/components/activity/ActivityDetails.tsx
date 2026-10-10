@@ -130,7 +130,7 @@ export function ActivityDetails({
         subtitle={`${count} · ${periodLabel}`}
       />
       {events.length === 0 ? (
-        <EmptyState icon={Activity} title="No records found" description="There are no activities matching the selected filters." />
+        <EmptyState icon={Activity} title="No records found" />
       ) : (
         <>
           <ResponsiveTable
@@ -153,7 +153,7 @@ export function ActivityDetails({
           />
           {events.length > rows.length ? (
             <p className="border-t border-border-soft px-5 py-3 text-xs text-ink-muted">
-              Showing the latest {rows.length} of {events.length} — choose a shorter period to see fewer.
+              Showing the latest {rows.length} of {events.length}
             </p>
           ) : null}
         </>

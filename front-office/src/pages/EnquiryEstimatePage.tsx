@@ -83,7 +83,7 @@ export function EnquiryEstimatePage() {
         estimateId: estimate.estimateId,
       })
       printBill(bill.paymentId)
-      notify(`Bill printed — ${patient.name} pays at the billing counter`, { detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}` })
+      notify(`Bill printed for ${patient.name}`, { detail: `${billNumberFor(bill)} · ${formatRupees(bill.totalAmount)}` })
     } catch (err) {
       notify('Could not raise the bill', { tone: 'error', detail: err instanceof Error ? err.message : String(err) })
     }
@@ -94,10 +94,7 @@ export function EnquiryEstimatePage() {
 
   return (
     <div>
-      <PageHeader
-        title="Enquiry & Estimate"
-        subtitle="Published rate card and cost estimates. Rates are a straight lookup from the hospital tariff — never predicted."
-      />
+      <PageHeader title="Enquiry & Estimate" />
 
       <div className="flex flex-col gap-4 sm:gap-5 mt-4 sm:mt-5">
         {/* Patient gate — every estimate belongs to one patient */}
@@ -107,26 +104,23 @@ export function EnquiryEstimatePage() {
             <PatientPickField
               patient={patient}
               onChange={(next) => setPatientId(next.patientId)}
-              placeholder="Search the patient this estimate is for"
+              placeholder="Search for the patient this estimate is for"
               detail={patient?.mobile}
             />
-            {!patient ? (
-              <p className="text-xs text-ink-muted">Services can be browsed below; every estimate belongs to a specific patient.</p>
-            ) : null}
           </CardBody>
         </Card>
 
         <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
           {/* Available services */}
           <Card accentTone="stable" className="min-w-0">
-            <CardHeader icon={Receipt} iconTone="stable" title="Available Services" subtitle="Displayed rates for enquiries at the counter" />
+            <CardHeader icon={Receipt} iconTone="stable" title="Available Services" />
             <div className="flex flex-col gap-3 border-b border-border-soft p-4 sm:flex-row sm:items-center">
               <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border-soft bg-surface-1 px-3 transition-colors hover:border-border-strong focus-within:border-primary-600 focus-within:ring-4 focus-within:ring-primary-600/10">
                 <Search className="h-4 w-4 shrink-0 text-ink-subtle" strokeWidth={1.75} />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search services..."
+                  placeholder="Search services"
                   aria-label="Search services"
                   className="min-h-11 w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-subtle"
                 />
@@ -145,7 +139,7 @@ export function EnquiryEstimatePage() {
             </div>
 
             {filtered.length === 0 ? (
-              <EmptyState icon={Search} title="No services match" description="Try a different search or department." />
+              <EmptyState icon={Search} title="No services match" />
             ) : (
               <ResponsiveTable
                 rows={filtered}
@@ -207,9 +201,9 @@ export function EnquiryEstimatePage() {
               />
               <CardBody className="flex flex-col gap-4">
                 {!patient ? (
-                  <p className="text-sm text-ink-muted">Select a patient to see or start their estimate.</p>
+                  <p className="text-sm text-ink-muted">No patient selected</p>
                 ) : !estimate || estimate.items.length === 0 ? (
-                  <p className="text-sm text-ink-muted">No estimate yet. Add services from the list to start one for {patient.name}.</p>
+                  <p className="text-sm text-ink-muted">No estimate yet</p>
                 ) : (
                   <div className="divide-y divide-border-soft">
                     {estimate.items.map((item) => {
@@ -268,16 +262,12 @@ export function EnquiryEstimatePage() {
                   </div>
                 ) : null}
 
-                <p className="text-xs text-ink-subtle">
-                  An estimate is not an invoice — when the patient is ready, print the bill and they pay it at the billing counter.
-                </p>
-
                 {patient ? (
                   <div className="flex flex-wrap gap-2 border-t border-border-soft pt-4">
                     {hasItems && estimate ? (
                       <>
                         <Button size="sm" variant="secondary" onClick={() => window.print()}>
-                          Print Estimate
+                          Print estimate
                         </Button>
                         {canBill && estimate ? (
                           <Button size="sm" onClick={raiseAndPrintBill}>

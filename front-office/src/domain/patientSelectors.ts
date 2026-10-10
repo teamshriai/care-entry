@@ -18,7 +18,8 @@ import { formatTime, todayKey } from './time'
 export type RiskLevel = 'High' | 'Watch' | 'Normal'
 
 export interface PatientHeaderSummary {
-  risk: { level: RiskLevel; reason: string }
+  /** `label`: the badge's words — what the patient's state actually is. */
+  risk: { level: RiskLevel; reason: string; label: string }
   payment: { status: 'Paid' | 'Partial' | 'Pending' | 'Failed' | 'No bills'; due: number }
   /** The current admission — admitted, or waiting for a bed. */
   admission: Admission | null
@@ -67,16 +68,20 @@ export function getPatientHeader(state: AppState, patientId: string, asOf: numbe
 
   const reasons: string[] = []
   let level: RiskLevel = 'Normal'
+  let label = 'Outpatient'
   if (admitted && critical) {
     level = 'High'
+    label = admitted.wardLabel === 'ICU' ? 'In ICU' : 'In Emergency'
     reasons.push(`In ${admitted.wardLabel} · ${admitted.bedNumber}`)
   }
   if (openMlc) {
+    if (level !== 'High') label = 'MLC open'
     level = 'High'
     reasons.push(`${openMlc.mlcId} open — police acknowledgement awaited`)
   }
   if (level === 'Normal' && admission) {
     level = 'Watch'
+    label = admitted ? 'Inpatient' : 'Awaiting bed'
     reasons.push(admitted ? `Inpatient · ${admitted.wardLabel} · ${admitted.bedNumber}` : 'Admission waiting for a bed')
   }
 
@@ -91,7 +96,7 @@ export function getPatientHeader(state: AppState, patientId: string, asOf: numbe
     dues.some((bill) => bill.paidAmount > 0 && bill.paymentId !== admissionBillId) || (live ? live.paid > 0 && live.pending > 0 : false)
 
   return {
-    risk: { level, reason: reasons.join(' · ') || 'Outpatient — no admission or open MLC' },
+    risk: { level, label, reason: reasons.join(' · ') || 'Outpatient — no admission or open MLC' },
     payment: {
       status: anyFailed ? 'Failed' : due > 0 ? (anyPaidTowardDue ? 'Partial' : 'Pending') : bills.length > 0 ? 'Paid' : 'No bills',
       due,

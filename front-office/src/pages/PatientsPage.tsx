@@ -3,6 +3,7 @@ import { Copy, UserPlus, Users } from 'lucide-react'
 import { PageHeader } from '../components/layout/PageHeader'
 import { PatientIllustration } from '../components/ui/illustrations/PatientIllustration'
 import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Avatar } from '../components/ui/Avatar'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -30,10 +31,10 @@ function readFilter(search: string): PatientFilter {
   return FILTERS.includes(value as PatientFilter) ? (value as PatientFilter) : 'all'
 }
 
-const EMPTY: Record<PatientFilter, { title: string; description: string }> = {
-  all: { title: 'No patients yet', description: 'Registered patients appear here.' },
-  today: { title: 'Nobody registered yet today', description: 'Patients registered today appear here.' },
-  duplicates: { title: 'No possible duplicates', description: 'Records that share a mobile number appear here.' },
+const EMPTY_TITLE: Record<PatientFilter, string> = {
+  all: 'No patients yet',
+  today: 'Nobody registered yet today',
+  duplicates: 'No possible duplicates',
 }
 
 /**
@@ -66,9 +67,9 @@ export function PatientsPage() {
   }
 
   const items: StatFilterItem<PatientFilter>[] = [
-    { key: 'all', label: 'All patients', value: rows.length, context: 'Newest first', tone: 'info', icon: Users },
-    { key: 'today', label: 'Registered today', value: lists.today.length, context: 'New records', tone: 'teal', icon: UserPlus },
-    { key: 'duplicates', label: 'Possible duplicates', value: lists.duplicates.length, context: 'Same mobile number', tone: 'warning', icon: Copy },
+    { key: 'all', label: 'All patients', value: rows.length, tone: 'info', icon: Users },
+    { key: 'today', label: 'Registered today', value: lists.today.length, tone: 'teal', icon: UserPlus },
+    { key: 'duplicates', label: 'Possible duplicates', value: lists.duplicates.length, tone: 'warning', icon: Copy },
   ]
 
   const openPatient = (uhid: string) => navigate(`/patients/${uhid}`)
@@ -135,9 +136,16 @@ export function PatientsPage() {
     <div>
       <PageHeader
         title="Patients"
-        subtitle="Every registered patient, newest first. Open one to schedule an appointment, admit or discharge."
         illustration={<PatientIllustration className="h-8 w-8" />}
         illustrationTone="teal"
+        actions={
+          <Button onClick={() => navigate('/register/new')}>
+            <UserPlus className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+            {/* "Register" alone fits beside the title on a phone. */}
+            <span className="sm:hidden">Register</span>
+            <span className="hidden sm:inline">Register Patient</span>
+          </Button>
+        }
         tabs={<PatientsTabs />}
       />
 
@@ -146,11 +154,7 @@ export function PatientsPage() {
 
         <Card accentTone="teal">
           {shown.length === 0 ? (
-            <EmptyState
-              illustration={<PatientIllustration className="h-12 w-12" />}
-              title={EMPTY[filter].title}
-              description={EMPTY[filter].description}
-            />
+            <EmptyState illustration={<PatientIllustration className="h-12 w-12" />} title={EMPTY_TITLE[filter]} />
           ) : (
             <ResponsiveTable
               rows={shown}

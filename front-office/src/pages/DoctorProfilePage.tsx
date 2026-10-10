@@ -54,7 +54,6 @@ export function DoctorProfilePage() {
               <EmptyState
                 icon={Stethoscope}
                 title="No such doctor"
-                description="This doctor may have been removed. Every doctor is listed in the directory."
                 action={<Button size="sm" onClick={() => navigate('/doctors')}>Doctors</Button>}
               />
             </CardBody>
@@ -118,7 +117,7 @@ export function DoctorProfilePage() {
 
                 <dl className="space-y-2 border-t border-border-soft pt-3 text-sm">
                   <Row label="Department" value={provider.department} />
-                  <Row label="Specialty" value={provider.specialty} />
+                  <Row label="Speciality" value={provider.specialty} />
                   <Row label="Registration no." value={provider.registrationNumber} />
                   <Row label="Experience" value={`${provider.experienceYears} yrs`} />
                   <Row label="Consultation" value={provider.consultationType} />
@@ -146,9 +145,6 @@ export function DoctorProfilePage() {
                       Activate account
                     </Button>
                   )}
-                  <p className="mt-2 text-xs text-ink-subtle">
-                    An inactive doctor stays in the directory for reference but cannot be booked.
-                  </p>
                 </div>
               </CardBody>
             </Card>
@@ -172,14 +168,7 @@ export function DoctorProfilePage() {
               />
               <CardBody>
                 {slotEntries.length === 0 ? (
-                  <EmptyState
-                    title={status === 'On leave' ? 'On leave today' : 'No session today'}
-                    description={
-                      status === 'On leave'
-                        ? 'Slots are not offered on a leave day. Remove the leave record to restore them.'
-                        : "This doctor's working days do not include today."
-                    }
-                  />
+                  <EmptyState title={status === 'On leave' ? 'On leave today' : 'No session today'} />
                 ) : (
                   <DoctorDayChart providerId={id} date={today} now={now} onPick={(date, slot) => openFlow('schedule', { doctor: id, date, slot })} />
                 )}
@@ -191,7 +180,6 @@ export function DoctorProfilePage() {
                 icon={Stethoscope}
                 iconTone="info"
                 title="Today's appointments"
-                subtitle="Operational schedule only — no clinical record is shown here"
                 action={
                   <Button size="sm" variant="ghost" onClick={() => navigate(`/patients/outpatients?provider=${id}`)}>
                     Outpatients · {appointments.length}

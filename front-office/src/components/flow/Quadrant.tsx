@@ -20,6 +20,7 @@ export function Quadrant({
   className,
   icon: Icon,
   hue,
+  numbered = false,
   children,
 }: {
   /** An anchor for the step rail to scroll to. */
@@ -40,6 +41,8 @@ export function Quadrant({
    *  with it — the section's own colour. Without, the plain numbered heading. */
   icon?: ElementType
   hue?: IconTone
+  /** A toned heading shows its step number too, so the order reads at a glance. */
+  numbered?: boolean
   children: ReactNode
 }) {
   const toned = Boolean(Icon && hue)
@@ -66,6 +69,11 @@ export function Quadrant({
           toned && 'bg-[linear-gradient(100deg,color-mix(in_oklab,var(--tone)_13%,var(--color-surface-1))_0%,var(--color-surface-1)_75%)] py-3',
         )}
       >
+        {toned && numbered ? (
+          <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--tone)_40%,transparent)] bg-surface-1 text-xs font-bold text-[var(--tone)]">
+            {step}
+          </span>
+        ) : null}
         {toned && Icon ? (
           <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--tone)] text-white shadow-card-sm">
             <Icon size={16} strokeWidth={2} />

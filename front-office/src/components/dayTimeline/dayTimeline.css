@@ -135,6 +135,8 @@
 /* ── The row ── */
 
 .dtl-row { position: relative; height: 64px; }
+/* Rows under a shared axis (the booking page): a slimmer bar. */
+.dtl[data-compact] .dtl-row { height: 40px; }
 
 /* The hover guide: a line with a dot at each end, under the pointer. */
 .dtl-guide {
@@ -223,7 +225,11 @@ button.dtl-act:hover { filter: brightness(1.05); }
 }
 button.dtl-free { transition: filter 150ms; }
 button.dtl-free:hover { filter: brightness(0.97); }
-.dtl-free-gone { border: 1.5px dashed var(--dtl-line-strong); }
+/* Free time that has already passed: a quiet grey, so it reads as gone rather than empty. */
+.dtl-free-gone {
+  background: color-mix(in oklab, var(--color-ink-subtle) 16%, var(--color-surface-1));
+  border: 1px solid color-mix(in oklab, var(--color-ink-subtle) 24%, var(--color-surface-1));
+}
 
 .dtl-off { background: repeating-linear-gradient(135deg, var(--off-hatch) 0 2px, var(--off-fill) 2px 8px); }
 button.dtl-off { transition: box-shadow 150ms; }
@@ -350,6 +356,13 @@ button.dtl-off:hover { box-shadow: inset 0 0 0 1.5px var(--dtl-line-strong); }
   border: 1px dashed var(--dtl-crit);
   border-radius: 4px;
   background: repeating-linear-gradient(135deg, var(--dtl-crit-bg) 0 6px, transparent 6px 10px);
+}
+.dtl-swatch-gone {
+  width: 18px;
+  height: 13px;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--color-ink-subtle) 16%, var(--color-surface-1));
+  border: 1px solid color-mix(in oklab, var(--color-ink-subtle) 24%, var(--color-surface-1));
 }
 .dtl-swatch-off {
   width: 18px;

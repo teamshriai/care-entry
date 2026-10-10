@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
-import { BedDouble, ClipboardList, IndianRupee, ShieldCheck, Stethoscope } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { BedDouble, ClipboardList, ShieldCheck, Stethoscope } from 'lucide-react'
 import { FlowSheet } from '../../components/flow/FlowSheet'
-import { Quadrant, SummaryItem, Waiting } from '../../components/flow/Quadrant'
+import { Quadrant, SummaryItem } from '../../components/flow/Quadrant'
 import { useToast } from '../../hooks/useToast'
 import { PatientSearch } from '../../components/patient/PatientSearch'
 import { MobileInput } from '../../components/ui/MobileInput'
@@ -13,10 +13,13 @@ import { useStoreValue } from '../../hooks/useStore'
 import { getState } from '../../domain/store'
 import { getDepartments, getPatientById, getProviders } from '../../domain/selectors'
 import { getBedsForWard, getFirstFreeBed, getWardSummaries } from '../../domain/admissionSelectors'
-import { getCurrentAdmissionForPatient, getTodaysEncounterDoctor } from '../../domain/patientSelectors'
+import { getCurrentAdmissionForPatient } from '../../domain/patientSelectors'
 import { admitPatient } from '../../domain/admissionActions'
 import { DAILY_BED_CHARGE, admissionBillItems, formatRupees } from '../../utils/billing'
 import { isValidMobile } from '../../utils/phone'
+import { mobileEarlyError, mobileError } from '../../utils/validation'
+import { revealFirstInvalid } from '../../utils/revealInvalid'
+import { FieldError } from '../../components/patient/AgeConfirm'
 import { cn } from '../../utils/cn'
 import { ATTENDANT_RELATIONSHIPS, REFERRAL_SOURCES } from '../../types/admission'
 import { departmentIcon, departmentTone } from '../../utils/departments'
@@ -24,7 +27,7 @@ import { TONE_HEX } from '../../utils/toneHex'
 import type { AdmissionType, AttendantRelationship, PaymentType, ReferralSource, Ward } from '../../types/admission'
 import type { Patient } from '../../types/patient'
 import type { FlowProps } from '../registry'
-import { inputClass } from '../../utils/formClasses'
+import { errorClass, inputClass } from '../../utils/formClasses'
 
 
 interface Details {
@@ -45,9 +48,9 @@ interface Details {
 function startingDetails(patientId: string): Details {
   const state = getState()
   const waiting = getCurrentAdmissionForPatient(state, patientId)
-  const todaysDoctor = getTodaysEncounterDoctor(state, patientId)
   return {
-    doctorId: waiting?.doctorId ?? todaysDoctor ?? '',
+    // A waiting request keeps its doctor; otherwise the desk picks one in Emergency, where Admit opens.
+    doctorId: waiting?.doctorId ?? '',
     admissionType: waiting?.admissionType ?? 'Elective',
     reason: waiting?.reason ?? '',
     referralSource: waiting?.referralSource ?? 'Outpatient',
@@ -60,22 +63,39 @@ function startingDetails(patientId: string): Details {
   }
 }
 
+/** The ward and bed Admit opens on: the page's own when it named one, else the first ward with a free bed. */
+function startingBed(ward: Ward | undefined, bedId: string | undefined): { ward: Ward | null; bedId: string | null } {
+  if (ward) return { ward, bedId: bedId ?? getFirstFreeBed(getState(), ward)?.bedId ?? null }
+  for (const candidate of ['General Ward', 'Semi-Private Ward', 'Private Ward', 'ICU'] as Ward[]) {
+    const free = getFirstFreeBed(getState(), candidate)
+    if (free) return { ward: candidate, bedId: free.bedId }
+  }
+  return { ward: null, bedId: null }
+}
+
+/** Admit opens in Emergency — most admissions come through it. */
+const ADMIT_DEPARTMENT = 'Emergency'
+
 /** The department of a doctor, by id — where the department picker starts. */
 function departmentOf(doctorId: string): string | null {
   return getState().providers.find((p) => p.providerId === doctorId)?.department ?? null
 }
 
-/** The details card's own fields: the reason and the attendant. */
+/** An attendant's mobile is optional — but a valid one when typed. */
+function attendantPhoneOk(d: Details): boolean {
+  return !d.attendantPhone.trim() || isValidMobile(d.attendantPhone)
+}
+
+/** The details card's own required field is the reason; the attendant is optional. */
 function detailsFilled(d: Details): boolean {
-  return d.reason.trim().length > 0 && d.attendantName.trim().length > 0 && isValidMobile(d.attendantPhone)
+  return d.reason.trim().length > 0 && attendantPhoneOk(d)
 }
 
 function detailsComplete(d: Details): boolean {
   return (
     Boolean(d.doctorId) &&
     d.reason.trim().length > 0 &&
-    d.attendantName.trim().length > 0 &&
-    isValidMobile(d.attendantPhone) &&
+    attendantPhoneOk(d) &&
     (d.paymentType === 'Self Pay' || d.paymentType === 'Corporate' || d.insuranceProvider.trim().length > 0)
   )
 }
@@ -96,15 +116,20 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
 
   const wards = useStoreValue(getWardSummaries)
   const providers = useStoreValue(getProviders)
-  const [ward, setWard] = useState<Ward | null>((params.ward as Ward | undefined) ?? null)
-  const [bedId, setBedId] = useState<string | null>(params.bed ?? null)
+  // A ward and its first free bed are chosen from the start (General Ward first), so the bed and the
+  // bill show at once; tapping another ward or bed changes it.
+  const [start] = useState(() => startingBed(params.ward as Ward | undefined, params.bed))
+  const [ward, setWard] = useState<Ward | null>(start.ward)
+  const [bedId, setBedId] = useState<string | null>(start.bedId)
   const beds = useStoreValue(getBedsForWard, ward ?? 'General Ward')
   const bed = beds.find((b) => b.bedId === bedId) ?? null
 
   const [details, setDetails] = useState<Details>(() => startingDetails(params.uhid ?? ''))
-  const departments = useStoreValue(getDepartments)
+  // Emergency first on Admit, then the usual order.
+  const allDepartments = useStoreValue(getDepartments)
+  const departments = [ADMIT_DEPARTMENT, ...allDepartments.filter((d) => d !== ADMIT_DEPARTMENT)]
   // The department narrows the doctors to choose from; it starts at the known doctor's.
-  const [department, setDepartment] = useState<string | null>(() => departmentOf(details.doctorId))
+  const [department, setDepartment] = useState<string | null>(() => departmentOf(details.doctorId) ?? ADMIT_DEPARTMENT)
   const { notify } = useToast()
   const [error, setError] = useState<string | null>(null)
 
@@ -114,12 +139,37 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
 
   const wardDone = !alreadyAdmitted && Boolean(bed && bed.status === 'Available')
   const ready = Boolean(patient) && wardDone && detailsComplete(details)
+  // Admit stays clickable: tried with something missing or wrong, it marks each such field.
+  const [attempted, setAttempted] = useState(false)
+  const problem = {
+    doctor: details.doctorId ? null : department ? 'Choose the admitting doctor.' : 'Choose a department, then the admitting doctor.',
+    reason: details.reason.trim() ? null : 'Enter the reason for admission.',
+    attendantPhone: details.attendantPhone.trim() ? mobileError(details.attendantPhone) : null,
+    bed: patient && !alreadyAdmitted && !wardDone ? 'Choose a ward and an available bed.' : null,
+  }
+  const shown = (key: keyof typeof problem) => (attempted ? problem[key] : null)
+  // The one thing still to do, named in the bar at the bottom and lit on its section.
+  const next = !patient
+    ? 'choose the patient'
+    : alreadyAdmitted
+      ? null
+      : !doctor
+        ? 'choose the admitting doctor'
+        : !wardDone
+          ? 'choose a ward and an available bed'
+          : !details.reason.trim()
+            ? 'enter the reason for admission'
+            : problem.attendantPhone
+              ? 'check the attendant’s mobile number'
+              : null
+  // A mobile starting 0–5 is wrong already, so it is flagged while still being typed.
+  const phoneShown = shown('attendantPhone') ?? mobileEarlyError(details.attendantPhone)
 
   function choosePatient(next: Patient) {
     setPatientId(next.patientId)
     const started = startingDetails(next.patientId)
     setDetails(started)
-    setDepartment(departmentOf(started.doctorId))
+    setDepartment(departmentOf(started.doctorId) ?? ADMIT_DEPARTMENT)
   }
 
   function chooseDepartment(next: string) {
@@ -143,7 +193,11 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
   }
 
   function admit() {
-    if (!patient || !bed || !ready) return
+    if (!patient || !bed || !ready) {
+      setAttempted(true)
+      revealFirstInvalid()
+      return
+    }
     setError(null)
     try {
       const result = admitPatient({
@@ -178,14 +232,12 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
 
 
   const billTotal = billItems.reduce((sum, item) => sum + item.amount, 0)
-  const bedSummary = bed ? `${bed.ward} · ${bed.bedNumber} · ${formatRupees(DAILY_BED_CHARGE[bed.roomType])}/day` : undefined
 
   const confirmBar = (
     <div className="flex flex-col gap-4 py-2">
       {error ? <Alert tone="critical">{error}</Alert> : null}
       <div className="grid grid-cols-1 items-center gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-base sm:grid-cols-4">
-          <SummaryItem label="Patient" value={patient ? `${patient.name} · ${patient.uhid}` : null} />
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-base sm:grid-cols-3">
           <SummaryItem label="Ward & bed" value={bed && wardDone ? `${bed.ward} · ${bed.bedNumber}` : null} />
           <SummaryItem label="Doctor" value={doctor ? doctor.name : null} />
           <SummaryItem label="Payer" value={selfPay ? 'Self pay' : details.insuranceProvider || details.paymentType} />
@@ -193,21 +245,22 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
         <div className="flex flex-wrap items-center justify-between gap-3 xl:justify-end">
           <div className="text-right">
             <p className="text-sm text-ink-muted">First-day bill</p>
-            <p className="text-2xl font-bold tabular-nums text-ink">{formatRupees(billTotal)}</p>
+            <p className="text-2xl font-bold tabular-nums text-ink">{billItems.length ? formatRupees(billTotal) : '—'}</p>
+            {billItems.length ? (
+              <p className="text-xs text-ink-muted">{billItems.map((item) => `${item.description} ${formatRupees(item.amount)}`).join(' · ')}</p>
+            ) : null}
           </div>
-          <Button size="lg" onClick={admit} disabled={!ready}>
+          <Button size="lg" onClick={admit}>
             {selfPay ? <BedDouble className="h-4 w-4" strokeWidth={1.75} /> : <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />}
             {selfPay ? 'Admit' : `Admit — bill ${details.insuranceProvider || details.paymentType}`}
           </Button>
         </div>
       </div>
-      <p className="text-sm text-ink-muted">
-        {ready
-          ? selfPay
-            ? `After admitting, print the first-day bill from ${patient?.name ?? 'the patient'}’s Payment History for the billing counter. The bed charge accrues daily; the final bill is settled at discharge.`
-            : 'The bill goes to the payer and is settled at discharge.'
-          : 'Choose the patient, a free bed and complete the details to admit.'}
-      </p>
+      {!ready && (alreadyAdmitted || next) ? (
+        <p className="text-sm text-ink-muted">
+          {alreadyAdmitted ? `${patient?.name ?? 'The patient'} is already admitted.` : next ? <span className="font-semibold text-ink">{next.charAt(0).toUpperCase() + next.slice(1)}</span> : null}
+        </p>
+      ) : null}
     </div>
   )
 
@@ -218,34 +271,32 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
             Only a flow opened with no patient asks for one. */}
         {!patient ? (
           <Quadrant step={1} title="Patient" done={false} allowOverflow>
-            <PatientSearch mode="pick" onPick={choosePatient} autoFocus placeholder="Search the patient by name, mobile, UHID or ABHA" />
+            <PatientSearch mode="pick" onPick={choosePatient} autoFocus placeholder="Search for the patient by name, mobile, UHID or ABHA" />
           </Quadrant>
         ) : alreadyAdmitted ? (
           <Alert tone="warning">
             <strong>{patient.name} is already admitted</strong> — {alreadyAdmitted.wardLabel} · {alreadyAdmitted.bedNumber} ({alreadyAdmitted.admissionNumber}).
           </Alert>
-        ) : current ? (
-          <Alert tone="info">Admitting the request already waiting for a bed ({current.admissionNumber}).</Alert>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
-          {/* Left: who admits the patient, and the admission's details */}
-          <div className="flex min-w-0 flex-col gap-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
+          {/* Left: who admits the patient. Right: where they go, then the admission's details. */}
             <Quadrant
               step={patient ? 1 : 2}
+              numbered
+              current={next === 'choose the admitting doctor'}
               title="Department & doctor"
+              className="lg:row-span-2"
               icon={Stethoscope}
               hue="violet"
               done={Boolean(doctor)}
-              summary={doctor ? `${doctor.name} · ${doctor.department}` : undefined}
             >
               <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="group" aria-label="Department">
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Department">
                   {departments.map((dep) => {
                     const Icon = departmentIcon(dep)
                     const tone = TONE_HEX[departmentTone(dep)]
                     const chosen = dep === department
-                    const count = providers.filter((p) => p.status === 'Active' && p.department === dep).length
                     return (
                       <button
                         key={dep}
@@ -254,21 +305,14 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                         onClick={() => chooseDepartment(dep)}
                         style={{ '--tone': tone } as CSSProperties}
                         className={cn(
-                          'focus-ring flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all',
+                          'focus-ring inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-sm font-semibold transition-colors',
                           chosen
-                            ? 'border-[var(--tone)] bg-[color-mix(in_oklab,var(--tone)_10%,var(--color-surface-1))] shadow-card-sm'
-                            : 'border-border-soft bg-surface-1 hover:border-[color-mix(in_oklab,var(--tone)_45%,var(--color-border))] hover:bg-surface-2',
+                            ? 'border-[var(--tone)] bg-[color-mix(in_oklab,var(--tone)_14%,var(--color-surface-1))] text-ink shadow-card-sm'
+                            : 'border-border-soft bg-surface-1 text-ink hover:border-[color-mix(in_oklab,var(--tone)_45%,var(--color-border))]',
                         )}
                       >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_oklab,var(--tone)_16%,var(--color-surface-1))] text-[var(--tone)]">
-                          <Icon size={16} strokeWidth={2} aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-ink">{dep}</span>
-                          <span className="block text-xs text-ink-muted">
-                            {count} {count === 1 ? 'doctor' : 'doctors'}
-                          </span>
-                        </span>
+                        <Icon size={15} strokeWidth={2} aria-hidden="true" className="text-[var(--tone)]" />
+                        {dep}
                       </button>
                     )
                   })}
@@ -276,9 +320,9 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                 {department ? (
                   <div>
                     <p className="mb-2 text-xs font-medium text-ink-muted">
-                      Admitting doctor · {department} <RequiredStar />
+                      Admitting doctor <RequiredStar />
                     </p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Admitting doctor">
+                    <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label="Admitting doctor">
                       {providers
                         .filter((p) => p.status === 'Active' && p.department === department)
                         .map((p) => {
@@ -291,77 +335,32 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                               aria-checked={chosen}
                               onClick={() => update({ doctorId: p.providerId })}
                               className={cn(
-                                'focus-ring flex min-w-0 flex-col items-start rounded-xl border px-3 py-2.5 text-left transition-colors',
+                                'focus-ring flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
                                 chosen ? 'border-primary-600 bg-primary-50 shadow-card-sm' : 'border-border-soft bg-surface-1 hover:bg-surface-2',
                               )}
                             >
-                              <span className="block w-full truncate text-sm font-semibold text-ink">{p.name}</span>
-                              <span className="block w-full truncate text-xs text-ink-muted">{p.specialty}</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-semibold text-ink">{p.name}</span>
+                                <span className="block truncate text-xs text-ink-muted">{p.specialty}</span>
+                              </span>
+                              {p.room ? <span className="shrink-0 text-xs text-ink-muted">{p.room}</span> : null}
                             </button>
                           )
                         })}
                     </div>
                   </div>
-                ) : (
-                  <Waiting>Choose a department to see its doctors.</Waiting>
-                )}
+                ) : null}
+                {shown('doctor') ? (
+                  <p data-invalid="true" tabIndex={-1} role="alert" className="text-xs font-medium text-critical-fg outline-none">
+                    {shown('doctor')}
+                  </p>
+                ) : null}
               </div>
             </Quadrant>
 
-            <Quadrant
-              step={patient ? 2 : 3}
-              title="Details"
-              icon={ClipboardList}
-              hue="blue"
-              done={detailsFilled(details)}
-              summary={details.attendantName.trim() ? `Attendant · ${details.attendantName.trim()}` : undefined}
-            >
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-ink-muted">
-                  <RequiredStar /> Required
-                </p>
-                <label className="flex flex-col gap-1 text-xs font-medium text-ink-muted">
-                  Referred from
-                  <select value={details.referralSource} onChange={(e) => update({ referralSource: e.target.value as ReferralSource })} className={inputClass}>
-                    {/* Walk-in is not a choice here; an older request that has it keeps it. */}
-                    {REFERRAL_SOURCES.filter((option) => option !== 'Walk-in' || details.referralSource === 'Walk-in').map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
-                <StarField>
-                  <input value={details.reason} onChange={(e) => update({ reason: e.target.value })} placeholder="Reason for admission" aria-label="Reason for admission" className={cn(inputClass, 'pr-8')} aria-required="true" />
-                </StarField>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
-                  <StarField>
-                    <input value={details.attendantName} onChange={(e) => update({ attendantName: e.target.value })} placeholder="Attendant name" aria-label="Attendant name" className={cn(inputClass, 'pr-8')} aria-required="true" />
-                  </StarField>
-                  <select
-                    value={details.attendantRelationship}
-                    onChange={(e) => update({ attendantRelationship: e.target.value as AttendantRelationship })}
-                    aria-label="Attendant relationship"
-                    className={inputClass}
-                  >
-                    {ATTENDANT_RELATIONSHIPS.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
-                </div>
-                <StarField>
-                  <MobileInput value={details.attendantPhone} onValueChange={(value) => update({ attendantPhone: value })} placeholder="Attendant mobile (10 digits)" className={cn(inputClass, 'pr-8')} />
-                </StarField>
-              </div>
-            </Quadrant>
-          </div>
 
-          {/* Right: where the patient goes, and the first-day bill */}
-          <div className="flex min-w-0 flex-col gap-5">
-            <Quadrant step={patient ? 3 : 4} title="Ward & bed" icon={BedDouble} hue="teal" done={wardDone} summary={bedSummary}>
-              {!patient ? (
-                <Waiting>Choose the patient to pick a ward and bed.</Waiting>
-              ) : alreadyAdmitted ? (
-                <Waiting>This patient is already admitted.</Waiting>
-              ) : (
+            <Quadrant step={patient ? 2 : 3} numbered current={next === 'choose a ward and an available bed'} className="lg:col-start-2" title="Ward & bed" icon={BedDouble} hue="teal" done={wardDone}>
+              {!patient || alreadyAdmitted ? null : (
                 <>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {wards
@@ -386,9 +385,8 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                               <WardIcon ward={w.ward} className={cn('h-4.5 w-4.5', w.ward === 'ICU' ? 'text-critical-fg' : 'text-primary-text')} />
                               {w.ward}
                             </span>
-                            <span className={cn('text-xs font-medium', full ? 'text-critical-fg' : 'text-success-fg')}>
-                              {full ? 'Full' : `${w.available} free`} of {w.total}
-                            </span>
+                            {/* Only a full ward says so; otherwise the beds below show what is free. */}
+                            {full ? <span className="text-xs font-semibold text-critical-fg">Full</span> : null}
                             <span className="text-xs text-ink-muted">{formatRupees(DAILY_BED_CHARGE[roomType])}/day</span>
                           </button>
                         )
@@ -396,7 +394,6 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                   </div>
                   {ward ? (
                     <div className="mt-3">
-                      <p className="mb-2 text-xs font-medium text-ink-muted">Bed — the first free one is chosen; tap another to change</p>
                       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Bed">
                         {beds.map((b) => {
                           const free = b.status === 'Available'
@@ -407,14 +404,15 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                               disabled={!free}
                               aria-pressed={b.bedId === bedId}
                               onClick={() => setBedId(b.bedId)}
-                              title={`${b.bedNumber} · ${b.status}`}
+                              title={`${b.bedNumber} · ${free ? 'Available' : 'Occupied'}`}
+                              aria-label={`${b.bedNumber}, ${free ? 'available' : 'occupied'}`}
                               className={cn(
                                 'rounded-lg border px-2.5 py-1.5 text-xs font-semibold tabular-nums transition-colors',
                                 b.bedId === bedId
-                                  ? 'border-primary-600 bg-primary-600 text-on-primary'
+                                  ? 'border-primary-600 bg-primary-600 text-on-primary shadow-card-sm'
                                   : free
-                                    ? 'border-success-fg/25 bg-success-bg text-ink hover:border-primary-600'
-                                    : 'cursor-not-allowed border-border-soft bg-surface-2 text-ink-subtle line-through',
+                                    ? 'border-success-fg/50 bg-success-bg text-success-fg hover:border-primary-600 hover:text-primary-text'
+                                    : 'cursor-not-allowed border-border bg-surface-2 text-ink-subtle line-through',
                               )}
                             >
                               {b.bedNumber}
@@ -424,36 +422,85 @@ export function AdmitFlow({ params, onClose }: FlowProps) {
                       </div>
                     </div>
                   ) : null}
+                  {shown('bed') ? (
+                    <p data-invalid="true" tabIndex={-1} role="alert" className="mt-3 text-xs font-medium text-critical-fg outline-none">
+                      {shown('bed')}
+                    </p>
+                  ) : null}
                 </>
               )}
             </Quadrant>
 
-            <Quadrant step={patient ? 4 : 5} title="Bill" icon={IndianRupee} hue="green" done={billItems.length > 0 && ready} summary={billItems.length ? formatRupees(billTotal) : undefined}>
-              {billItems.length === 0 ? (
-                <Waiting>Choose a bed to see the first-day bill.</Waiting>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <div className="divide-y divide-border-soft overflow-hidden rounded-xl border border-border-soft">
-                    {billItems.map((item) => (
-                      <div key={item.code} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                        <span className="text-ink">{item.description}</span>
-                        <span className="font-medium tabular-nums text-ink">{formatRupees(item.amount)}</span>
-                      </div>
+
+            <Quadrant
+              step={patient ? 3 : 4}
+              numbered
+              current={next === 'enter the reason for admission' || next === 'check the attendant’s mobile number'}
+              title="Details"
+              className="lg:col-start-2"
+              icon={ClipboardList}
+              hue="blue"
+              done={detailsFilled(details)}
+            >
+              {/* Two short rows, each field sized to what it holds — the reason gets the room. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-6 sm:items-start">
+                <label className="flex flex-col gap-1 text-xs font-medium text-ink-muted sm:col-span-2">
+                  Referred from
+                  <select value={details.referralSource} onChange={(e) => update({ referralSource: e.target.value as ReferralSource })} className={inputClass}>
+                    {/* Walk-in is not a choice here; an older request that has it keeps it. */}
+                    {REFERRAL_SOURCES.filter((option) => option !== 'Walk-in' || details.referralSource === 'Walk-in').map((option) => (
+                      <option key={option}>{option}</option>
                     ))}
-                    <div className="flex items-center justify-between bg-success-bg px-4 py-3 text-sm font-semibold text-ink">
-                      <span>Total</span>
-                      <span className="text-base tabular-nums">{formatRupees(billTotal)}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-ink-muted">
-                    {selfPay
-                      ? 'Paid at the billing counter. The bed charge accrues daily; the final bill is settled at discharge.'
-                      : `Billed to ${details.insuranceProvider || details.paymentType} — settled at discharge.`}
-                  </p>
-                </div>
-              )}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-ink-muted sm:col-span-4">
+                  <span>
+                    Reason for admission <RequiredStar />
+                  </span>
+                  <input
+                    value={details.reason}
+                    onChange={(e) => update({ reason: e.target.value })}
+                    placeholder="e.g. Fever with low platelets — observation"
+                    aria-required="true"
+                    aria-invalid={Boolean(shown('reason'))}
+                    className={cn(inputClass, 'text-ink', shown('reason') && errorClass)}
+                  />
+                  <FieldError message={shown('reason')} />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-ink-muted sm:col-span-2">
+                  Attendant name
+                  <input
+                    value={details.attendantName}
+                    onChange={(e) => update({ attendantName: e.target.value })}
+                    placeholder="Optional"
+                    className={inputClass}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-ink-muted sm:col-span-2">
+                  Relationship
+                  <select
+                    value={details.attendantRelationship}
+                    onChange={(e) => update({ attendantRelationship: e.target.value as AttendantRelationship })}
+                    className={inputClass}
+                  >
+                    {ATTENDANT_RELATIONSHIPS.map((option) => (
+                      <option key={option}>{option}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-ink-muted sm:col-span-2">
+                  Attendant mobile
+                  <MobileInput
+                    value={details.attendantPhone}
+                    onValueChange={(value) => update({ attendantPhone: value })}
+                    placeholder="Optional"
+                    aria-invalid={Boolean(phoneShown)}
+                    className={cn(inputClass, phoneShown && errorClass)}
+                  />
+                  <FieldError message={phoneShown} />
+                </label>
+              </div>
             </Quadrant>
-          </div>
         </div>
       </div>
     </FlowSheet>
@@ -469,14 +516,3 @@ function RequiredStar() {
   )
 }
 
-/** A required text field: its red star sits at the right end of the box. */
-function StarField({ children }: { children: ReactNode }) {
-  return (
-    <div className="relative">
-      {children}
-      <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-base font-semibold leading-none text-critical-fg">
-        *
-      </span>
-    </div>
-  )
-}

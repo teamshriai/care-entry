@@ -25,7 +25,7 @@ export function StatCard({
   hue: IconTone
   value: ReactNode
   label: string
-  hint: string
+  hint?: string
   /** Where the card opens. Leave out for an information-only card (no button, no click). */
   to?: string
   /** Where the card leads — shown as its tooltip. */

@@ -124,7 +124,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
     today: { doctor: NEU.sanjay, reason: 'Review with reports', offset: -3, status: 'Completed' },
   },
   {
-    uhid: 'SHRI-0031521', name: 'Padma Lakshmi', nameNative: 'பத்மா லட்சுமி', age: 58, sex: 'Female', email: 'padma.l@example.mock', registered: '2022-10-03',
+    uhid: 'SHRI-0031521', name: 'Padma Lakshmi', nameNative: 'பத்மா லட்சுமி', age: 58, sex: 'Female', email: 'padma.l@example.com', registered: '2022-10-03',
     visits: [
       { on: '2022-10-03', doctor: GEN.farah, reason: 'Persistent cough' },
       { on: '2023-04-18', doctor: GEN.rahul, reason: 'Thyroid review' },
@@ -308,7 +308,7 @@ export const PATIENT_HISTORY: PatientHistorySeed[] = [
 
   // ------------------------------------------ recent only, no visit today
   {
-    uhid: 'SHRI-0033679', name: 'Vignesh Natarajan', age: 31, sex: 'Male', email: 'vignesh.n@example.mock', registered: '2026-06-02',
+    uhid: 'SHRI-0033679', name: 'Vignesh Natarajan', age: 31, sex: 'Male', email: 'vignesh.n@example.com', registered: '2026-06-02',
     visits: [{ on: -64, doctor: ORT.nandini, reason: 'Lower back pain after a long drive' }, { on: -23, doctor: ORT.nandini, reason: 'Back pain — review', status: 'Cancelled' }],
   },
   {

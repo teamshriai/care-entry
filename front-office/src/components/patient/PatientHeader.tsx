@@ -1,23 +1,24 @@
-import type { ElementType } from 'react'
-import { BedDouble, CalendarPlus, Copy, LogOut } from 'lucide-react'
+import type { CSSProperties, ElementType } from 'react'
+import { BedDouble, CalendarPlus, Copy, IndianRupee, LogOut } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Badge } from '../ui/Badge'
-import { Button } from '../ui/Button'
 import { useToast } from '../../hooks/useToast'
 import { usePatientCareStatus } from '../../hooks/useCareStatus'
 import { PatientStatusIcons } from './PatientStatusIcons'
 import { PatientDetailsStrip } from './PatientDetailsCard'
 import { initialsOf } from '../../utils/format'
+import { cn } from '../../utils/cn'
 import type { PatientHeaderSummary } from '../../domain/patientSelectors'
 import type { Patient } from '../../types/patient'
 import type { Tone } from '../../utils/tone'
 
-const RISK_LABEL = { High: 'High risk', Watch: 'Watch', Normal: 'Normal' } as const
-const RISK_TONE: Record<keyof typeof RISK_LABEL, Tone> = { High: 'critical', Watch: 'warning', Normal: 'info' }
+const RISK_TONE: Record<'High' | 'Watch' | 'Normal', Tone> = { High: 'critical', Watch: 'warning', Normal: 'info' }
 export interface PatientActions {
   schedule: () => void
   admit: () => void
   discharge: () => void
+  /** Show or hide the Payment History panel beside the timeline. */
+  togglePayments: () => void
 }
 
 /**
@@ -29,10 +30,12 @@ export function PatientHeader({
   patient,
   summary,
   actions,
+  paymentsOpen = false,
 }: {
   patient: Patient
   summary: PatientHeaderSummary
   actions: PatientActions
+  paymentsOpen?: boolean
 }) {
   const { notify } = useToast()
   const care = usePatientCareStatus()
@@ -55,10 +58,15 @@ export function PatientHeader({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <h1 className="truncate text-xl font-semibold tracking-tight text-ink sm:text-2xl">{patient.name}</h1>
               <PatientStatusIcons status={care[patient.patientId]} />
-              <span title={risk.reason}>
-                <Badge tone={RISK_TONE[risk.level]}>{RISK_LABEL[risk.level]}</Badge>
-              </span>
-              <span className="sr-only">Risk: {risk.reason}</span>
+              {/* Only a state worth flagging gets a tag — a plain outpatient has none. */}
+              {risk.level !== 'Normal' ? (
+                <>
+                  <span title={risk.reason}>
+                    <Badge tone={RISK_TONE[risk.level]}>{risk.label}</Badge>
+                  </span>
+                  <span className="sr-only">Risk: {risk.reason}</span>
+                </>
+              ) : null}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-ink-muted">
               <button
@@ -78,13 +86,22 @@ export function PatientHeader({
           </div>
         </div>
 
+        {/* Schedule first, then Admit (or Discharge), then Payment History — each in its own colour. */}
         <div className="flex shrink-0 flex-wrap gap-2">
-          <Action icon={CalendarPlus} label="Schedule Appointment" onClick={actions.schedule} />
+          <Action icon={CalendarPlus} label="Schedule Appointment" hue={HUES.blue} onClick={actions.schedule} />
           {inpatient ? (
-            <Action icon={LogOut} label="Discharge" onClick={actions.discharge} />
+            <Action icon={LogOut} label="Discharge" hue={HUES.red} onClick={actions.discharge} />
           ) : (
-            <Action icon={BedDouble} label="Admit" onClick={actions.admit} />
+            <Action icon={BedDouble} label="Admit" hue={HUES.orange} onClick={actions.admit} />
           )}
+          <Action
+            icon={IndianRupee}
+            label="Payment History"
+            hue={HUES.green}
+            onClick={actions.togglePayments}
+            pressed={paymentsOpen}
+            title={paymentsOpen ? 'Hide payment history' : 'Show payment history'}
+          />
         </div>
       </div>
       {/* Contact and ABHA across the full width, lined up under the name. */}
@@ -95,11 +112,48 @@ export function PatientHeader({
   )
 }
 
-function Action({ icon: Icon, label, onClick }: { icon: ElementType; label: string; onClick: () => void }) {
+/** One clearly different hue per action — blue, orange, green (red for Discharge). */
+const HUES = {
+  blue: '#2563eb',
+  orange: '#ea580c',
+  green: '#059669',
+  red: '#dc2626',
+}
+
+/** A header action in a light tint of its own hue with the hue's text, so the three read apart at a glance; pressed (Payment History open) is a deeper tint with a ring. */
+function Action({
+  icon: Icon,
+  label,
+  hue,
+  onClick,
+  pressed,
+  title,
+}: {
+  icon: ElementType
+  label: string
+  hue: string
+  onClick: () => void
+  pressed?: boolean
+  title?: string
+}) {
   return (
-    <Button size="md" variant="secondary" onClick={onClick} aria-label={label} title={label}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={pressed}
+      title={title ?? label}
+      style={{ '--tone': hue } as CSSProperties}
+      className={cn(
+        'focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors lg:min-h-10',
+        'border-[color-mix(in_oklab,var(--tone)_30%,var(--color-surface-1))] font-semibold text-[color-mix(in_oklab,var(--tone)_85%,var(--color-ink))] shadow-card-sm',
+        pressed
+          ? 'bg-[color-mix(in_oklab,var(--tone)_26%,var(--color-surface-1))] ring-2 ring-[color-mix(in_oklab,var(--tone)_35%,transparent)] ring-offset-1 ring-offset-[var(--color-surface-1)]'
+          : 'bg-[color-mix(in_oklab,var(--tone)_14%,var(--color-surface-1))] hover:bg-[color-mix(in_oklab,var(--tone)_22%,var(--color-surface-1))]',
+      )}
+    >
       <Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
       <span className="hidden sm:inline">{label}</span>
-    </Button>
+    </button>
   )
 }

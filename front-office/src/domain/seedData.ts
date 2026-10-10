@@ -157,7 +157,7 @@ export function createSeedState(): AppState {
     gender: d.gender,
     dateOfBirth: d.dateOfBirth,
     mobile: d.mobile,
-    email: `${d.handle}@shrimedical.mock`,
+    email: `${d.handle}@example.com`,
     department: d.department,
     specialty: d.specialty,
     qualification: d.qualification,
@@ -167,7 +167,7 @@ export function createSeedState(): AppState {
     consultationType: d.consultationType,
     consultationFee: d.consultationFee,
     room: d.room,
-    loginEmail: `${d.handle}@shrimedical.mock`,
+    loginEmail: `${d.handle}@example.com`,
     role: d.role,
     status: 'Active',
     schedule: { workingDays: ALL_DAYS, startTime: t(d.start), endTime: t(Math.max(d.end, d.start + 120 * MINUTE)), slotMinutes: d.slotMinutes, breaks: d.breaks ?? [] },
@@ -181,7 +181,7 @@ export function createSeedState(): AppState {
       gender: 'Male',
       dateOfBirth: '1974-03-12',
       mobile: '+91 98450 11020',
-      email: 'arun.kumar@shrimedical.mock',
+      email: 'arun.kumar@example.com',
       department: 'Neurology',
       specialty: 'Stroke & Neurology',
       qualification: 'MBBS, MD, DM (Neurology)',
@@ -191,7 +191,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient',
       consultationFee: 250,
       room: 'Room 12, Block B',
-      loginEmail: 'arun.kumar@shrimedical.mock',
+      loginEmail: 'arun.kumar@example.com',
       role: 'Consultant',
       status: 'Active',
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 15, breaks: [] },
@@ -203,7 +203,7 @@ export function createSeedState(): AppState {
       gender: 'Female',
       dateOfBirth: '1981-07-30',
       mobile: '+91 98451 33440',
-      email: 'priya.nair@shrimedical.mock',
+      email: 'priya.nair@example.com',
       department: 'Cardiology',
       specialty: 'Interventional Cardiology',
       qualification: 'MBBS, MD, DM (Cardiology)',
@@ -213,7 +213,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient + Teleconsult',
       consultationFee: 250,
       room: 'Room 4, Block A',
-      loginEmail: 'priya.nair@shrimedical.mock',
+      loginEmail: 'priya.nair@example.com',
       role: 'Consultant',
       status: 'Active',
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart + 30 * MINUTE), endTime: t(sessionEnd), slotMinutes: 15, breaks: [] },
@@ -225,7 +225,7 @@ export function createSeedState(): AppState {
       gender: 'Male',
       dateOfBirth: '1978-11-04',
       mobile: '+91 98452 77810',
-      email: 'rahul.menon@shrimedical.mock',
+      email: 'rahul.menon@example.com',
       department: 'General Medicine',
       specialty: 'Internal Medicine',
       qualification: 'MBBS, MD (General Medicine)',
@@ -235,7 +235,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient',
       consultationFee: 200,
       room: 'Room 2, Block A',
-      loginEmail: 'rahul.menon@shrimedical.mock',
+      loginEmail: 'rahul.menon@example.com',
       role: 'Consultant',
       status: 'Active',
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 15, breaks: [] },
@@ -247,7 +247,7 @@ export function createSeedState(): AppState {
       gender: 'Female',
       dateOfBirth: '1983-01-22',
       mobile: '+91 98453 90015',
-      email: 'meera.shah@shrimedical.mock',
+      email: 'meera.shah@example.com',
       department: 'Orthopedics',
       specialty: 'Joint Replacement',
       qualification: 'MBBS, MS (Orthopedics)',
@@ -257,7 +257,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient',
       consultationFee: 200,
       room: 'Room 8, Block C',
-      loginEmail: 'meera.shah@shrimedical.mock',
+      loginEmail: 'meera.shah@example.com',
       role: 'Consultant',
       status: 'Active',
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 20, breaks: [] },
@@ -269,7 +269,7 @@ export function createSeedState(): AppState {
       gender: 'Female',
       dateOfBirth: '1986-05-18',
       mobile: '+91 98454 20077',
-      email: 'ananya.rao@shrimedical.mock',
+      email: 'ananya.rao@example.com',
       department: 'Neurology',
       specialty: 'Epilepsy & Neurology',
       qualification: 'MBBS, MD, DM (Neurology)',
@@ -279,7 +279,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient',
       consultationFee: 200,
       room: 'Room 14, Block B',
-      loginEmail: 'ananya.rao@shrimedical.mock',
+      loginEmail: 'ananya.rao@example.com',
       role: 'Consultant',
       status: 'Active',
       schedule: {
@@ -299,7 +299,7 @@ export function createSeedState(): AppState {
       gender: 'Male',
       dateOfBirth: '1976-09-09',
       mobile: '+91 98455 61234',
-      email: 'vikram.das@shrimedical.mock',
+      email: 'vikram.das@example.com',
       department: 'General Medicine',
       specialty: 'Diabetology',
       qualification: 'MBBS, MD (General Medicine)',
@@ -309,7 +309,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient + Teleconsult',
       consultationFee: 300,
       room: 'Room 1, Block A',
-      loginEmail: 'vikram.das@shrimedical.mock',
+      loginEmail: 'vikram.das@example.com',
       role: 'Senior Consultant',
       status: 'Active',
       // Coarse 30-minute grid; every slot gets consumed below -> Fully booked.
@@ -322,7 +322,7 @@ export function createSeedState(): AppState {
       gender: 'Male',
       dateOfBirth: '1971-08-21',
       mobile: '+91 98451 30418',
-      email: 'raj.srinivas@shrimedical.mock',
+      email: 'raj.srinivas@example.com',
       department: 'Neurosurgery',
       specialty: 'Neurosurgeon',
       qualification: 'MBBS, MS, MCh (Neurosurgery)',
@@ -332,7 +332,7 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient',
       consultationFee: 300,
       room: 'Room 16, Block B',
-      loginEmail: 'raj.srinivas@shrimedical.mock',
+      loginEmail: 'raj.srinivas@example.com',
       role: 'Senior Consultant',
       status: 'Active',
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 20, breaks: [] },
@@ -344,8 +344,8 @@ export function createSeedState(): AppState {
       gender: 'Male',
       dateOfBirth: '1986-01-09',
       mobile: '+91 97890 44126',
-      email: 'logesh@shrimedical.mock',
-      department: 'Emergency Medicine',
+      email: 'logesh@example.com',
+      department: 'Emergency',
       specialty: 'Emergency Care Specialist',
       qualification: 'MBBS, MD (Emergency Medicine)',
       registrationNumber: 'TNMC-88214',
@@ -354,13 +354,13 @@ export function createSeedState(): AppState {
       consultationType: 'Outpatient',
       consultationFee: 200,
       room: 'Emergency Block, Bay 2',
-      loginEmail: 'logesh@shrimedical.mock',
+      loginEmail: 'logesh@example.com',
       role: 'Consultant',
       status: 'Active',
       schedule: { workingDays: ALL_DAYS, startTime: t(sessionStart), endTime: t(sessionEnd), slotMinutes: 15, breaks: [] },
       createdAt: minutesAgo(250 * 24 * 60),
     },
-    // Every department has at least three doctors (ten more below), so the
+    // Every department has at least five doctors (more below), so the
     // desk always has a real choice — the same records drive the directory,
     // booking, Doctor Availability and every filter.
     seedDoctor({
@@ -416,15 +416,88 @@ export function createSeedState(): AppState {
     }),
     seedDoctor({
       providerId: 'dr-arvind-shetty', name: 'Dr. Arvind Shetty', gender: 'Male', dateOfBirth: '1982-01-30', mobile: '+91 98464 71530', handle: 'arvind.shetty',
-      department: 'Emergency Medicine', specialty: 'Acute Medicine', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'KMC-58840', experienceYears: 12,
+      department: 'Emergency', specialty: 'Acute Medicine', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'KMC-58840', experienceYears: 12,
       employeeId: 'SHRI-DOC-033', consultationType: 'Outpatient', consultationFee: 200, room: 'Emergency Block, Bay 3', role: 'Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 310,
     }),
     seedDoctor({
       providerId: 'dr-swetha-venkat', name: 'Dr. Swetha Venkat', gender: 'Female', dateOfBirth: '1990-10-11', mobile: '+91 98465 08623', handle: 'swetha.venkat',
-      department: 'Emergency Medicine', specialty: 'Trauma Care', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'TNMC-93361', experienceYears: 6,
+      department: 'Emergency', specialty: 'Trauma Care', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'TNMC-93361', experienceYears: 6,
       employeeId: 'SHRI-DOC-053', consultationType: 'Outpatient', consultationFee: 150, room: 'Emergency Block, Bay 4', role: 'Associate Consultant',
       start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 95,
+    }),
+    // Two more for every department, so each has a fuller choice of doctors.
+    seedDoctor({
+      providerId: 'dr-kavitha-sundaram', name: 'Dr. Kavitha Sundaram', gender: 'Female', dateOfBirth: '1981-05-09', mobile: '+91 98466 31245', handle: 'kavitha.sundaram',
+      department: 'General Medicine', specialty: 'Internal Medicine', qualification: 'MBBS, MD (General Medicine)', registrationNumber: 'TNMC-71823', experienceYears: 13,
+      employeeId: 'SHRI-DOC-055', consultationType: 'Outpatient + Teleconsult', consultationFee: 200, room: 'Room 4, Block A', role: 'Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 260,
+    }),
+    seedDoctor({
+      providerId: 'dr-prakash-natarajan', name: 'Dr. Prakash Natarajan', gender: 'Male', dateOfBirth: '1976-08-21', mobile: '+91 98467 50982', handle: 'prakash.natarajan',
+      department: 'General Medicine', specialty: 'Infectious Diseases', qualification: 'MBBS, MD (General Medicine), FID', registrationNumber: 'TNMC-62047', experienceYears: 18,
+      employeeId: 'SHRI-DOC-056', consultationType: 'Outpatient', consultationFee: 250, room: 'Room 7, Block A', role: 'Senior Consultant',
+      start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 15, days: 640,
+    }),
+    seedDoctor({
+      providerId: 'dr-deepak-varma', name: 'Dr. Deepak Varma', gender: 'Male', dateOfBirth: '1984-03-12', mobile: '+91 98468 27713', handle: 'deepak.varma',
+      department: 'Emergency', specialty: 'Critical Care', qualification: 'MBBS, MD (Emergency Medicine), IDCCM', registrationNumber: 'KMC-61392', experienceYears: 11,
+      employeeId: 'SHRI-DOC-057', consultationType: 'Outpatient', consultationFee: 200, room: 'Emergency Block, Bay 5', role: 'Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 300,
+    }),
+    seedDoctor({
+      providerId: 'dr-lakshmi-priya', name: 'Dr. Lakshmi Priya', gender: 'Female', dateOfBirth: '1991-12-04', mobile: '+91 98469 64028', handle: 'lakshmi.priya',
+      department: 'Emergency', specialty: 'Toxicology & Emergency Care', qualification: 'MBBS, MD (Emergency Medicine)', registrationNumber: 'TNMC-95108', experienceYears: 5,
+      employeeId: 'SHRI-DOC-058', consultationType: 'Outpatient', consultationFee: 150, room: 'Emergency Block, Bay 6', role: 'Associate Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 15, days: 80,
+    }),
+    seedDoctor({
+      providerId: 'dr-karthik-raman', name: 'Dr. Karthik Raman', gender: 'Male', dateOfBirth: '1978-10-30', mobile: '+91 98470 18456', handle: 'karthik.raman',
+      department: 'Cardiology', specialty: 'Interventional Cardiology', qualification: 'MBBS, MD, DM (Cardiology)', registrationNumber: 'TNMC-58361', experienceYears: 17,
+      employeeId: 'SHRI-DOC-059', consultationType: 'Outpatient', consultationFee: 300, room: 'Room 8, Block A', role: 'Senior Consultant',
+      start: sessionStart + 60 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 700,
+    }),
+    seedDoctor({
+      providerId: 'dr-shalini-gupta', name: 'Dr. Shalini Gupta', gender: 'Female', dateOfBirth: '1987-02-17', mobile: '+91 98471 39287', handle: 'shalini.gupta',
+      department: 'Cardiology', specialty: 'Paediatric Cardiology', qualification: 'MBBS, MD (Paediatrics), DM (Cardiology)', registrationNumber: 'KMC-67520', experienceYears: 9,
+      employeeId: 'SHRI-DOC-060', consultationType: 'Outpatient + Teleconsult', consultationFee: 250, room: 'Room 11, Block A', role: 'Consultant',
+      start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 210,
+    }),
+    seedDoctor({
+      providerId: 'dr-vivek-chandran', name: 'Dr. Vivek Chandran', gender: 'Male', dateOfBirth: '1982-07-08', mobile: '+91 98472 70614', handle: 'vivek.chandran',
+      department: 'Neurology', specialty: 'Epilepsy', qualification: 'MBBS, MD, DM (Neurology)', registrationNumber: 'KMC-59973', experienceYears: 12,
+      employeeId: 'SHRI-DOC-061', consultationType: 'Outpatient', consultationFee: 250, room: 'Room 16, Block B', role: 'Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 20, days: 330,
+    }),
+    seedDoctor({
+      providerId: 'dr-anitha-george', name: 'Dr. Anitha George', gender: 'Female', dateOfBirth: '1986-11-25', mobile: '+91 98473 05539', handle: 'anitha.george',
+      department: 'Neurology', specialty: 'Stroke & Headache', qualification: 'MBBS, MD, DM (Neurology)', registrationNumber: 'TNMC-80264', experienceYears: 10,
+      employeeId: 'SHRI-DOC-062', consultationType: 'Outpatient + Teleconsult', consultationFee: 250, room: 'Room 19, Block B', role: 'Consultant',
+      start: sessionStart + 60 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 250,
+    }),
+    seedDoctor({
+      providerId: 'dr-rajesh-kannan', name: 'Dr. Rajesh Kannan', gender: 'Male', dateOfBirth: '1974-04-03', mobile: '+91 98474 82106', handle: 'rajesh.kannan',
+      department: 'Neurosurgery', specialty: 'Brain Tumour Surgery', qualification: 'MBBS, MS, MCh (Neurosurgery)', registrationNumber: 'TNMC-52689', experienceYears: 20,
+      employeeId: 'SHRI-DOC-063', consultationType: 'Outpatient', consultationFee: 350, room: 'Room 20, Block B', role: 'Senior Consultant',
+      start: sessionStart + 90 * MINUTE, end: sessionEnd, slotMinutes: 30, days: 780,
+    }),
+    seedDoctor({
+      providerId: 'dr-pooja-menon', name: 'Dr. Pooja Menon', gender: 'Female', dateOfBirth: '1989-06-14', mobile: '+91 98475 41873', handle: 'pooja.menon',
+      department: 'Neurosurgery', specialty: 'Functional Neurosurgery', qualification: 'MBBS, MS, MCh (Neurosurgery)', registrationNumber: 'KMC-68841', experienceYears: 7,
+      employeeId: 'SHRI-DOC-064', consultationType: 'Outpatient', consultationFee: 250, room: 'Room 21, Block B', role: 'Associate Consultant',
+      start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 140,
+    }),
+    seedDoctor({
+      providerId: 'dr-manoj-krishnan', name: 'Dr. Manoj Krishnan', gender: 'Male', dateOfBirth: '1979-09-19', mobile: '+91 98476 26450', handle: 'manoj.krishnan',
+      department: 'Orthopedics', specialty: 'Joint Replacement', qualification: 'MBBS, MS (Orthopaedics), FJRS', registrationNumber: 'TNMC-60715', experienceYears: 16,
+      employeeId: 'SHRI-DOC-065', consultationType: 'Outpatient', consultationFee: 300, room: 'Room 11, Block C', role: 'Senior Consultant',
+      start: sessionStart + 30 * MINUTE, end: sessionEnd, slotMinutes: 20, days: 560,
+    }),
+    seedDoctor({
+      providerId: 'dr-sneha-balaji', name: 'Dr. Sneha Balaji', gender: 'Female', dateOfBirth: '1990-01-27', mobile: '+91 98477 93162', handle: 'sneha.balaji',
+      department: 'Orthopedics', specialty: 'Paediatric Orthopaedics', qualification: 'MBBS, MS (Orthopaedics)', registrationNumber: 'KMC-70396', experienceYears: 6,
+      employeeId: 'SHRI-DOC-066', consultationType: 'Outpatient + Teleconsult', consultationFee: 200, room: 'Room 12, Block C', role: 'Associate Consultant',
+      start: sessionStart, end: sessionEnd, slotMinutes: 20, days: 110,
     }),
   ]
 
@@ -444,8 +517,8 @@ export function createSeedState(): AppState {
   const patients: Patient[] = [
     // In a bed now
     patient({ uhid: 'SHRI-0044120', name: 'Ramesh Babu', nameNative: 'ரமேஷ் பாபு', age: 64, sex: 'Male', mobile: '+91 98431 22456', address: '12 Raja Street, R.S. Puram, Coimbatore 641002', abhaId: 'ramesh.babu@abdm', createdAt: daysAgo(400) }),
-    patient({ uhid: 'SHRI-0069958', name: 'Abdul Rahman', nameNative: 'عبدالرحمن', age: 59, sex: 'Male', mobile: '+91 98422 70315', email: 'a.rahman@example.mock', address: '31 Big Bazaar Street, Town Hall, Coimbatore 641001', abhaId: 'abdul.rahman@abdm', createdAt: daysAgo(280) }),
-    patient({ uhid: 'SHRI-0102234', name: 'Anjali Menon', nameNative: 'അഞ്ജലി മേനോൻ', age: 29, sex: 'Female', mobile: '+91 99000 44310', email: 'anjali.menon@example.mock', address: '7 Lake View, Race Course, Coimbatore 641018', createdAt: daysAgo(90) }),
+    patient({ uhid: 'SHRI-0069958', name: 'Abdul Rahman', nameNative: 'عبدالرحمن', age: 59, sex: 'Male', mobile: '+91 98422 70315', email: 'a.rahman@example.com', address: '31 Big Bazaar Street, Town Hall, Coimbatore 641001', abhaId: 'abdul.rahman@abdm', createdAt: daysAgo(280) }),
+    patient({ uhid: 'SHRI-0102234', name: 'Anjali Menon', nameNative: 'അഞ്ജലി മേനോൻ', age: 29, sex: 'Female', mobile: '+91 99000 44310', email: 'anjali.menon@example.com', address: '7 Lake View, Race Course, Coimbatore 641018', createdAt: daysAgo(90) }),
     patient({ uhid: 'SHRI-0106392', name: 'Selvi Murugan', nameNative: 'செல்வி முருகன்', age: 71, sex: 'Female', mobile: '+91 98940 31876', address: '5 Kamarajar Street, Ganapathy, Coimbatore 641006', abhaId: '91-4410-2286-7731', createdAt: daysAgo(75) }),
     patient({ uhid: 'SHRI-0125590', name: 'Karthik Subramanian', nameNative: 'கார்த்திக் சுப்பிரமணியன்', age: 52, sex: 'Male', mobile: '+91 94440 66231', address: '88 Avinashi Road, Peelamedu, Coimbatore 641004', abhaId: 'karthik.s@abdm', createdAt: hoursAgo(21) }),
     patient({ uhid: 'SHRI-0129901', name: 'Mohan Raj', nameNative: 'மோகன் ராஜ்', age: 38, sex: 'Male', mobile: '+91 97890 22144', address: '19 Sathy Road, Saravanampatti, Coimbatore 641035', createdAt: minutesAgo(150) }),
@@ -458,15 +531,15 @@ export function createSeedState(): AppState {
     patient({ uhid: 'SHRI-0091133', name: 'R. Lakshmanan', nameNative: 'ஆர். லக்ஷ்மணன்', age: 58, sex: 'Male', mobile: '+91 98432 11987', address: '44 Gandhi Road, Peelamedu, Coimbatore 641004', abhaId: 'lakshmanan.r@abdm', aliases: ['laxmanan r', 'laxmanan'], createdAt: daysAgo(200) }),
     patient({ uhid: 'SHRI-0118934', name: 'Gopal Krishnan', nameNative: 'கோபால் கிருஷ்ணன்', age: 67, sex: 'Male', mobile: '+91 94433 50871', address: '3 Nehru Street, Ramanathapuram, Coimbatore 641045', createdAt: daysAgo(32) }),
     patient({ uhid: 'SHRI-0120338', name: 'Sunita Rao', age: 47, sex: 'Female', mobile: '+91 98860 20114', address: '3 Trichy Road, Sungam, Coimbatore 641045', createdAt: daysAgo(30) }),
-    patient({ uhid: 'SHRI-0117760', name: 'Harish Chandran', nameNative: 'ഹരീഷ് ചന്ദ്രൻ', age: 44, sex: 'Male', mobile: '+91 95669 04218', email: 'harish.c@example.mock', address: '27 Thadagam Road, Vadavalli, Coimbatore 641041', abhaId: '71-2093-5518-4402', createdAt: daysAgo(35) }),
-    patient({ uhid: 'SHRI-0124106', name: 'Arjun Prakash', age: 26, sex: 'Male', mobile: '+91 90807 44562', email: 'arjun.prakash@example.mock', address: '62 DB Road, R.S. Puram, Coimbatore 641002', abhaId: 'arjun.prakash@abdm', createdAt: daysAgo(12) }),
-    patient({ uhid: 'SHRI-0078812', name: 'Fatima Sheikh', nameNative: 'فاطمہ شیخ', age: 41, sex: 'Female', mobile: '+91 90441 55220', email: 'f.sheikh@example.mock', address: '9 Mill Road, Singanallur, Coimbatore 641005', abhaId: '34-1187-0043-9921', createdAt: daysAgo(260) }),
+    patient({ uhid: 'SHRI-0117760', name: 'Harish Chandran', nameNative: 'ഹരീഷ് ചന്ദ്രൻ', age: 44, sex: 'Male', mobile: '+91 95669 04218', email: 'harish.c@example.com', address: '27 Thadagam Road, Vadavalli, Coimbatore 641041', abhaId: '71-2093-5518-4402', createdAt: daysAgo(35) }),
+    patient({ uhid: 'SHRI-0124106', name: 'Arjun Prakash', age: 26, sex: 'Male', mobile: '+91 90807 44562', email: 'arjun.prakash@example.com', address: '62 DB Road, R.S. Puram, Coimbatore 641002', abhaId: 'arjun.prakash@abdm', createdAt: daysAgo(12) }),
+    patient({ uhid: 'SHRI-0078812', name: 'Fatima Sheikh', nameNative: 'فاطمہ شیخ', age: 41, sex: 'Female', mobile: '+91 90441 55220', email: 'f.sheikh@example.com', address: '9 Mill Road, Singanallur, Coimbatore 641005', abhaId: '34-1187-0043-9921', createdAt: daysAgo(260) }),
     patient({ uhid: 'SHRI-0129904', name: 'Ravi Shankar', age: 29, sex: 'Male', mobile: '+91 99520 61873', address: '8 Kalingarayan Street, Ram Nagar, Coimbatore 641009', createdAt: minutesAgo(20) }),
 
     // Booked for later today
     patient({ uhid: 'SHRI-0114479', name: 'Lakshmi Narayanan', nameNative: 'லட்சுமி நாராயணன்', age: 54, sex: 'Female', mobile: '+91 94860 15532', address: '11 Avarampalayam Road, Coimbatore 641006', abhaId: 'lakshmi.n@abdm', createdAt: daysAgo(45) }),
     patient({ uhid: 'SHRI-0125311', name: 'Deepa Krishnan', nameNative: 'தீபா கிருஷ்ணன்', age: 33, sex: 'Female', mobile: '+91 98653 27740', address: '45 Sowripalayam Road, Coimbatore 641028', createdAt: daysAgo(2) }),
-    patient({ uhid: 'SHRI-0129902', name: 'Nisha Varghese', nameNative: 'നിഷ വർഗീസ്', age: 31, sex: 'Female', mobile: '+91 97455 80213', email: 'nisha.v@example.mock', address: '4 Lawley Road, Coimbatore 641003', createdAt: minutesAgo(75) }),
+    patient({ uhid: 'SHRI-0129902', name: 'Nisha Varghese', nameNative: 'നിഷ വർഗീസ്', age: 31, sex: 'Female', mobile: '+91 97455 80213', email: 'nisha.v@example.com', address: '4 Lawley Road, Coimbatore 641003', createdAt: minutesAgo(75) }),
     // Duplicate of R. Lakshmanan: same mobile, transliterated name, registered
     // again today. getPossibleDuplicates() finds this from the data itself.
     patient({ uhid: 'SHRI-0129903', name: 'Laxmanan R', age: 58, sex: 'Male', mobile: '+91 98432 11987', address: '44 Gandhi Road, Peelamedu, Coimbatore 641004', createdAt: minutesAgo(52) }),
@@ -474,12 +547,12 @@ export function createSeedState(): AppState {
     // Dr. Vikram Das's full day
     patient({ uhid: 'SHRI-0057164', name: 'Senthil Kumar', nameNative: 'செந்தில் குமார்', age: 49, sex: 'Male', mobile: '+91 98944 10273', address: '22 Masakalipalayam Road, Peelamedu, Coimbatore 641004', abhaId: 'senthil.k@abdm', aliases: ['senthilkumar'], createdAt: daysAgo(330) }),
     patient({ uhid: 'SHRI-0063390', name: 'Meenakshi Sundaram', nameNative: 'மீனாட்சி சுந்தரம்', age: 62, sex: 'Female', mobile: '+91 94421 88306', address: '9 Sarojini Street, Ram Nagar, Coimbatore 641009', createdAt: daysAgo(300) }),
-    patient({ uhid: 'SHRI-0083041', name: 'Prakash Rao', nameNative: 'ಪ್ರಕಾಶ್ ರಾವ್', age: 57, sex: 'Male', mobile: '+91 98450 63117', email: 'prakash.rao@example.mock', address: '16 Bharathi Nagar, Ganapathy, Coimbatore 641006', abhaId: '56-3301-7745-1208', createdAt: daysAgo(240) }),
+    patient({ uhid: 'SHRI-0083041', name: 'Prakash Rao', nameNative: 'ಪ್ರಕಾಶ್ ರಾವ್', age: 57, sex: 'Male', mobile: '+91 98450 63117', email: 'prakash.rao@example.com', address: '16 Bharathi Nagar, Ganapathy, Coimbatore 641006', abhaId: '56-3301-7745-1208', createdAt: daysAgo(240) }),
     patient({ uhid: 'SHRI-0087576', name: 'Geetha Raman', nameNative: 'கீதா ராமன்', age: 50, sex: 'Female', mobile: '+91 99940 27165', address: '2 Thiruvenkatasamy Road, R.S. Puram, Coimbatore 641002', abhaId: 'geetha.raman@abdm', createdAt: daysAgo(220) }),
     patient({ uhid: 'SHRI-0095218', name: 'Shabana Begum', nameNative: 'شبانہ بیگم', age: 46, sex: 'Female', mobile: '+91 90037 41129', address: '7 Ukkadam Main Road, Coimbatore 641001', createdAt: daysAgo(170) }),
     patient({ uhid: 'SHRI-0098647', name: 'S. Kumaravel', nameNative: 'எஸ். குமரவேல்', age: 55, sex: 'Male', mobile: '+91 97877 52310', address: '40 Mettupalayam Road, Thudiyalur, Coimbatore 641034', createdAt: daysAgo(150) }),
     patient({ uhid: 'SHRI-0108815', name: 'Imran Basha', nameNative: 'عمران باشا', age: 41, sex: 'Male', mobile: '+91 98946 77021', address: '12 Karumbukadai Main Road, Coimbatore 641008', abhaId: 'imran.basha@abdm', createdAt: daysAgo(70) }),
-    patient({ uhid: 'SHRI-0116023', name: 'Uma Maheswari', nameNative: 'ఉమా మహేశ్వరి', age: 36, sex: 'Female', mobile: '+91 93453 60948', email: 'uma.m@example.mock', address: '18 Kovaipudur Main Road, Coimbatore 641042', abhaId: '88-5512-0937-6634', createdAt: daysAgo(40) }),
+    patient({ uhid: 'SHRI-0116023', name: 'Uma Maheswari', nameNative: 'ఉమా మహేశ్వరి', age: 36, sex: 'Female', mobile: '+91 93453 60948', email: 'uma.m@example.com', address: '18 Kovaipudur Main Road, Coimbatore 641042', abhaId: '88-5512-0937-6634', createdAt: daysAgo(40) }),
     patient({ uhid: 'SHRI-0048305', name: 'Joseph Thomas', nameNative: 'ജോസഫ് തോമസ്', age: 68, sex: 'Male', mobile: '+91 94473 50127', address: '6 Church Road, Podanur, Coimbatore 641023', createdAt: daysAgo(380) }),
 
     // Discharged
@@ -487,7 +560,7 @@ export function createSeedState(): AppState {
     patient({ uhid: 'SHRI-0125584', name: 'Naveen Chandra', age: 34, sex: 'Male', mobile: '+91 96007 18233', address: '91 Nanjundapuram Road, Coimbatore 641036', abhaId: 'naveen.chandra@abdm', createdAt: hoursAgo(23) }),
 
     // Registered a few minutes ago — nothing else yet
-    patient({ uhid: 'SHRI-0129905', name: 'Pooja Sharma', nameNative: 'पूजा शर्मा', age: 24, sex: 'Female', mobile: '+91 99766 31245', email: 'pooja.sharma@example.mock', address: '33 Avinashi Road, Hope College, Coimbatore 641004', createdAt: minutesAgo(8) }),
+    patient({ uhid: 'SHRI-0129905', name: 'Pooja Sharma', nameNative: 'पूजा शर्मा', age: 24, sex: 'Female', mobile: '+91 99766 31245', email: 'pooja.sharma@example.com', address: '33 Avinashi Road, Hope College, Coimbatore 641004', createdAt: minutesAgo(8) }),
   ]
 
   // Longitudinal records — registered from 2022 on, with visits since, and
@@ -552,7 +625,7 @@ export function createSeedState(): AppState {
       cancelReason: cancelled?.reason ?? null,
     }
     payments.push(bill)
-    for (const c of collections) logAt(c.at, 'Payment collected', `${name} · ${formatRupees(c.amount)} · ${c.method}`)
+    for (const c of collections) logAt(c.at, 'Payment received at the billing counter', `${name} · ${formatRupees(c.amount)} · ${c.method}`)
     for (const f of failed) logAt(f.at, 'Payment attempt failed', `${name} · ${formatRupees(f.amount)} · ${f.method} · ${f.reason}`)
     if (refund) logAt(refund.at, 'Payment refunded', `${name} · ${formatRupees(paid)}`)
     return bill
@@ -828,7 +901,7 @@ export function createSeedState(): AppState {
   const visits: Visit[] = []
   const queueTokens: QueueToken[] = []
   const tokenCounters: TokenCounters = { NEU: 0, CAR: 0, MED: 0, ORT: 0, NSG: 0, EMG: 0 }
-  const PREFIX: Record<string, string> = { Neurology: 'NEU', Cardiology: 'CAR', 'General Medicine': 'MED', Orthopedics: 'ORT', Neurosurgery: 'NSG', 'Emergency Medicine': 'EMG' }
+  const PREFIX: Record<string, string> = { Neurology: 'NEU', Cardiology: 'CAR', 'General Medicine': 'MED', Orthopedics: 'ORT', Neurosurgery: 'NSG', 'Emergency': 'EMG' }
   encounters.sort((a, b) => a.arrival - b.arrival)
   encounters.forEach((encounter, index) => {
     const visitId = `visit-${index + 1}`
@@ -986,8 +1059,8 @@ export function createSeedState(): AppState {
   const todayAt = (minutesBack: number) => Math.max(dayStart + 5 * MINUTE, minutesAgo(minutesBack))
   const visitingDoctorAt = todayAt(110)
   const engineerAt = todayAt(45)
-  logAt(visitingDoctorAt, 'Guest pass printed', 'GP/VDR/105 · Anand Krishnan · for Dr. Arun Kumar · confirmed with Dr. Arun Kumar')
-  logAt(engineerAt, 'Guest pass printed', 'GP/STF/106 · Suresh Babu · for Prakash Natarajan · confirmed with Prakash Natarajan')
+  logAt(visitingDoctorAt, 'Guest pass printed', 'GP/VDR/105 · Anand Krishnan · for Dr. Arun Kumar · confirmed with the host')
+  logAt(engineerAt, 'Guest pass printed', 'GP/STF/106 · Suresh Babu · for Prakash Natarajan · confirmed with the host')
   const guestPasses: GuestPass[] = [
     visitorPass(101, 'SHRI-0052719', afterAdmission('SHRI-0052719', 30), stayOf('SHRI-0052719').dischargedAt),
     visitorPass(102, 'SHRI-0069958', daysAgo(2) - 2 * HOUR, null),
@@ -1155,7 +1228,7 @@ export function createSeedState(): AppState {
     { code: 'CONS-CAR', name: 'Cardiology consultation', department: 'Cardiology', rate: 250 },
     { code: 'CONS-ORT', name: 'Orthopedics consultation', department: 'Orthopedics', rate: 200 },
     { code: 'CONS-NSG', name: 'Neurosurgery consultation', department: 'Neurosurgery', rate: 300 },
-    { code: 'CONS-EMG', name: 'Emergency medicine consultation', department: 'Emergency Medicine', rate: 200 },
+    { code: 'CONS-EMG', name: 'Emergency medicine consultation', department: 'Emergency', rate: 200 },
     { code: 'INV-ECG', name: 'ECG', department: 'Cardiology', rate: 350 },
     { code: 'INV-ECHO', name: '2D Echocardiogram', department: 'Cardiology', rate: 2400 },
     { code: 'INV-MRI-B', name: 'MRI Brain (plain)', department: 'Neurology', rate: 7500 },

@@ -41,11 +41,7 @@ export function BillAtCounter({ paymentId, className, readOnly = false }: { paym
         <BillStatusBadge payment={bill} />
       </div>
       <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-        <p className="text-xs text-ink-muted">
-          {due
-            ? `${bill.patientName} pays ${formatRupees(bill.balance)} at the billing counter.`
-            : `Paid at the billing counter — thank you, ${bill.patientName}.`}
-        </p>
+        {due ? <p className="text-xs text-ink-muted">{formatRupees(bill.balance)} due</p> : null}
         {due && !readOnly ? (
           <Button size="xs" variant="secondary" onClick={() => printBill(bill.paymentId)}>
             <Printer className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />

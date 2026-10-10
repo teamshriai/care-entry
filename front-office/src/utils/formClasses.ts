@@ -8,6 +8,10 @@ export const inputClass =
  *  composed with `inputClass` (cn() concatenates; it does not merge). */
 export const errorClass = 'border-critical-fg/50! focus:ring-critical-fg/35!'
 
+/** The same error edge for every control inside a marked field's wrapper —
+ *  for forms whose fields are drawn by a shared wrapper rather than one by one. */
+export const errorWithinClass = '[&_input]:border-critical-fg/50! [&_select]:border-critical-fg/50! [&_textarea]:border-critical-fg/50!'
+
 /** Field label, required mark and hint (§10.2). */
 export const labelClass = 'mb-1.5 flex items-center gap-1 text-sm font-medium text-ink-muted'
 export const hintClass = 'mt-1 text-xs text-ink-subtle'

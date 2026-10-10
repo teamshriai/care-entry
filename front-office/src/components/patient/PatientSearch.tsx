@@ -318,7 +318,7 @@ function PatientRow({
         {flags && flags.due > 0 ? (
           <span
             className={cn('flex items-center gap-0.5 text-xs font-semibold tabular-nums', flags.failed ? 'text-critical-fg' : 'text-warning-fg')}
-            title={flags.failed ? 'Payment failed' : 'Payment due'}
+            title={flags.failed ? 'Payment failed' : 'Payment pending'}
           >
             <IndianRupee className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
             <span className="sr-only">{flags.failed ? 'Payment failed,' : 'Payment pending,'}</span>

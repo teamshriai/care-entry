@@ -47,7 +47,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 
-import { KIND_LABEL, duration, hourLine, isActivity, range12, span12, time12, type ActivityKind, type DayModel, type TimelineItem } from './dayModel'
+import { KIND_LABEL, duration, hourLine, isActivity, range12, span12, time12, type ActivityKind, type DayModel, type Span, type TimelineItem } from './dayModel'
 import './dayTimeline.css'
 
 /** The row's scale on every screen: twelve hours are about 1,330px, before the short stretches widen. */
@@ -126,6 +126,14 @@ function minOf(s: Scale, f: number): number {
   return s.mins[i] + (b > a ? ((Math.min(Math.max(f, a), b) - a) / (b - a)) * (s.mins[i + 1] - s.mins[i]) : 0)
 }
 
+/** A plain linear scale: every minute the same width — rows that share one axis. */
+function linearScale([r0, r1]: Span): Scale {
+  return { mins: [r0, r1], fracs: [0, 1] }
+}
+
+/** The narrowest a booked patient's bar is drawn, in px. */
+const BOOKED_MIN_PX = 48
+
 const at = (s: Scale, min: number) => `${fracOf(s, min) * 100}%`
 const between = (s: Scale, a: number, b: number) => `${(fracOf(s, b) - fracOf(s, a)) * 100}%`
 
@@ -135,8 +143,14 @@ export function DayTimeline({
   onOpen,
   onSchedule,
   onBlocked,
+  fit = false,
+  hideAxis = false,
 }: {
   model: DayModel
+  /** Fit the width with a linear scale (no sideways scroll) — to line up with a shared axis. */
+  fit?: boolean
+  /** No hours or Now label of its own: a shared DayTimelineAxis above names them. */
+  hideAxis?: boolean
   /** The OPD queue's next patient, today — named when hovering the OPD on now. */
   nextPatient?: { name: string; token: string }
   /** An activity tapped. Without it, activities are drawn but not buttons. */
@@ -149,9 +163,9 @@ export function DayTimeline({
   const wrapRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
-  const minW = widthFor(model)
+  const minW = fit ? 0 : widthFor(model)
   const [w, setW] = useState(minW)
-  const scale = scaleFor(model, Math.max(w, minW))
+  const scale = fit ? linearScale(model.range) : scaleFor(model, Math.max(w, minW))
   const [hover, setHover] = useState<{ min: number; x: number; top: number; left: number } | null>(null)
 
   useEffect(() => {
@@ -211,10 +225,12 @@ export function DayTimeline({
   const hovered = hover ? under(hover.min) : undefined
 
   return (
-    <div ref={wrapRef} className="dtl">
+    <div ref={wrapRef} className="dtl" data-compact={hideAxis ? '' : undefined}>
       <div ref={scrollRef} className="dtl-scroll">
         <div className="dtl-track" style={{ minWidth: minW + 52 }}>
           <div className="dtl-inner">
+            {hideAxis ? null : (
+            <>
             {/* Now, named above the hours. */}
             <div className="dtl-now-head" aria-hidden="true">
               {model.now !== null && (
@@ -238,6 +254,8 @@ export function DayTimeline({
               })}
             </div>
             <Ticks marks={marks} scale={scale} />
+            </>
+            )}
 
             {/* The row. */}
             <div ref={rowRef} onPointerMove={onMove} onPointerLeave={() => setHover(null)} className="dtl-row">
@@ -291,7 +309,16 @@ function Ticks({ marks, scale }: { marks: number[]; scale: Scale }) {
 
 /** One bar: an activity, free time, a break or blocked time — a button where it does something and is wide enough to tap. */
 function Bar({ item, scale, px, onOpen, onTap }: { item: TimelineItem; scale: Scale; px: number; onOpen?: (item: TimelineItem) => void; onTap: (item: TimelineItem, clientX?: number) => void }) {
-  const place: CSSProperties = { left: `calc(${at(scale, item.start)} + 2px)`, width: `calc(${between(scale, item.start, item.drawEnd)} - 4px)` }
+  const span = between(scale, item.start, item.drawEnd)
+  // A booked patient is often a short slot: drawn at least BOOKED_MIN_PX wide, still centred on its time.
+  const place: CSSProperties =
+    item.kind === 'patient'
+      ? {
+          left: `calc(${at(scale, item.start)} + ${span} / 2 - max(${span} - 4px, ${BOOKED_MIN_PX}px) / 2)`,
+          width: `max(calc(${span} - 4px), ${BOOKED_MIN_PX}px)`,
+          zIndex: 1,
+        }
+      : { left: `calc(${at(scale, item.start)} + 2px)`, width: `calc(${span} - 4px)` }
   const when = range12(item.start, item.end)
   /** Anything drawn is tapped — a sliver too thin to see is not drawn as a control. */
   const tappable = px >= 2
@@ -328,7 +355,7 @@ function Bar({ item, scale, px, onOpen, onTap }: { item: TimelineItem; scale: Sc
   }
 
   if (item.kind === 'free') {
-    if (item.past) return <span aria-hidden="true" title={`${item.title} · ${when} · gone`} className="dtl-bar dtl-free-gone" style={place} />
+    if (item.past) return <span aria-hidden="true" title={`${item.title} · ${when} · time passed`} className="dtl-bar dtl-free-gone" style={place} />
     // A picture, not words: + where a patient can be scheduled, a clock with + in extra hours.
     const words = <Icon icon={item.extra ? ClockPlus : Plus} size={18} strokeWidth={2.25} />
     return tappable ? (
@@ -397,8 +424,8 @@ function HoverCard({ min, item, next, nextPatient, style }: { min: number; item?
   const what =
     item.kind === 'free'
       ? item.past
-        ? { dot: 'var(--dtl-line-strong)', name: 'Free', aside: 'gone' }
-        : { dot: 'var(--avail-edge)', name: item.extra ? 'Available · extra hours' : 'Available', aside: `${left} min free` }
+        ? { dot: 'var(--dtl-line-strong)', name: 'Time passed', aside: 'Not bookable' }
+        : { dot: 'var(--avail-edge)', name: item.extra ? 'Available · extra hours' : 'Available', aside: `${left} min available` }
       : item.kind === 'break'
         ? { dot: 'var(--off-hatch)', name: 'Break', aside: 'Not bookable' }
         : item.kind === 'blocked'
@@ -420,14 +447,14 @@ function HoverCard({ min, item, next, nextPatient, style }: { min: number; item?
         {nextPatient ? (
           <>
             <span className="dtl-card-next-what">
-              Next patient: <b>{nextPatient.name}</b>
+              Upcoming patient: <b>{nextPatient.name}</b>
             </span>
             <span className="dtl-card-next-when">{nextPatient.token}</span>
           </>
         ) : next ? (
           <>
             <span className="dtl-card-next-what">
-              Next: <b>{next.activity?.iconOnly ? 'Not bookable' : next.title}</b>
+              After this: <b>{next.activity?.iconOnly ? 'Not bookable' : next.title}</b>
             </span>
             <span className="dtl-card-next-when">{time12(next.start)}</span>
           </>
@@ -476,6 +503,12 @@ export function DayTimelineKey({ model }: { model: DayModel }) {
             {model.items.some((i) => i.kind === 'blocked' && !i.block?.allDay) ? 'Blocked' : 'Leave'}
           </span>
         )}
+        {model.items.some((i) => i.kind === 'free' && i.past) && (
+          <span className="dtl-key-item">
+            <span className="dtl-swatch-gone" />
+            Time passed
+          </span>
+        )}
         {has('break') && (
           <span className="dtl-key-item">
             <span className="dtl-swatch-off" />
@@ -484,19 +517,66 @@ export function DayTimelineKey({ model }: { model: DayModel }) {
         )}
       </div>
       <p className="dtl-totals">
-        Busy <b>{duration(model.busyMin)}</b> · Free <b>{duration(model.freeMin)}</b>
-        {model.nextFree !== null && (
-          <>
-            {' '}
-            · Next free <b>{time12(model.nextFree)}</b>
-          </>
-        )}
+        Busy <b>{duration(model.busyMin)}</b> · Available <b>{duration(model.freeMin)}</b>
       </p>
       <ul className="dtl-sr" aria-label="Hour by hour">
         {model.cells.map((c) => (
           <li key={c.start}>{hourLine(c)}</li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+/**
+ * The hours and the Now label alone, for rows drawn with `fit` and `hideAxis`
+ * underneath — so one axis can stay put while the rows scroll. It is laid out
+ * exactly like a DayTimeline, so the hours land above the same minutes.
+ */
+export function DayTimelineAxis({ range, now }: { range: Span; now: number | null }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setW(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const scale = linearScale(range)
+  const marks = Array.from({ length: (range[1] - range[0]) / 30 + 1 }, (_, i) => range[0] + i * 30)
+  const perHalfHour = (w * 30) / Math.max(1, range[1] - range[0])
+  const shown = marks.filter((m) => m % 60 === 0 || perHalfHour >= 40)
+  const onAxis = now !== null && now >= range[0] && now <= range[1]
+  const nowSide = onAxis && now! > range[1] - 90 ? 'left' : 'right'
+  return (
+    <div className="dtl" aria-hidden="true">
+      <div className="dtl-scroll">
+        <div className="dtl-track">
+          <div ref={ref} className="dtl-inner">
+            <div className="dtl-now-head">
+              {onAxis ? (
+                <span className="dtl-now-label" data-side={nowSide} style={{ left: at(scale, now!) }}>
+                  <span>Now</span>
+                  <span>{time12(now!)}</span>
+                </span>
+              ) : null}
+            </div>
+            <div className="dtl-hours">
+              {shown.map((m) => {
+                const t = time12(m)
+                return (
+                  <span key={m} className="dtl-hour" data-whole={m % 60 === 0 ? '' : undefined} style={{ left: at(scale, m) }}>
+                    <span>{t.slice(0, -3)}</span>
+                    <span className="dtl-hour-period">{t.slice(-2)}</span>
+                  </span>
+                )
+              })}
+            </div>
+            <Ticks marks={marks} scale={scale} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

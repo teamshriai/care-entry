@@ -9,7 +9,7 @@ const DEPARTMENT_ICON: Record<string, ElementType> = {
   'General Medicine': Stethoscope,
   Orthopedics: Bone,
   Neurosurgery: Brain,
-  'Emergency Medicine': Siren,
+  'Emergency': Siren,
 }
 
 /** Each department's own hue — its tile, the same everywhere it appears. */
@@ -19,7 +19,7 @@ const DEPARTMENT_TONE: Record<string, IconTone> = {
   'General Medicine': 'teal',
   Orthopedics: 'amber',
   Neurosurgery: 'indigo',
-  'Emergency Medicine': 'red',
+  'Emergency': 'red',
 }
 
 export function departmentIcon(department: string): ElementType {

@@ -3,9 +3,9 @@
 // day tabs and the next free time always agree.
 import type { AppState } from '../types/store'
 import type { SlotBoardEntry } from '../types/appointment'
-import { minus, minutesFrom } from '../components/dayTimeline/dayModel'
+import { dayModel, minus, minutesFrom } from '../components/dayTimeline/dayModel'
 import type { DayActivity, DayBlock, DayInput, Span } from '../components/dayTimeline/dayModel'
-import { addDaysToKey, getAvailableSlots, getDoctorSchedule, getPatientById, getQueueView, getSlotBoard } from './selectors'
+import { addDaysToKey, getAvailableSlots, getDoctorDateStrip, getDoctorSchedule, getPatientById, getQueueView, getSlotBoard } from './selectors'
 import type { FreeSlot } from './selectors'
 import { dayStartTimestamp } from './time'
 
@@ -144,4 +144,47 @@ export function getNextFreeSlotFrom(state: AppState, providerId: string, now: nu
     if (first) return { date: day, slot: first }
   }
   return null
+}
+
+/** The active doctors of a department. */
+function departmentDoctors(state: AppState, department: string) {
+  return state.providers.filter((p) => p.department === department && p.status === 'Active')
+}
+
+/** A department's days for the booking page's one date row: each day with how
+ *  many slots its doctors still have free in all. */
+export function getDepartmentDateStrip(state: AppState, department: string, now: number): { date: string; open: number }[] {
+  const strips = departmentDoctors(state, department).map((p) => getDoctorDateStrip(state, p.providerId, now))
+  if (strips.length === 0) return []
+  return strips[0].map((day, i) => ({ date: day.date, open: strips.reduce((n, strip) => n + (strip[i]?.open ?? 0), 0) }))
+}
+
+/** The hours that hold every doctor's day in a department on a date — one
+ *  time axis for all of them. 7 AM to 7 PM when nobody works that day. */
+export function getDepartmentDayRange(state: AppState, department: string, now: number, date: string): [number, number] {
+  const ranges = departmentDoctors(state, department)
+    .map((p) => getDoctorDay(state, p.providerId, now, date))
+    .filter((d) => d.work.length > 0)
+    .map((d) => dayModel(d.input).range)
+  if (ranges.length === 0) return [7 * 60, 19 * 60]
+  return [Math.min(...ranges.map((r) => r[0])), Math.max(...ranges.map((r) => r[1]))]
+}
+
+/** The date row for any set of doctors (the Doctors page shows several
+ *  departments at once): each day with how many slots they have free in all. */
+export function getDoctorsDateStrip(state: AppState, providerIds: string[], now: number): { date: string; open: number }[] {
+  const strips = providerIds.map((id) => getDoctorDateStrip(state, id, now))
+  if (strips.length === 0) return []
+  return strips[0].map((day, i) => ({ date: day.date, open: strips.reduce((n, strip) => n + (strip[i]?.open ?? 0), 0) }))
+}
+
+/** The hours that hold every listed doctor's day on a date — one time axis for
+ *  all of them. 7 AM to 7 PM when none of them works that day. */
+export function getDoctorsDayRange(state: AppState, providerIds: string[], now: number, date: string): [number, number] {
+  const ranges = providerIds
+    .map((id) => getDoctorDay(state, id, now, date))
+    .filter((d) => d.work.length > 0)
+    .map((d) => dayModel(d.input).range)
+  if (ranges.length === 0) return [7 * 60, 19 * 60]
+  return [Math.min(...ranges.map((r) => r[0])), Math.max(...ranges.map((r) => r[1]))]
 }

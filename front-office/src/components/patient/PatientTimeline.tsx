@@ -1,16 +1,17 @@
 import type { CSSProperties, ElementType } from 'react'
 import { Link } from 'react-router-dom'
-import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogOut, MoreHorizontal, Stethoscope, Ticket, UserPlus, Video, XCircle } from 'lucide-react'
+import { BedDouble, CalendarClock, FileWarning, IdCard, IndianRupee, LogOut, Printer, Stethoscope, Ticket, UserPlus, Video, XCircle } from 'lucide-react'
 import { Card, CardHeader } from '../ui/Card'
 import { Badge } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { CheckInToggle } from '../appointment/CheckInToggle'
 import { EmptyState } from '../ui/EmptyState'
-import { BILL_STATUS_LABEL, BILL_STATUS_TONE } from '../../utils/billing'
+import { BILL_STATUS_LABEL, BILL_STATUS_TONE, formatRupees } from '../../utils/billing'
 import { appointmentStatusLabel } from '../../utils/appointment'
 import { relativeDayLabel, formatDateKey } from '../../utils/dates'
 import { formatClock } from '../../utils/format'
 import { formatTime, todayKey } from '../../domain/time'
+import { printBill } from '../../utils/printBill'
 import type { PatientTimeline as Timeline, TimelineKind, UpcomingItem } from '../../domain/patientSelectors'
 import type { BillDisplayStatus } from '../../types/payment'
 
@@ -47,29 +48,31 @@ const KIND_HUE: Record<TimelineKind, string> = {
 export function PatientTimeline({
   timeline,
   today,
-  onChangeBooking,
+  onReschedule,
+  onCancel,
 }: {
   timeline: Timeline
   today: string
-  /** Opens the reschedule-or-cancel choice for a confirmed booking. */
-  onChangeBooking: (appointmentId: string) => void
+  /** Moves a booking to another time. `unpaid`: nothing has been paid for it yet. */
+  onReschedule: (appointmentId: string, unpaid: boolean) => void
+  /** Cancels a booking. `unpaid`: nothing has been paid for it yet. */
+  onCancel: (appointmentId: string, unpaid: boolean) => void
 }) {
   return (
     <Card accentTone="info" className="min-w-0">
-      <CardHeader icon={CalendarClock} iconTone="info" title="Timeline" subtitle="Visits and admissions — newest first" />
+      <CardHeader icon={CalendarClock} iconTone="info" title="Visit History" />
 
-      <section aria-label="Today and upcoming" className="border-t border-border-soft">
-        <h3 className="px-5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Today &amp; upcoming</h3>
-        {timeline.upcoming.length === 0 ? (
-          <p className="px-5 pb-4 text-sm text-ink-muted">Nothing booked. Schedule Appointment books an appointment.</p>
-        ) : (
+      {/* Today & upcoming shows only when something is booked — no empty message. */}
+      {timeline.upcoming.length > 0 ? (
+        <section aria-label="Today and upcoming" className="border-t border-border-soft">
+          <h3 className="px-5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">Today &amp; upcoming</h3>
           <ul className="divide-y divide-border-soft">
             {timeline.upcoming.map((item) => (
-              <UpcomingRow key={item.id} item={item} today={today} onChangeBooking={onChangeBooking} />
+              <UpcomingRow key={item.id} item={item} today={today} onReschedule={onReschedule} onCancel={onCancel} />
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section aria-label="History" className="border-t border-border-soft">
         <h3 className="px-5 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wide text-ink-subtle">History</h3>
@@ -125,11 +128,13 @@ export function PatientTimeline({
 function UpcomingRow({
   item,
   today,
-  onChangeBooking,
+  onReschedule,
+  onCancel,
 }: {
   item: UpcomingItem
   today: string
-  onChangeBooking: (appointmentId: string) => void
+  onReschedule: (appointmentId: string, unpaid: boolean) => void
+  onCancel: (appointmentId: string, unpaid: boolean) => void
 }) {
   if (item.kind === 'walk-in') {
     return (
@@ -152,6 +157,9 @@ function UpcomingRow({
   const isToday = appointment.date === today
   const unpaid = (appointment.status === 'Payment Pending' || appointment.status === 'Scheduled') && bill && bill.balance > 0
   const tele = appointment.mode === 'Teleconsult'
+  // Booked but nothing paid yet: it can still be moved or dropped at once — an accidental tap undone.
+  const fresh = Boolean(unpaid && bill && bill.paidAmount === 0)
+  const canChange = fresh || appointment.status === 'Confirmed'
   return (
     <li className="flex flex-wrap items-center gap-3 px-5 py-3">
       <span className={tele ? 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-therapy-bg' : 'flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-info-bg'}>
@@ -174,22 +182,39 @@ function UpcomingRow({
       {appointment.status === 'Checked-in' && token ? (
         <Badge status={token.status}>{token.status}</Badge>
       ) : (
-        <Badge status={appointment.status}>{appointmentStatusLabel(appointment.status)}</Badge>
+        <Badge status={appointment.status}>
+          {appointmentStatusLabel(appointment.status)}
+          {/* What is still owed for this visit, paid at the billing counter. */}
+          {unpaid ? <span className="tabular-nums"> · {formatRupees(bill.balance)} due</span> : null}
+        </Badge>
       )}
-      {/* An unpaid booking can't be checked in yet; its bill is printed from Payment History. */}
+      {/* The bill to take to the billing counter — the booking is confirmed once it is paid. */}
+      {unpaid && bill ? (
+        <button
+          type="button"
+          onClick={() => printBill(bill.paymentId)}
+          aria-label="Print bill"
+          title="Print bill"
+          className="focus-ring flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-on-primary shadow-card-sm transition-colors hover:bg-primary-700"
+        >
+          <Printer className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      ) : null}
+      {/* An unpaid booking can't be checked in yet. */}
       {unpaid ? null : isToday ? (
         <CheckInToggle appointment={appointment} />
       ) : null}
-      {appointment.status === 'Confirmed' ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-label="Reschedule or cancel this booking"
-          title="Reschedule or cancel"
-          onClick={() => onChangeBooking(appointment.appointmentId)}
-        >
-          <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} />
-        </Button>
+      {canChange ? (
+        <div className="flex items-center gap-1.5">
+          <Button size="xs" variant="outline" onClick={() => onReschedule(appointment.appointmentId, fresh)}>
+            <CalendarClock className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+            Reschedule
+          </Button>
+          <Button size="xs" variant="outline" className="text-critical-fg" onClick={() => onCancel(appointment.appointmentId, fresh)}>
+            <XCircle className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
+            Cancel
+          </Button>
+        </div>
       ) : null}
     </li>
   )

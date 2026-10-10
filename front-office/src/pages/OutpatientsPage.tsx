@@ -35,19 +35,18 @@ import type { OutpatientFilter, OutpatientRow } from '../domain/outpatientSelect
 import { markNoShow } from '../domain/actions'
 import { CheckInToggle } from '../components/appointment/CheckInToggle'
 import { todayKey } from '../domain/time'
-import { formatClock } from '../utils/format'
 
 function readFilter(value: string | null): OutpatientFilter {
   return OUTPATIENT_FILTERS.includes(value as OutpatientFilter) ? (value as OutpatientFilter) : 'today'
 }
 
-const EMPTY: Record<OutpatientFilter, { title: string; description: string }> = {
-  today: { title: 'No outpatients today', description: 'Today’s bookings appear here.' },
-  'check-in': { title: 'Everyone booked has arrived', description: 'Paid bookings for today appear here until the patient checks in.' },
-  waiting: { title: 'Nobody is waiting', description: 'Checked-in patients appear here until the doctor calls them.' },
-  'with-doctor': { title: 'Nobody is with a doctor', description: 'Called patients and those in the room appear here.' },
-  done: { title: 'Nobody seen yet today', description: 'Finished visits, no-shows and cancellations appear here.' },
-  upcoming: { title: 'Nothing booked ahead', description: 'Bookings for the coming days appear here.' },
+const EMPTY_TITLE: Record<OutpatientFilter, string> = {
+  today: 'No outpatients today',
+  'check-in': 'Everyone booked has arrived',
+  waiting: 'Nobody is waiting',
+  'with-doctor': 'Nobody is with a doctor',
+  done: 'Nobody seen yet today',
+  upcoming: 'Nothing booked ahead',
 }
 
 /**
@@ -169,19 +168,18 @@ export function OutpatientsPage() {
   }
 
   const items: StatFilterItem<OutpatientFilter>[] = [
-    { key: 'today', label: 'Today', value: counts.today, context: 'Booked for today', tone: 'info', icon: CalendarClock },
-    { key: 'check-in', label: 'To check in', value: counts['check-in'], context: 'Booked, not here yet', tone: 'warning', icon: LogIn },
-    { key: 'waiting', label: 'Waiting for consultation', value: counts.waiting, context: 'Checked in', tone: 'purple', icon: UserCheck },
-    { key: 'with-doctor', label: 'With doctor', value: counts['with-doctor'], context: 'Called or in the room', tone: 'teal', icon: DoorOpen },
-    { key: 'done', label: 'Done today', value: counts.done, context: 'Seen or closed', tone: 'stable', icon: CheckCircle2 },
-    { key: 'upcoming', label: 'Upcoming', value: counts.upcoming, context: 'Booked for later days', tone: 'indigo', icon: CalendarDays },
+    { key: 'today', label: 'Today', value: counts.today, tone: 'info', icon: CalendarClock },
+    { key: 'check-in', label: 'To check in', value: counts['check-in'], tone: 'warning', icon: LogIn },
+    { key: 'waiting', label: 'Waiting for consultation', value: counts.waiting, tone: 'purple', icon: UserCheck },
+    { key: 'with-doctor', label: 'With doctor', value: counts['with-doctor'], tone: 'teal', icon: DoorOpen },
+    { key: 'done', label: 'Done today', value: counts.done, tone: 'stable', icon: CheckCircle2 },
+    { key: 'upcoming', label: 'Upcoming', value: counts.upcoming, tone: 'indigo', icon: CalendarDays },
   ]
 
   return (
     <div>
       <PageHeader
         title="Patients"
-        subtitle={`Outpatients — today's bookings, from arrival to the doctor's room · updated ${formatClock(now)}`}
         illustration={<AppointmentIllustration className="h-8 w-8" />}
         illustrationTone="info"
         tabs={<PatientsTabs />}
@@ -226,8 +224,7 @@ export function OutpatientsPage() {
             today={today}
             onOpenPatient={(patientId) => navigate(`/patients/${patientId}`)}
             renderActions={actionsFor}
-            emptyTitle={EMPTY[filter].title}
-            emptyDescription={EMPTY[filter].description}
+            emptyTitle={EMPTY_TITLE[filter]}
           />
         </Card>
       </div>

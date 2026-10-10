@@ -27,6 +27,7 @@ export interface RegisterPatientInput {
   sex: Sex | ''
   mobile: string
   abhaId?: string
+  address?: string
   /** An age of 100 or more has been confirmed with the patient. */
   ageConfirmed?: boolean
 }

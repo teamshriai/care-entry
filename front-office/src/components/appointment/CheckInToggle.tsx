@@ -50,7 +50,7 @@ export function CheckInToggle({
         }
       >
         {tele ? <Video className="h-3.5 w-3.5" strokeWidth={1.75} /> : <LogIn className="h-3.5 w-3.5" strokeWidth={1.75} />}
-        {tele ? 'Joined' : 'Check in'}
+        {tele ? 'Mark joined' : 'Check in'}
       </Button>
     )
   }
@@ -61,7 +61,7 @@ export function CheckInToggle({
         size="sm"
         variant="secondary"
         aria-pressed
-        title="Checked in · checked in by mistake? Click again to undo"
+        title="Checked in by mistake? Click again to undo"
         onClick={() =>
           run(() => {
             undoCheckIn(appointment.appointmentId)

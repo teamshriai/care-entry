@@ -29,12 +29,16 @@ function statusOf(row: OutpatientRow): { label: string; tone: Tone; note: string
       return {
         label: 'Waiting for consultation',
         tone: 'info',
-        note: token?.waitingMinutes != null ? `${token.waitingMinutes} min${token.position ? ` · ${ordinal(token.position)} in line` : ''}` : null,
+        // How long since check-in, and their place in the doctor's queue — in words.
+        note:
+          token?.waitingMinutes != null
+            ? `Waiting ${token.waitingMinutes} min${token.position ? ` · ${ordinal(token.position)} in queue` : ''}`
+            : null,
       }
     case 'called':
-      return { label: 'Called', tone: 'info', note: token?.calledMinutes != null ? `${token.calledMinutes} min ago` : null }
+      return { label: 'Called', tone: 'info', note: token?.calledMinutes != null ? `Called ${token.calledMinutes} min ago` : null }
     case 'in-room':
-      return { label: 'In room', tone: 'stable', note: token?.consultingMinutes != null ? `${token.consultingMinutes} min` : null }
+      return { label: 'In room', tone: 'stable', note: token?.consultingMinutes != null ? `In the room for ${token.consultingMinutes} min` : null }
     case 'done': {
       const word = token?.status === 'No-show' ? 'No-show' : token ? 'Completed' : row.appointment ? appointmentStatusLabel(row.appointment.status) : 'Completed'
       return { label: word, tone: word === 'Completed' ? 'stable' : word === 'Cancelled' || word === 'No-show' ? 'neutral' : 'info', note: null }
@@ -65,7 +69,7 @@ export function OutpatientList({
   onOpenPatient: (patientId: string) => void
   renderActions: (row: OutpatientRow) => ReactNode
   emptyTitle: string
-  emptyDescription: string
+  emptyDescription?: string
 }) {
   const care = usePatientCareStatus()
   if (rows.length === 0) {
@@ -77,15 +81,10 @@ export function OutpatientList({
         const status = statusOf(row)
         return (
           <li key={row.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors hover:bg-surface-2 sm:px-5">
-            <div className="w-24 shrink-0">
+            {/* Just the time — the booked slot, or a walk-in's arrival. */}
+            <div className="w-20 shrink-0">
               <p className="text-sm font-semibold tabular-nums text-ink">{formatTime(row.time)}</p>
-              <p className="truncate text-2xs tabular-nums text-ink-subtle">
-                {row.stage === 'upcoming'
-                  ? relativeDayLabel(row.date, today)
-                  : row.kind === 'walk-in'
-                    ? `Walk-in · ${row.token?.tokenNumber ?? ''}`
-                    : (row.token?.tokenNumber ?? 'Booked')}
-              </p>
+              {row.stage === 'upcoming' ? <p className="truncate text-2xs text-ink-subtle">{relativeDayLabel(row.date, today)}</p> : null}
             </div>
             <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
               {row.patient ? <Avatar name={row.patient.name} initials={initialsOf(row.patient.name)} size="sm" /> : null}

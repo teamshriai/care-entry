@@ -31,7 +31,7 @@ import { getOutpatients } from '../domain/outpatientSelectors'
 import { getPatientRows } from '../domain/patientSelectors'
 import { todayKey } from '../domain/time'
 import type { NeedsAttentionItem } from '../domain/selectors'
-import { getInpatientRows, getWardSummaries } from '../domain/admissionSelectors'
+import { getInpatientRows } from '../domain/admissionSelectors'
 import { returnGuestPass } from '../domain/actions'
 import { CheckInToggle } from '../components/appointment/CheckInToggle'
 import { formatRupees } from '../utils/billing'
@@ -66,7 +66,6 @@ export function FrontOfficeHomePage() {
   const billing = useStoreValue(getBillingOverview)
   const trends = useStoreValue(getTodayTrends, now)
   const inpatients = useStoreValue(getInpatientRows, now)
-  const wards = useStoreValue(getWardSummaries)
   const needsAttention = useStoreValue(getNeedsAttention, now)
   const outpatients = useStoreValue(getOutpatients, now, 'today', false, '')
   const patientRows = useStoreValue(getPatientRows)
@@ -75,9 +74,6 @@ export function FrontOfficeHomePage() {
 
   const booked = appointments.filter((a) => a.status !== 'Cancelled')
   const toCheckIn = appointments.filter((a) => a.status === 'Confirmed')
-  const longestWait = Math.max(0, ...queue.waiting.map((t) => t.waitingMinutes ?? 0))
-  const bedsFree = wards.reduce((sum, w) => sum + w.available, 0)
-  const critical = inpatients.filter((r) => r.admission.wardLabel === 'ICU' || r.admission.wardLabel === 'Emergency').length
   // Display order only: what is still to happen first (stable sort keeps time order).
   const isClosed = (status: string) => status === 'Completed' || status === 'Cancelled' || status === 'No-show'
   const todaysList = [...appointments].sort((a, b) => Number(isClosed(a.status)) - Number(isClosed(b.status)))
@@ -129,7 +125,7 @@ export function FrontOfficeHomePage() {
     <div>
       <PageHeader
         title="SHRI Health Care Entry"
-        subtitle={`${formatHeaderDateTime(new Date(now))} · every figure is derived from today's records`}
+        subtitle={formatHeaderDateTime(new Date(now))}
         pinActions
         actions={
           <Button onClick={() => navigate('/register/new')}>
@@ -150,7 +146,6 @@ export function FrontOfficeHomePage() {
             value={outpatients.counts.today}
             label="Outpatients today"
             trend={trends.APPOINTMENT_SCHEDULED}
-            hint={`${outpatients.counts['check-in']} to check in`}
             to="/patients/outpatients"
             title="Show everyone booked for today"
           />
@@ -160,7 +155,6 @@ export function FrontOfficeHomePage() {
             value={queue.waiting.length}
             label="Waiting for consultation"
             trend={trends.PATIENT_CHECKED_IN}
-            hint={queue.waiting.length ? `Longest ${longestWait} min` : 'Nobody waiting'}
             to="/patients/outpatients?filter=waiting"
             title="Show who is waiting for consultation"
           />
@@ -170,7 +164,6 @@ export function FrontOfficeHomePage() {
             value={inpatients.length}
             label="Inpatients"
             trend={trends.PATIENT_ADMITTED}
-            hint={`${critical} in ICU/ER · ${bedsFree} beds free`}
             to="/patients/inpatients"
             title="Show who is admitted, and the beds"
           />
@@ -180,7 +173,6 @@ export function FrontOfficeHomePage() {
             value={formatRupees(billing.dueAmount)}
             label="Payment pending today"
             trend={trends.PAYMENT_COMPLETED}
-            hint={`${billing.dueCount} ${billing.dueCount === 1 ? 'bill' : 'bills'}${billing.failedCount ? ` · ${billing.failedCount} failed` : ''}`}
             to="/billing?filter=due"
             title="Bills raised today still to pay at the billing counter — opens every bill with payment pending"
           />
@@ -190,7 +182,6 @@ export function FrontOfficeHomePage() {
             value={registeredToday}
             label="Registered today"
             trend={trends.PATIENT_REGISTERED}
-            hint="New patient records"
             to="/patients?filter=today"
             title="Show the patients registered today"
           />
@@ -242,7 +233,7 @@ export function FrontOfficeHomePage() {
             <Card accentTone="warning">
               <CardHeader icon={AlertTriangle} iconTone="warning" title="Needs attention" subtitle={`${needsAttention.length} open`} />
               {needsAttention.length === 0 ? (
-                <EmptyState title="Nothing needs attention" description="Outstanding front-desk tasks appear here." />
+                <EmptyState title="Nothing needs attention" />
               ) : (
                 <div className="flex flex-col gap-1.5 p-2.5 sm:p-3">
                   {needsAttention.slice(0, ATTENTION_ROWS).map((item) => {
